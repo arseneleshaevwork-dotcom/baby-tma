@@ -190,8 +190,19 @@ function renderSchedule(blocks,daySegs,p){
   // Tips
   document.getElementById('tipsBlock').innerHTML=`<div class="tips-title">💡 Советы для ${p.label}</div><ul>${getTips(_age).map(t=>`<li>${t}</li>`).join('')}</ul>`;
 
-  // Stats charts
-  renderStatCharts(p,daySegs);
+  // Stats charts — only if Chart.js loaded
+  if (typeof Chart !== 'undefined') {
+    renderStatCharts(p,daySegs);
+  } else {
+    // Retry once Chart.js loads async
+    var _chartRetry = setInterval(function(){
+      if (typeof Chart !== 'undefined') {
+        clearInterval(_chartRetry);
+        renderStatCharts(p,daySegs);
+      }
+    }, 200);
+    setTimeout(function(){ clearInterval(_chartRetry); }, 5000);
+  }
 }
 
 function renderStatCharts(p,daySegs){

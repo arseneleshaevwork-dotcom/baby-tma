@@ -5,10 +5,38 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Режим Малыша</title>
 <meta name="description" content="Научно обоснованный генератор режима дня для малыша">
+
+<!-- Critical inline CSS — рендерится мгновенно без внешних запросов -->
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:#07071a;color:#f1f5f9;font-family:-apple-system,system-ui,sans-serif}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 100% 40% at 50% 0%,rgba(139,92,246,.15),transparent);pointer-events:none;z-index:0}
+</style>
+
+<!-- Telegram SDK — синхронно, нужен до DOMContentLoaded -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<!-- Google Fonts — non-blocking (не блокирует рендер) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+
+<!-- Chart.js — async, не блокирует загрузку -->
+<script>
+(function(){
+  var s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+  s.async=true;
+  s.onerror=function(){
+    // Заглушка если Chart.js не загрузился
+    window.Chart=function(){return{destroy:function(){},update:function(){}};};
+    window.Chart.prototype={};
+    console.warn('Chart.js не загрузился, графики отключены');
+  };
+  document.head.appendChild(s);
+})();
+</script>
+
 <link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
