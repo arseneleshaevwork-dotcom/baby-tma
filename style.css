@@ -1,20 +1,59 @@
 /* ── Telegram Mini App — Baby Schedule ── */
+/* Design System v2 — based on ECC design-system + motion-ui skills */
 :root {
-  --tg-bg: var(--tg-theme-bg-color, #07071a);
-  --tg-sec: var(--tg-theme-secondary-bg-color, #12122a);
-  --tg-text: var(--tg-theme-text-color, #f1f5f9);
-  --tg-hint: var(--tg-theme-hint-color, #94a3b8);
-  --tg-link: var(--tg-theme-link-color, #818cf8);
-  --tg-btn: var(--tg-theme-button-color, #8b5cf6);
-  --tg-btn-text: var(--tg-theme-button-text-color, #ffffff);
-  --p1: #d946ef; --p2: #8b5cf6; --p3: #4f46e5;
-  --sleep: #6366f1; --feed: #f97316; --awake: #22c55e;
-  --hygiene: #0ea5e9; --walk: #db2777;
-  --muted: rgba(255,255,255,0.05);
-  --surf: rgba(255,255,255,0.08);
-  --border: rgba(255,255,255,0.12);
+  /* Telegram theme bridge */
+  --tg-bg:      var(--tg-theme-bg-color, #07071a);
+  --tg-sec:     var(--tg-theme-secondary-bg-color, #12122a);
+  --tg-text:    var(--tg-theme-text-color, #f1f5f9);
+  --tg-hint:    var(--tg-theme-hint-color, #94a3b8);
+  --tg-link:    var(--tg-theme-link-color, #818cf8);
+  --tg-btn:     var(--tg-theme-button-color, #8b5cf6);
+  --tg-btn-text:var(--tg-theme-button-text-color, #ffffff);
+
+  /* Semantic color palette — HSL for consistency */
+  --clr-primary:   #d946ef;  /* fuchsia-500 */
+  --clr-secondary: #8b5cf6;  /* violet-500  */
+  --clr-accent:    #4f46e5;  /* indigo-600  */
+  --clr-sleep:     #6366f1;  /* indigo-500  */
+  --clr-feed:      #f97316;  /* orange-500  */
+  --clr-awake:     #22c55e;  /* green-500   */
+  --clr-hygiene:   #0ea5e9;  /* sky-500     */
+  --clr-walk:      #db2777;  /* pink-600    */
+
+  /* Aliases kept for backward compat */
+  --p1: var(--clr-primary);
+  --p2: var(--clr-secondary);
+  --p3: var(--clr-accent);
+  --sleep: var(--clr-sleep);
+  --feed: var(--clr-feed);
+  --awake: var(--clr-awake);
+  --hygiene: var(--clr-hygiene);
+  --walk: var(--clr-walk);
+
+  /* Surfaces */
+  --surf:   rgba(255,255,255,0.07);
+  --surf-hi:rgba(255,255,255,0.11);
+  --border: rgba(255,255,255,0.11);
+  --muted:  rgba(255,255,255,0.04);
+
+  /* Layout */
   --radius: 16px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* 8pt spacing scale */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 16px;
+  --sp-4: 24px;
+  --sp-5: 32px;
+  --sp-6: 48px;
+
+  /* Motion tokens — ECC motion-ui skill */
+  --dur-fast:   150ms;
+  --dur-normal: 350ms;
+  --dur-slow:   600ms;
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-sharp:  cubic-bezier(0.4, 0, 0.2, 1);
 }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
@@ -59,19 +98,26 @@ body::before {
   justify-content:center; min-height:48px; padding:8px 4px;
   background:none; border:none; color:var(--tg-hint);
   font-size:.65rem; font-weight:600; font-family:inherit;
-  cursor:pointer; transition:color .2s ease, transform .15s ease; gap:2px;
-  touch-action: manipulation;
+  cursor:pointer; gap:var(--sp-1); touch-action:manipulation;
+  /* ECC motion-ui: fast+sharp for interactive feedback */
+  transition: color var(--dur-fast) var(--ease-sharp),
+              transform var(--dur-fast) var(--ease-sharp);
 }
 .bnav-item .icon { display:flex; align-items:center; justify-content:center; line-height:1; font-size:1.4rem; }
-.bnav-item .icon svg { transition: stroke .2s ease; }
-.bnav-item:active { transform: scale(.92); }
-.bnav-item.active { color:var(--p1); }
-.bnav-item.active .icon { filter:drop-shadow(0 0 8px rgba(217,70,239,.5)); }
+.bnav-item:active { transform:scale(.92); }
+.bnav-item.active { color:var(--clr-primary); }
+.bnav-item.active .icon { filter:drop-shadow(0 0 8px rgba(217,70,239,.45)); }
 
-/* ── PAGES ── */
-.page { display:none; padding:0 16px; position:relative; z-index:1; animation:fadeIn .25s var(--ease-out,ease); }
-.page.active { display:block; }
-@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+/* ── PAGES — smooth entry (ECC motion: communicate state) ── */
+.page { display:none; padding:0 var(--sp-3); position:relative; z-index:1; }
+.page.active {
+  display:block;
+  animation: pageIn var(--dur-normal) var(--ease-smooth) both;
+}
+@keyframes pageIn {
+  from { opacity:0; transform:translateY(10px); }
+  to   { opacity:1; transform:translateY(0); }
+}
 
 /* ── CARD ── */
 .card {
@@ -101,19 +147,29 @@ body::before {
 
 /* ── GENERATE BUTTON ── */
 .gen-btn {
-  width:100%; padding:16px; border:none; border-radius:16px;
-  background:linear-gradient(135deg,var(--p1),var(--p2),var(--p3));
+  width:100%; padding:var(--sp-3); border:none; border-radius:var(--radius);
+  background:linear-gradient(135deg,var(--clr-primary),var(--clr-secondary),var(--clr-accent));
   color:#fff; font-size:1rem; font-weight:700; font-family:inherit;
-  cursor:pointer; transition:transform .15s ease, box-shadow .2s ease;
-  position:relative; overflow:hidden; touch-action:manipulation;
-  box-shadow: 0 4px 20px rgba(139,92,246,.35);
-  min-height: 52px;
+  cursor:pointer; touch-action:manipulation; position:relative; overflow:hidden;
+  box-shadow: 0 4px 24px rgba(139,92,246,.4);
+  min-height:52px;
+  /* ECC motion-ui: normal+smooth for CTA */
+  transition: transform var(--dur-fast) var(--ease-sharp),
+              box-shadow var(--dur-normal) var(--ease-smooth);
 }
-.gen-btn:hover { box-shadow: 0 6px 28px rgba(139,92,246,.5); }
+.gen-btn:hover { box-shadow:0 6px 32px rgba(139,92,246,.55); }
 .gen-btn:active { transform:scale(.97); box-shadow:0 2px 12px rgba(139,92,246,.3); }
+/* Loading state */
+.gen-btn.loading { pointer-events:none; opacity:.75; }
+.gen-btn.loading::before {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.15) 50%,transparent 100%);
+  animation:shimmer 1.2s var(--ease-smooth) infinite;
+}
+@keyframes shimmer { from{transform:translateX(-100%)} to{transform:translateX(100%)} }
 .gen-btn::after {
   content:''; position:absolute; inset:0;
-  background:rgba(255,255,255,.12); opacity:0; transition:.15s;
+  background:rgba(255,255,255,.1); opacity:0; transition:opacity var(--dur-fast);
 }
 .gen-btn:active::after { opacity:1; }
 
@@ -145,28 +201,53 @@ body::before {
 .stat-card .val { font-size:1.6rem; font-weight:800; background:linear-gradient(135deg,#f9a8d4,#c084fc); -webkit-background-clip:text; -webkit-text-fill-color:transparent; line-height:1; }
 .stat-card .lbl { font-size:.62rem; color:var(--tg-hint); margin-top:4px; font-weight:500; text-transform:uppercase; letter-spacing:.04em; }
 
-/* ── TIMELINE ── */
+/* ── TIMELINE — ECC stagger reveal ── */
 .timeline { position:relative; }
-.tl-line { position:absolute; left:44px; top:0; bottom:0; width:2px; background:linear-gradient(to bottom,var(--p1),var(--p3),var(--sleep)); border-radius:2px; }
-.time-block { display:flex; gap:10px; align-items:flex-start; padding:11px 0; border-bottom:1px solid rgba(255,255,255,.05); }
+.tl-line { position:absolute; left:44px; top:0; bottom:0; width:2px; background:linear-gradient(to bottom,var(--clr-primary),var(--clr-accent),var(--clr-sleep)); border-radius:2px; }
+.time-block {
+  display:flex; gap:10px; align-items:flex-start; padding:11px 0;
+  border-bottom:1px solid rgba(255,255,255,.05);
+  /* ECC stagger: opacity+translateY, safe transform only */
+  animation: blockIn var(--dur-normal) var(--ease-smooth) both;
+}
+/* Stagger: max 0.08s per item (ECC rule: keep ≤ 0.1s to avoid sluggishness) */
+.time-block:nth-child(1)  { animation-delay: .00s; }
+.time-block:nth-child(2)  { animation-delay: .06s; }
+.time-block:nth-child(3)  { animation-delay: .12s; }
+.time-block:nth-child(4)  { animation-delay: .18s; }
+.time-block:nth-child(5)  { animation-delay: .24s; }
+.time-block:nth-child(6)  { animation-delay: .30s; }
+.time-block:nth-child(7)  { animation-delay: .36s; }
+.time-block:nth-child(n+8){ animation-delay: .40s; }
+@keyframes blockIn {
+  from { opacity:0; transform:translateX(-8px); }
+  to   { opacity:1; transform:translateX(0); }
+}
 .time-block:last-child { border-bottom:none; }
-.tb-time { min-width:40px; font-size:.7rem; font-weight:700; color:var(--p2); text-align:right; padding-top:2px; flex-shrink:0; letter-spacing:.02em; }
+.tb-time { min-width:40px; font-size:.7rem; font-weight:700; color:var(--clr-secondary); text-align:right; padding-top:2px; flex-shrink:0; letter-spacing:.02em; }
 .tb-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; margin-top:3px; z-index:1; position:relative; }
-.tb-dot.sleep { background:var(--sleep); box-shadow:0 0 7px var(--sleep); }
-.tb-dot.feed { background:var(--feed); box-shadow:0 0 7px var(--feed); }
-.tb-dot.active { background:var(--awake); box-shadow:0 0 7px var(--awake); }
-.tb-dot.hygiene { background:var(--hygiene); box-shadow:0 0 7px var(--hygiene); }
-.tb-dot.walk { background:var(--walk); box-shadow:0 0 7px var(--walk); }
+.tb-dot.sleep   { background:var(--clr-sleep);   box-shadow:0 0 7px var(--clr-sleep); }
+.tb-dot.feed    { background:var(--clr-feed);    box-shadow:0 0 7px var(--clr-feed); }
+.tb-dot.active  { background:var(--clr-awake);   box-shadow:0 0 7px var(--clr-awake); }
+.tb-dot.hygiene { background:var(--clr-hygiene); box-shadow:0 0 7px var(--clr-hygiene); }
+.tb-dot.walk    { background:var(--clr-walk);    box-shadow:0 0 7px var(--clr-walk); }
 .tb-content { flex:1; min-width:0; }
 .tb-top { display:flex; align-items:center; justify-content:space-between; gap:6px; }
 .tb-title { font-size:.88rem; font-weight:600; }
 .tb-note { font-size:.76rem; color:var(--tg-hint); margin-top:2px; line-height:1.4; }
 .tb-tag { display:inline-block; border-radius:5px; padding:2px 7px; font-size:.65rem; font-weight:600; margin-top:3px; }
-.tb-tag.sleep { background:rgba(129,140,248,.18); color:var(--sleep); }
-.tb-tag.feed { background:rgba(251,146,60,.18); color:var(--feed); }
-.tb-tag.active { background:rgba(74,222,128,.18); color:var(--awake); }
-.tb-tag.hygiene { background:rgba(56,189,248,.18); color:var(--hygiene); }
-.tb-tag.walk { background:rgba(244,114,182,.18); color:var(--walk); }
+.tb-tag.sleep   { background:rgba(99,102,241,.18);  color:var(--clr-sleep); }
+.tb-tag.feed    { background:rgba(249,115,22,.18);  color:var(--clr-feed); }
+.tb-tag.active  { background:rgba(34,197,94,.18);   color:var(--clr-awake); }
+.tb-tag.hygiene { background:rgba(14,165,233,.18);  color:var(--clr-hygiene); }
+.tb-tag.walk    { background:rgba(219,39,119,.18);  color:var(--clr-walk); }
+
+/* Device adaptation — ECC motion-ui: reduce for low-end */
+@media (prefers-reduced-motion: reduce), (update: slow) {
+  .time-block { animation: none; opacity:1; transform:none; }
+  .page.active { animation: none; opacity:1; }
+  .gen-btn.loading::before { animation: none; }
+}
 
 /* ── SHIFT BUTTONS ── */
 .shift-btns { display:flex; gap:3px; flex-shrink:0; }
