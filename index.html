@@ -138,6 +138,11 @@
     <div class="stats-row" id="statsRow"></div>
     <div class="timeline"><div class="tl-line"></div><div id="timeline"></div></div>
     <div class="tips" id="tipsBlock"></div>
+    <button class="reminder-btn" id="reminderBtn" onclick="toggleNotifications();hapticLight()" style="display:none">
+      <span class="rb-icon">🔔</span>
+      <span>Напоминания о режиме</span>
+      <span class="rb-badge" id="reminderBadge">Вкл</span>
+    </button>
   </div>
   <div class="charts-grid">
     <div class="chart-box"><div class="chart-title">Распределение</div><canvas id="pieChart"></canvas></div>
@@ -257,6 +262,8 @@
 <script src="chat.js"></script>
 <script src="tracker.js"></script>
 <script src="premium.js"></script>
+<script src="onboarding.js"></script>
+<script src="notifications.js"></script>
 <script src="app.js"></script>
 <script>
 // ECC motion-ui: device adaptation heuristic
@@ -308,6 +315,7 @@ window.addEventListener('DOMContentLoaded', function() {
   if (typeof initChat === 'function') initChat();
   if (typeof initPremium === 'function') initPremium();
   if (typeof renderTracker === 'function') renderTracker();
+  if (typeof initOnboarding === 'function') initOnboarding();
 });
 </script>
 </body>

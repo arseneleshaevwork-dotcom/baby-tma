@@ -424,3 +424,131 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   touch-action:manipulation;
 }
 .mood-btn.selected { border-color:var(--p2); background:rgba(139,92,246,.2); transform:scale(1.08); }
+
+/* ══════════════════════════════════════════════════════════════
+   ONBOARDING
+══════════════════════════════════════════════════════════════ */
+#onboarding {
+  position:fixed; inset:0; z-index:9999;
+  display:flex; align-items:flex-end; justify-content:center;
+  opacity:0; pointer-events:none;
+  transition: opacity var(--dur-normal) var(--ease-smooth);
+}
+#onboarding.ob-visible { opacity:1; pointer-events:all; }
+#onboarding.ob-hiding  { opacity:0; pointer-events:none; }
+
+.ob-backdrop {
+  position:absolute; inset:0;
+  background:rgba(0,0,0,.75); backdrop-filter:blur(8px);
+}
+.ob-card {
+  position:relative; z-index:1; width:100%; max-width:420px;
+  background:linear-gradient(160deg,#12102e,#1a0d35);
+  border:1px solid rgba(139,92,246,.25);
+  border-radius:28px 28px 0 0;
+  padding:28px 24px 40px;
+  transform: translateY(60px);
+  transition: transform var(--dur-normal) var(--ease-smooth);
+  box-shadow: 0 -8px 48px rgba(139,92,246,.2);
+}
+#onboarding.ob-visible .ob-card { transform:translateY(0); }
+
+.ob-skip {
+  position:absolute; top:18px; right:20px;
+  background:none; border:none; color:var(--tg-hint);
+  font-size:.8rem; font-weight:600; cursor:pointer;
+  font-family:inherit; padding:4px 8px;
+  transition: color var(--dur-fast) var(--ease-sharp);
+}
+.ob-skip:active { color:var(--tg-text); }
+
+.ob-slides { min-height:360px; display:flex; flex-direction:column; align-items:center; }
+
+.ob-slide { text-align:center; width:100%; animation:slideIn var(--dur-normal) var(--ease-smooth) both; }
+@keyframes slideIn {
+  from { opacity:0; transform:translateX(24px); }
+  to   { opacity:1; transform:translateX(0); }
+}
+
+.ob-img-wrap { position:relative; margin:0 auto 8px; width:220px; height:220px; }
+.ob-img {
+  width:220px; height:220px; object-fit:contain; border-radius:20px;
+  animation: float 5s ease-in-out infinite;
+}
+.ob-img-glow {
+  position:absolute; inset:0; border-radius:50%;
+  background:radial-gradient(circle,rgba(139,92,246,.25),transparent 70%);
+  animation: pulse 3s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{transform:scale(1);opacity:.6} 50%{transform:scale(1.1);opacity:1} }
+
+.ob-emoji { font-size:2rem; margin-bottom:8px; }
+.ob-title {
+  font-size:1.2rem; font-weight:800; letter-spacing:-.02em;
+  background:linear-gradient(135deg,#f9a8d4,#c084fc,#818cf8);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  margin-bottom:10px;
+}
+.ob-text { font-size:.88rem; color:var(--tg-hint); line-height:1.6; max-width:300px; margin:0 auto; }
+
+.ob-dots { display:flex; gap:7px; justify-content:center; margin:20px 0 16px; }
+.ob-dot {
+  width:7px; height:7px; border-radius:50%;
+  background:rgba(255,255,255,.2); cursor:pointer;
+  transition: all var(--dur-fast) var(--ease-smooth);
+}
+.ob-dot.active { background:var(--clr-primary); transform:scale(1.4); width:20px; border-radius:4px; }
+
+.ob-btn {
+  width:100%; padding:15px; border:none; border-radius:14px;
+  background:rgba(139,92,246,.2); border:1px solid rgba(139,92,246,.3);
+  color:#fff; font-size:1rem; font-weight:700; font-family:inherit;
+  cursor:pointer; touch-action:manipulation;
+  transition: background var(--dur-fast) var(--ease-sharp), transform var(--dur-fast) var(--ease-sharp);
+}
+.ob-btn:active { transform:scale(.97); }
+
+/* ══════════════════════════════════════════════════════════════
+   CONFETTI ANIMATION
+══════════════════════════════════════════════════════════════ */
+.confetti-piece {
+  position:fixed; width:8px; height:8px; border-radius:2px;
+  pointer-events:none; z-index:9998;
+  animation: confettiFall var(--dur-slow) var(--ease-sharp) forwards;
+}
+@keyframes confettiFall {
+  0%   { transform:translateY(-20px) rotate(0deg);   opacity:1; }
+  100% { transform:translateY(100vh) rotate(720deg); opacity:0; }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STAT COUNTER ANIMATION
+══════════════════════════════════════════════════════════════ */
+.stat-card .val.counting {
+  animation: countUp var(--dur-slow) var(--ease-smooth) both;
+}
+@keyframes countUp {
+  from { opacity:0; transform:translateY(8px) scale(.9); }
+  to   { opacity:1; transform:translateY(0) scale(1); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   REMINDER BUTTON
+══════════════════════════════════════════════════════════════ */
+.reminder-btn {
+  display:flex; align-items:center; gap:8px;
+  padding:12px 16px; border:1px solid rgba(139,92,246,.3);
+  border-radius:12px; background:rgba(139,92,246,.08);
+  color:var(--tg-text); font-size:.88rem; font-weight:600;
+  font-family:inherit; cursor:pointer; width:100%; margin-top:12px;
+  transition: background var(--dur-fast) var(--ease-sharp),
+              transform  var(--dur-fast) var(--ease-sharp);
+  touch-action:manipulation;
+}
+.reminder-btn:active { transform:scale(.98); background:rgba(139,92,246,.16); }
+.reminder-btn .rb-icon { font-size:1.2rem; }
+.reminder-btn .rb-badge {
+  margin-left:auto; font-size:.7rem; padding:2px 8px;
+  background:var(--clr-primary); border-radius:20px; color:#fff;
+}
+

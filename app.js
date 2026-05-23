@@ -190,6 +190,22 @@ function renderSchedule(blocks,daySegs,p){
   // Tips
   document.getElementById('tipsBlock').innerHTML=`<div class="tips-title">💡 Советы для ${p.label}</div><ul>${getTips(_age).map(t=>`<li>${t}</li>`).join('')}</ul>`;
 
+  // Show reminder button
+  const rb = document.getElementById('reminderBtn');
+  if (rb) {
+    rb.style.display = 'flex';
+    const badge = document.getElementById('reminderBadge');
+    if (badge && typeof isNotificationsEnabled === 'function') {
+      badge.textContent = isNotificationsEnabled() ? 'Вкл ✅' : 'Выкл';
+    }
+  }
+
+  // Animate stat counters
+  document.querySelectorAll('.stat-card .val').forEach((el,i) => {
+    el.classList.remove('counting');
+    setTimeout(() => el.classList.add('counting'), i * 80);
+  });
+
   // Stats charts — only if Chart.js loaded
   if (typeof Chart !== 'undefined') {
     renderStatCharts(p,daySegs);
@@ -322,5 +338,36 @@ function generate(){
 
   const{blocks,daySegs,profile:p}=buildSchedule(_age,_wakeMin,_feedType,_activity,0,{});
   renderSchedule(blocks,daySegs,p);
+
+  // Confetti burst on first-ever generation
+  const genCount = parseInt(localStorage.getItem('babymode_gen_count')||'0') + 1;
+  localStorage.setItem('babymode_gen_count', genCount);
+  if (genCount <= 3) launchConfetti();
+
+  // Schedule in-session reminders
+  if (typeof scheduleReminders === 'function') scheduleReminders(blocks);
+
   // Note: tab switch is handled in index.html override
+}
+
+// ─── Confetti ────────────────────────────────────────────────────────────────
+function launchConfetti() {
+  const colors = ['#d946ef','#8b5cf6','#4f46e5','#f97316','#22c55e','#f9a8d4'];
+  const count = 40;
+  for (let i = 0; i < count; i++) {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'confetti-piece';
+      el.style.cssText = `
+        left:${10 + Math.random()*80}%;
+        top:${Math.random()*30}%;
+        background:${colors[Math.floor(Math.random()*colors.length)]};
+        animation-duration:${0.6 + Math.random()*0.8}s;
+        animation-delay:0s;
+        transform:rotate(${Math.random()*360}deg);
+      `;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1500);
+    }, i * 30);
+  }
 }
