@@ -293,18 +293,24 @@ function goPage(id, btn) {
 function generateAndSwitch() {
   var btn = document.getElementById('btn-generate');
   if (btn) { btn.classList.add('loading'); btn.textContent = '⏳ Генерирую...'; }
-  try {
-    if (typeof generate !== 'function') {
-      if (typeof showToast === 'function') showToast('Ошибка: generate не загружена');
-      return;
+
+  // Use requestAnimationFrame so shimmer renders BEFORE generate() runs
+  requestAnimationFrame(function() {
+    try {
+      if (typeof generate !== 'function') {
+        if (typeof showToast === 'function') showToast('Ошибка: generate не загружена');
+        return;
+      }
+      generate();
+      if (typeof hapticSuccess === 'function') hapticSuccess();
+      goPage('schedule', document.getElementById('bn-schedule'));
+    } catch(e) {
+      if (typeof showToast === 'function') showToast('Ошибка: ' + e.message);
+      console.error('generateAndSwitch error:', e);
+    } finally {
+      if (btn) { btn.classList.remove('loading'); btn.textContent = '✨ Сгенерировать режим дня'; }
     }
-    generate();
-    if (typeof hapticSuccess === 'function') hapticSuccess();
-    goPage('schedule', document.getElementById('bn-schedule'));
-  } catch(e) {
-    if (typeof showToast === 'function') showToast('Ошибка: ' + e.message);
-    console.error('generateAndSwitch error:', e);
-  }
+  });
 }
 
 // Init after all scripts loaded

@@ -88,25 +88,43 @@ body::before {
 /* ── BOTTOM NAV ── */
 .bottom-nav {
   position:fixed; bottom:0; left:0; right:0; z-index:100;
-  background:rgba(7,7,26,.92); backdrop-filter:blur(20px);
-  border-top:1px solid var(--border);
+  background:rgba(7,7,26,.96); backdrop-filter:blur(24px) saturate(1.5);
+  border-top:1px solid rgba(139,92,246,.2);
   display:flex;
   padding-bottom: var(--safe-bottom);
+  /* Taller nav — easier to tap, labels always visible */
+  min-height: 64px;
 }
 .bnav-item {
   flex:1; display:flex; flex-direction:column; align-items:center;
-  justify-content:center; min-height:48px; padding:8px 4px;
-  background:none; border:none; color:var(--tg-hint);
-  font-size:.65rem; font-weight:600; font-family:inherit;
-  cursor:pointer; gap:var(--sp-1); touch-action:manipulation;
-  /* ECC motion-ui: fast+sharp for interactive feedback */
+  justify-content:center; min-height:64px; padding:10px 6px;
+  background:none; border:none; color:rgba(148,163,184,0.7);
+  font-size:.72rem; font-weight:700; font-family:inherit; letter-spacing:.01em;
+  cursor:pointer; gap:4px; touch-action:manipulation;
   transition: color var(--dur-fast) var(--ease-sharp),
               transform var(--dur-fast) var(--ease-sharp);
+  position:relative;
 }
-.bnav-item .icon { display:flex; align-items:center; justify-content:center; line-height:1; font-size:1.4rem; }
-.bnav-item:active { transform:scale(.92); }
+.bnav-item .icon {
+  display:flex; align-items:center; justify-content:center;
+  line-height:1; font-size:1.6rem;
+  transition: transform var(--dur-fast) var(--ease-smooth);
+}
+.bnav-item:active { transform:scale(.88); }
 .bnav-item.active { color:var(--clr-primary); }
-.bnav-item.active .icon { filter:drop-shadow(0 0 8px rgba(217,70,239,.45)); }
+.bnav-item.active .icon {
+  transform: scale(1.12);
+  filter:drop-shadow(0 0 10px rgba(217,70,239,.6));
+}
+/* Active pill underline */
+.bnav-item.active::after {
+  content:''; position:absolute; bottom:0; left:25%; right:25%;
+  height:3px; border-radius:3px 3px 0 0;
+  background:var(--clr-primary);
+  box-shadow: 0 0 8px rgba(217,70,239,.6);
+}
+/* Body padding matches new nav height */
+body { padding-bottom: calc(64px + var(--safe-bottom)); }
 
 /* ── PAGES — smooth entry (ECC motion: communicate state) ── */
 .page { display:none; padding:0 var(--sp-3); position:relative; z-index:1; }
