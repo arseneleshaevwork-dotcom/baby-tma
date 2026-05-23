@@ -116,15 +116,15 @@ body::before {
   transform: scale(1.12);
   filter:drop-shadow(0 0 10px rgba(217,70,239,.6));
 }
-/* Active pill underline */
+/* Active pill — at TOP of item, doesn't overlap label */
 .bnav-item.active::after {
-  content:''; position:absolute; bottom:0; left:25%; right:25%;
-  height:3px; border-radius:3px 3px 0 0;
+  content:''; position:absolute; top:0; left:25%; right:25%;
+  height:3px; border-radius:0 0 3px 3px;
   background:var(--clr-primary);
   box-shadow: 0 0 8px rgba(217,70,239,.6);
 }
 /* Body padding matches new nav height */
-body { padding-bottom: calc(64px + var(--safe-bottom)); }
+body { padding-bottom: calc(68px + var(--safe-bottom)); }
 
 /* ── PAGES — smooth entry (ECC motion: communicate state) ── */
 .page { display:none; padding:0 var(--sp-3); position:relative; z-index:1; }
