@@ -174,19 +174,29 @@
   </div>
 </div>
 
-<!-- PAGE: TRACKER -->
+<!-- PAGE: TRACKER (Smart Sleep Diary) -->
 <div id="page-tracker" class="page">
   <div class="card">
-    <div class="section-title">Запись за сегодня</div>
-    <div class="tracker-grid">
-      <div class="field"><label for="lgWake">Подъём</label><input type="time" id="lgWake" value="07:00"></div>
-      <div class="field"><label for="lgBed">Укладывание</label><input type="time" id="lgBed" value="19:30"></div>
-      <div class="field"><label for="lgNap1S">Сон 1 — начало</label><input type="time" id="lgNap1S"></div>
-      <div class="field"><label for="lgNap1E">Сон 1 — конец</label><input type="time" id="lgNap1E"></div>
-      <div class="field"><label for="lgNap2S">Сон 2 — начало</label><input type="time" id="lgNap2S"></div>
-      <div class="field"><label for="lgNap2E">Сон 2 — конец</label><input type="time" id="lgNap2E"></div>
+    <div class="diary-header">
+      <div class="section-title" style="margin-bottom:0">📓 Дневник сна</div>
+      <div class="diary-streak" id="diaryStreak"></div>
     </div>
-    <div class="field" style="margin-bottom:10px"><label>Настроение малыша</label></div>
+
+    <div class="tracker-grid">
+      <div class="field"><label for="lgWake">🌅 Подъём</label><input type="time" id="lgWake" value="07:00"></div>
+      <div class="field"><label for="lgBed">🌙 Укладывание</label><input type="time" id="lgBed" value="19:30"></div>
+      <div class="field"><label for="lgNap1S">☀️ Сон 1 начало</label><input type="time" id="lgNap1S"></div>
+      <div class="field"><label for="lgNap1E">☀️ Сон 1 конец</label><input type="time" id="lgNap1E"></div>
+      <div class="field"><label for="lgNap2S">🌤 Сон 2 начало</label><input type="time" id="lgNap2S"></div>
+      <div class="field"><label for="lgNap2E">🌤 Сон 2 конец</label><input type="time" id="lgNap2E"></div>
+    </div>
+
+    <div class="field" style="margin-bottom:8px">
+      <label>🏷 Отметки дня</label>
+    </div>
+    <div class="sleep-tags" id="sleepTags"></div>
+
+    <div class="field" style="margin:10px 0 8px"><label>😊 Настроение малыша</label></div>
     <div class="mood-row">
       <button class="mood-btn selected" onclick="selectMood('😊',this)">😊</button>
       <button class="mood-btn" onclick="selectMood('😐',this)">😐</button>
@@ -194,13 +204,22 @@
       <button class="mood-btn" onclick="selectMood('😴',this)">😴</button>
       <button class="mood-btn" onclick="selectMood('🤒',this)">🤒</button>
     </div>
-    <input class="note-input" id="lgNote" placeholder="Заметка: зубы, прогулка, настроение...">
+
+    <input class="note-input" id="lgNote" placeholder="Заметка: зубы, прогулка, гости...">
     <button class="save-log-btn" id="btn-save-log" onclick="saveLog();hapticSuccess()">💾 Сохранить день</button>
   </div>
+
+  <!-- AI Analysis block (shown after 3+ days) -->
+  <div class="card" id="analysisBlock" style="display:none">
+  </div>
+
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div class="section-title" style="margin-bottom:0">История</div>
-      <button class="export-btn" onclick="exportLog()">⬇ Экспорт</button>
+      <div class="section-title" style="margin-bottom:0">📈 История</div>
+      <div style="display:flex;gap:8px">
+        <button class="export-btn" onclick="shareLog()" style="color:var(--clr-primary)">📤 Поделиться</button>
+        <button class="export-btn" onclick="exportLog()">⬇ TXT</button>
+      </div>
     </div>
     <div class="period-tabs">
       <button class="period-tab active" onclick="setPeriod('week',this)">7 дней</button>
@@ -209,6 +228,18 @@
     <div class="chart-box" id="trackerChart" style="display:none;margin-bottom:12px"><canvas id="trackerChartCanvas"></canvas></div>
     <div id="trackerTable"></div>
   </div>
+</div>
+
+<!-- PAGE: ARTICLES -->
+<div id="page-articles" class="page">
+  <div class="card" style="padding-bottom:8px">
+    <div class="diary-header">
+      <div class="section-title" style="margin-bottom:0">📚 База знаний</div>
+      <span style="font-size:.72rem;color:var(--tg-hint)">18 статей</span>
+    </div>
+    <p style="font-size:.82rem;color:var(--tg-hint);margin-top:4px">Научно обоснованные статьи о сне, кормлении и развитии</p>
+  </div>
+  <div id="articlesContainer"></div>
 </div>
 
 <!-- PAGE: PREMIUM -->
@@ -245,11 +276,11 @@
   <button class="bnav-item" id="bn-schedule" onclick="goPage('schedule',this)" aria-label="Режим дня">
     <span class="icon">📅</span><span>Режим</span>
   </button>
-  <button class="bnav-item" id="bn-chat" onclick="goPage('chat',this)" aria-label="Чат консультант">
-    <span class="icon">💬</span><span>Чат</span>
+  <button class="bnav-item" id="bn-articles" onclick="goPage('articles',this);renderArticles()" aria-label="Статьи">
+    <span class="icon">📚</span><span>Статьи</span>
   </button>
   <button class="bnav-item" id="bn-tracker" onclick="goPage('tracker',this)" aria-label="Дневник">
-    <span class="icon">📊</span><span>Дневник</span>
+    <span class="icon">📓</span><span>Дневник</span>
   </button>
   <button class="bnav-item" id="bn-premium" onclick="goPage('premium',this)" aria-label="PRO версия">
     <span class="icon">⭐</span><span>PRO</span>
@@ -261,6 +292,7 @@
 <script src="tma.js"></script>
 <script src="chat.js"></script>
 <script src="tracker.js"></script>
+<script src="articles.js"></script>
 <script src="premium.js"></script>
 <script src="onboarding.js"></script>
 <script src="notifications.js"></script>

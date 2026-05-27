@@ -1,13 +1,45 @@
-// ─── Daily Tracker & Analytics ───────────────────────────────────────────────
+// ─── Smart Sleep Diary v2 ─────────────────────────────────────────────────────
+// Tags, AI analysis after 3+ days, recovery day detection
+
 const TRACKER_KEY = 'babymode_logs';
 let trackerPeriod = 'week';
 let moodSel = '😊';
 let trackerChartInst = null;
+let selectedTags = new Set();
+
+const SLEEP_TAGS = [
+  { id: 'long_soothe',  label: '⏳ Долгое укладывание', color: '#f97316' },
+  { id: 'cry_sleep',    label: '😢 Плач при засыпании', color: '#ef4444' },
+  { id: 'cry_wake',     label: '😭 Плач при пробуждении', color: '#ef4444' },
+  { id: 'illness',      label: '🤒 Болезнь', color: '#f97316' },
+  { id: 'travel',       label: '✈️ Путешествие', color: '#8b5cf6' },
+  { id: 'teeth',        label: '🦷 Зубы', color: '#f59e0b' },
+  { id: 'regression',   label: '📉 Регресс', color: '#ec4899' },
+  { id: 'slept_well',   label: '✨ Спал отлично', color: '#22c55e' },
+];
 
 function getLogs() {
   try { return JSON.parse(localStorage.getItem(TRACKER_KEY) || '[]'); } catch(e) { return []; }
 }
 function saveLogs(logs) { localStorage.setItem(TRACKER_KEY, JSON.stringify(logs)); }
+
+function toggleTag(id) {
+  if (selectedTags.has(id)) selectedTags.delete(id);
+  else selectedTags.add(id);
+  renderTagButtons();
+  if (typeof hapticLight === 'function') hapticLight();
+}
+
+function renderTagButtons() {
+  const container = document.getElementById('sleepTags');
+  if (!container) return;
+  container.innerHTML = SLEEP_TAGS.map(t => `
+    <button class="sleep-tag ${selectedTags.has(t.id) ? 'active' : ''}"
+      onclick="toggleTag('${t.id}')" style="${selectedTags.has(t.id) ? `--tag-color:${t.color}` : ''}">
+      ${t.label}
+    </button>
+  `).join('');
+}
 
 function selectMood(m, el) {
   moodSel = m;
@@ -21,25 +53,163 @@ function saveLog() {
   const nap1e = document.getElementById('lgNap1E').value;
   const nap2s = document.getElementById('lgNap2S').value;
   const nap2e = document.getElementById('lgNap2E').value;
+  const nap3s = document.getElementById('lgNap3S') ? document.getElementById('lgNap3S').value : '';
+  const nap3e = document.getElementById('lgNap3E') ? document.getElementById('lgNap3E').value : '';
   const bed   = document.getElementById('lgBed').value;
   const note  = document.getElementById('lgNote').value.trim();
 
   if (!wake || !bed) { showToast('Укажите время подъёма и укладывания'); return; }
 
-  const toMin = t => { const [h,m]=t.split(':'); return +h*60+ +m; };
+  const toMin = t => { if (!t) return 0; const [h,m]=t.split(':'); return +h*60+ +m; };
   const dur   = (s,e) => s&&e ? Math.max(0,toMin(e)-toMin(s)) : 0;
 
-  const dayNaps = dur(nap1s,nap1e) + dur(nap2s,nap2e);
-  const nightLen = toMin(bed) < toMin(wake)
-    ? (24*60 - toMin(bed)) + toMin(wake)
-    : toMin(bed) - toMin(wake);
+  const dayNaps = dur(nap1s,nap1e) + dur(nap2s,nap2e) + dur(nap3s,nap3e);
+
+  // Night sleep: time from bed to wake (handles midnight crossing)
+  const bedMin  = toMin(bed);
+  const wakeMin = toMin(wake);
+  const nightLen = bedMin > wakeMin ? (24*60 - bedMin) + wakeMin : Math.max(0, wakeMin - bedMin);
 
   const today = new Date().toISOString().slice(0,10);
-  const logs  = getLogs().filter(l => l.date !== today); // one per day
-  logs.push({ date:today, wake, bed, dayNaps, nightLen, mood:moodSel, note });
+  const logs  = getLogs().filter(l => l.date !== today);
+  logs.push({
+    date: today, wake, bed,
+    nap1s, nap1e, nap2s, nap2e, nap3s, nap3e,
+    dayNaps, nightLen,
+    mood: moodSel,
+    tags: [...selectedTags],
+    note
+  });
   saveLogs(logs);
+
+  selectedTags.clear();
+  renderTagButtons();
   showToast('✅ День сохранён!');
+  if (typeof hapticSuccess === 'function') hapticSuccess();
   renderTracker();
+
+  // Check if we have 3+ days to run analysis
+  const allLogs = getLogs();
+  if (allLogs.length >= 3) {
+    setTimeout(() => analyzeAndSuggest(allLogs), 600);
+  }
+}
+
+// ─── AI Analysis ─────────────────────────────────────────────────────────────
+function analyzeAndSuggest(logs) {
+  const recent = logs.slice(-5); // last 5 days
+  const avgNight = recent.reduce((s,l) => s + l.nightLen, 0) / recent.length;
+  const avgDay   = recent.reduce((s,l) => s + l.dayNaps, 0)  / recent.length;
+  const badTags  = recent.flatMap(l => l.tags || []);
+  const age      = parseInt(localStorage.getItem('babymode_last_age') || '6');
+
+  // Get norm for age
+  const profile  = typeof getProfile === 'function' ? getProfile(age) : null;
+  const normNight = profile ? profile.nightH * 60 : 600;
+  const normDay   = profile ? profile.dayH   * 60 : 180;
+
+  const deficit = normNight - avgNight; // minutes short on night sleep
+  const suggestions = [];
+
+  if (deficit > 30) {
+    suggestions.push({
+      icon: '🌙',
+      type: 'warning',
+      title: 'Малыш недосыпает ночью',
+      text: `За последние ${recent.length} дня(ей) средний ночной сон ${(avgNight/60).toFixed(1)}ч при норме ${(normNight/60).toFixed(1)}ч. Попробуйте уложить на 15–20 мин раньше.`,
+      action: 'recovery'
+    });
+  }
+
+  if (avgDay > (normDay + 30) && age >= 9) {
+    suggestions.push({
+      icon: '☀️',
+      type: 'info',
+      title: 'Дневной сон может мешать ночному',
+      text: `Слишком долгий дневной сон (${(avgDay/60).toFixed(1)}ч) может сокращать ночной. Попробуйте ограничить последний сон до 17:30.`
+    });
+  }
+
+  if (badTags.filter(t => t === 'long_soothe').length >= 2) {
+    suggestions.push({
+      icon: '⏳',
+      type: 'warning',
+      title: 'Долгое укладывание — 2+ дня подряд',
+      text: 'Возможно, малыш укладывается позже оптимального окна сна. Попробуйте сдвинуть укладывание на 15–20 мин раньше.'
+    });
+  }
+
+  if (badTags.filter(t => t === 'regression').length >= 1) {
+    suggestions.push({
+      icon: '📉',
+      type: 'info',
+      title: 'Регресс сна',
+      text: 'Регрессы временны (обычно 2–4 недели). Придерживайтесь режима, добавьте ритуал перед сном: ванна → кормление → колыбельная.'
+    });
+  }
+
+  if (suggestions.length > 0) renderAnalysis(suggestions);
+}
+
+function renderAnalysis(suggestions) {
+  const block = document.getElementById('analysisBlock');
+  if (!block) return;
+
+  block.innerHTML = `
+    <div class="analysis-header">
+      <span class="analysis-icon">🤖</span>
+      <span>Анализ режима</span>
+      <span class="analysis-badge">${suggestions.length} совет${suggestions.length > 1 ? 'а' : ''}</span>
+    </div>
+    ${suggestions.map(s => `
+      <div class="analysis-card analysis-${s.type}">
+        <div class="analysis-card-header">
+          <span>${s.icon}</span>
+          <strong>${s.title}</strong>
+        </div>
+        <p>${s.text}</p>
+        ${s.action === 'recovery' ? `
+          <button class="recovery-btn" onclick="suggestRecoveryDay();hapticLight()">
+            📅 Предложить восстановительный день
+          </button>
+        ` : ''}
+      </div>
+    `).join('')}
+  `;
+  block.style.display = 'block';
+}
+
+function suggestRecoveryDay() {
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (tg && tg.showPopup) {
+    tg.showPopup({
+      title: '😴 Восстановительный день',
+      message: 'Перенесите подъём на 30 мин позже и добавьте 15 мин к каждому дневному сну. Это поможет компенсировать дефицит сна за 1–2 дня.',
+      buttons: [
+        { id: 'apply', type: 'default', text: 'Понятно!' },
+      ]
+    }, () => {});
+  } else {
+    showToast('😴 Перенесите подъём на 30 мин позже и добавьте 15 мин к дневным снам');
+  }
+}
+
+function shareLog() {
+  const logs = getLogs().slice(-7);
+  if (!logs.length) { showToast('Нет данных для отправки'); return; }
+  const avg = l => logs.reduce((s,d) => s + (d[l]||0), 0) / logs.length;
+  const text = `👶 Дневник сна малыша (${logs.length} дней)\n\n`
+    + `🌙 Средний ночной сон: ${(avg('nightLen')/60).toFixed(1)}ч\n`
+    + `☀️ Средний дневной сон: ${(avg('dayNaps')/60).toFixed(1)}ч\n\n`
+    + `📊 Подробный режим: t.me/babymode1_bot/babymode`;
+
+  const tg = window.Telegram && window.Telegram.WebApp;
+  if (tg && tg.switchInlineQuery) {
+    tg.switchInlineQuery(text);
+  } else {
+    navigator.clipboard && navigator.clipboard.writeText(text);
+    showToast('📋 Скопировано в буфер');
+  }
 }
 
 function setPeriod(p, btn) {
@@ -50,6 +220,8 @@ function setPeriod(p, btn) {
 }
 
 function renderTracker() {
+  renderTagButtons();
+
   const logs = getLogs();
   const now  = new Date();
   const days  = trackerPeriod === 'week' ? 7 : 30;
@@ -57,78 +229,100 @@ function renderTracker() {
   const filtered = logs.filter(l => l.date >= cutoff).sort((a,b) => a.date.localeCompare(b.date));
 
   if (!filtered.length) {
-    document.getElementById('trackerChart').style.display = 'none';
-    document.getElementById('trackerTable').innerHTML =
-      '<p style="text-align:center;color:var(--muted);padding:24px">Нет данных за этот период. Добавьте первую запись выше 👆</p>';
+    const chart = document.getElementById('trackerChart');
+    if (chart) chart.style.display = 'none';
+    const table = document.getElementById('trackerTable');
+    if (table) table.innerHTML =
+      '<p style="text-align:center;color:var(--tg-hint);padding:24px">Нет данных за этот период. Добавьте первую запись выше 👆</p>';
     return;
   }
 
-  document.getElementById('trackerChart').style.display = 'block';
+  const chart = document.getElementById('trackerChart');
+  if (chart) chart.style.display = 'block';
 
   // Chart
-  const labels = filtered.map(l => {
-    const d = new Date(l.date);
-    return d.toLocaleDateString('ru',{day:'numeric',month:'short'});
-  });
+  const labels   = filtered.map(l => new Date(l.date).toLocaleDateString('ru',{day:'numeric',month:'short'}));
   const dayData  = filtered.map(l => +(l.dayNaps/60).toFixed(1));
   const nightData= filtered.map(l => +(l.nightLen/60).toFixed(1));
 
-  if (trackerChartInst) trackerChartInst.destroy();
-  trackerChartInst = new Chart(document.getElementById('trackerChartCanvas'), {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        { label:'Дн. сон (ч)', data:dayData, backgroundColor:'rgba(129,140,248,0.7)', borderRadius:6, borderSkipped:false },
-        { label:'Ночной сон (ч)', data:nightData, backgroundColor:'rgba(232,121,249,0.6)', borderRadius:6, borderSkipped:false },
-      ]
-    },
-    options: {
-      responsive:true,
-      plugins:{ legend:{ labels:{ color:'#94a3b8', font:{size:11} } } },
-      scales:{
-        x:{ ticks:{color:'#94a3b8',font:{size:10}}, grid:{color:'rgba(255,255,255,0.04)'} },
-        y:{ ticks:{color:'#94a3b8',font:{size:11},callback:v=>v+'ч'}, grid:{color:'rgba(255,255,255,0.04)'}, beginAtZero:true, max:14 }
+  const canvas = document.getElementById('trackerChartCanvas');
+  if (canvas && typeof Chart !== 'undefined') {
+    if (trackerChartInst) trackerChartInst.destroy();
+    trackerChartInst = new Chart(canvas, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label:'Дн. сон (ч)', data:dayData, backgroundColor:'rgba(99,102,241,0.7)', borderRadius:6, borderSkipped:false },
+          { label:'Ночной сон (ч)', data:nightData, backgroundColor:'rgba(217,70,239,0.6)', borderRadius:6, borderSkipped:false },
+        ]
+      },
+      options: {
+        responsive:true,
+        plugins:{ legend:{ labels:{ color:'#94a3b8', font:{size:11} } } },
+        scales:{
+          x:{ ticks:{color:'#94a3b8',font:{size:10}}, grid:{color:'rgba(255,255,255,0.04)'} },
+          y:{ ticks:{color:'#94a3b8',font:{size:11},callback:v=>v+'ч'}, grid:{color:'rgba(255,255,255,0.04)'}, beginAtZero:true, max:14 }
+        }
       }
-    }
-  });
+    });
+  }
 
-  // Table
-  const avgNight = filtered.reduce((s,l)=>s+l.nightLen,0) / filtered.length;
-  const avgDay   = filtered.reduce((s,l)=>s+l.dayNaps,0)  / filtered.length;
+  // Summary stats
+  const avgNight = filtered.reduce((s,l) => s+l.nightLen,0) / filtered.length;
+  const avgDay   = filtered.reduce((s,l) => s+l.dayNaps,0)  / filtered.length;
+
+  // Tag frequency
+  const tagCounts = {};
+  filtered.forEach(l => (l.tags||[]).forEach(t => { tagCounts[t] = (tagCounts[t]||0)+1; }));
+  const topTag = Object.entries(tagCounts).sort((a,b) => b[1]-a[1])[0];
+  const topTagInfo = topTag ? SLEEP_TAGS.find(t => t.id === topTag[0]) : null;
 
   let html = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
       <div class="stat-card"><div class="val">${(avgNight/60).toFixed(1)}ч</div><div class="lbl">Ср. ночной сон</div></div>
       <div class="stat-card"><div class="val">${(avgDay/60).toFixed(1)}ч</div><div class="lbl">Ср. дневной сон</div></div>
     </div>
+    ${topTagInfo ? `<div class="top-tag-row"><span>Частая проблема:</span><span class="top-tag-badge">${topTagInfo.label}</span></div>` : ''}
     <table class="log-table">
-      <tr><th>Дата</th><th>Подъём</th><th>Дн. сон</th><th>Укладывание</th><th>Настроение</th></tr>
+      <tr><th>Дата</th><th>Подъём</th><th>Дн. сон</th><th>Укладывание</th><th>Теги</th></tr>
   `;
   for (const l of [...filtered].reverse()) {
     const d = new Date(l.date).toLocaleDateString('ru',{day:'numeric',month:'short'});
+    const tags = (l.tags||[]).map(id => {
+      const t = SLEEP_TAGS.find(t => t.id === id);
+      return t ? `<span class="log-tag">${t.label.split(' ')[0]}</span>` : '';
+    }).join('');
     html += `<tr>
       <td>${d}</td>
       <td>${l.wake}</td>
       <td>${l.dayNaps ? Math.floor(l.dayNaps/60)+'ч '+(l.dayNaps%60)+'м' : '—'}</td>
       <td>${l.bed}</td>
-      <td style="font-size:1.2rem">${l.mood}</td>
+      <td style="font-size:.75rem">${tags || l.mood}</td>
     </tr>`;
   }
   html += '</table>';
-  document.getElementById('trackerTable').innerHTML = html;
+
+  const table = document.getElementById('trackerTable');
+  if (table) table.innerHTML = html;
+
+  // Run analysis if 3+ days
+  if (logs.length >= 3) analyzeAndSuggest(logs);
 }
 
 function exportLog() {
-  const logs = getLogs().sort((a,b)=>a.date.localeCompare(b.date));
+  const logs = getLogs().sort((a,b) => a.date.localeCompare(b.date));
   if (!logs.length) { showToast('Нет данных для экспорта'); return; }
   let text = 'Дневник режима малыша\n' + '='.repeat(40) + '\n\n';
   for (const l of logs) {
+    const tags = (l.tags||[]).map(id => SLEEP_TAGS.find(t=>t.id===id)?.label || id).join(', ');
     text += `${l.date} | Подъём ${l.wake} | Ночной сон ${Math.round(l.nightLen/60*10)/10}ч | Дн. сон ${Math.round(l.dayNaps/60*10)/10}ч | Укладывание ${l.bed} | Настр. ${l.mood}`;
+    if (tags) text += ` | Теги: ${tags}`;
     if (l.note) text += ` | ${l.note}`;
     text += '\n';
   }
   const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'baby_log.txt'; a.click();
+  showToast('📥 Файл скачан');
 }
