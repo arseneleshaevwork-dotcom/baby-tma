@@ -110,10 +110,23 @@ test('builds age sleep calendar with current and upcoming windows', () => {
 test('builds family report with averages, sleep debt and tomorrow plan', () => {
   const summary = summarizeSleepLogs(logs, 12);
   const plan = buildTomorrowPlan(summary, 12, { wake: '07:00', bedtime: '20:30' });
-  const report = buildFamilyReport(summary, plan, { babyName: 'Миша' });
+  const report = buildFamilyReport(summary, plan, { babyName: 'Миша', audience: 'family' });
 
   assert(report.includes('Дневник сна Миша'));
   assert(report.includes('Недосып'));
   assert(report.includes('План на завтра'));
   assert(report.includes('Восстановительный день'));
+});
+
+test('builds audience-specific family reports', () => {
+  const summary = summarizeSleepLogs(logs, 12);
+  const plan = buildTomorrowPlan(summary, 12, { wake: '07:00', bedtime: '20:30' });
+
+  const dad = buildFamilyReport(summary, plan, { babyName: 'Миша', audience: 'dad' });
+  const grandma = buildFamilyReport(summary, plan, { babyName: 'Миша', audience: 'grandma' });
+  const specialist = buildFamilyReport(summary, plan, { babyName: 'Миша', audience: 'specialist' });
+
+  assert(dad.includes('Как помочь сегодня'));
+  assert(grandma.includes('Что важно не сбивать'));
+  assert(specialist.includes('Данные для консультации'));
 });

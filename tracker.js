@@ -301,6 +301,51 @@ function shareLog() {
     return;
   }
 
+  openFamilyReportModal();
+}
+
+function openFamilyReportModal() {
+  const logs = getLogs();
+  if (!logs.length) { showToast('Нет данных для отправки'); return; }
+
+  const age = parseInt(localStorage.getItem('babymode_last_age') || document.getElementById('ageMonths')?.value || '6');
+  const summary = typeof SleepIntel !== 'undefined'
+    ? SleepIntel.summarizeSleepLogs(logs, age)
+    : null;
+  const plan = summary && typeof SleepIntel !== 'undefined'
+    ? SleepIntel.buildTomorrowPlan(summary, age, _getTomorrowPlanContext())
+    : null;
+  const babyName = localStorage.getItem('babymode_baby_name') || '';
+  const preview = summary && plan && typeof SleepIntel !== 'undefined'
+    ? SleepIntel.buildFamilyReport(summary, plan, { babyName, audience: 'dad' })
+    : _buildSimpleLogShare(logs);
+
+  let modal = document.getElementById('familyReportModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'familyReportModal';
+    document.body.appendChild(modal);
+  }
+  modal.className = 'family-report-modal show';
+  modal.innerHTML = `
+    <div class="frm-sheet">
+      <div class="frm-handle"></div>
+      <div class="frm-title">Отправить отчёт близким</div>
+      <div class="frm-sub">Выберите, кому отправляем — текст адаптируется под роль</div>
+      <div class="frm-audiences">
+        <button onclick="sendFamilyReport('dad')">👨 Папе</button>
+        <button onclick="sendFamilyReport('grandma')">👵 Бабушке</button>
+        <button onclick="sendFamilyReport('specialist')">🩺 Консультанту</button>
+      </div>
+      <div class="frm-preview">${preview.replace(/</g,'&lt;').slice(0, 520).replace(/\n/g,'<br>')}...</div>
+      <button class="cta-outline-btn" onclick="closeFamilyReportModal();hapticLight()">Закрыть</button>
+    </div>
+  `;
+}
+
+function sendFamilyReport(audience) {
+  const logs = getLogs();
+  if (!logs.length) { showToast('Нет данных для отправки'); return; }
   const age = parseInt(localStorage.getItem('babymode_last_age') || document.getElementById('ageMonths')?.value || '6');
   const summary = typeof SleepIntel !== 'undefined'
     ? SleepIntel.summarizeSleepLogs(logs, age)
@@ -310,9 +355,10 @@ function shareLog() {
     : null;
   const babyName = localStorage.getItem('babymode_baby_name') || '';
   const text = summary && plan && typeof SleepIntel !== 'undefined'
-    ? SleepIntel.buildFamilyReport(summary, plan, { babyName })
+    ? SleepIntel.buildFamilyReport(summary, plan, { babyName, audience })
     : _buildSimpleLogShare(logs);
 
+  closeFamilyReportModal();
   const tg = window.Telegram && window.Telegram.WebApp;
   if (tg && tg.switchInlineQuery) {
     tg.switchInlineQuery(text);
@@ -320,6 +366,11 @@ function shareLog() {
     navigator.clipboard && navigator.clipboard.writeText(text);
     showToast('📋 Скопировано в буфер');
   }
+}
+
+function closeFamilyReportModal() {
+  const modal = document.getElementById('familyReportModal');
+  if (modal) modal.classList.remove('show');
 }
 
 function _buildSimpleLogShare(logs) {

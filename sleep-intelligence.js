@@ -340,6 +340,7 @@ function buildTomorrowPlan(summary, age, context = {}) {
 
 function buildFamilyReport(summary, plan, context = {}) {
   const name = context.babyName ? String(context.babyName).trim() : 'малыша';
+  const audience = context.audience || 'family';
   const days = summary.recent.length;
   const debt = summary.sleepDebt ? `${(summary.sleepDebt / 60).toFixed(1)}ч` : 'нет';
   const trendText = {
@@ -350,6 +351,7 @@ function buildFamilyReport(summary, plan, context = {}) {
 
   const rules = plan.rules.slice(0, 3).map(rule => `• ${rule}`).join('\n');
   const schedule = plan.schedule.map(item => `• ${item.label}: ${item.value}`).join('\n');
+  const audienceBlock = getAudienceReportBlock(audience, plan);
 
   return `👶 Дневник сна ${name} (${days} дн.)\n\n`
     + `🌙 Ночной сон: ${(summary.avgNight / 60).toFixed(1)}ч в среднем\n`
@@ -360,7 +362,33 @@ function buildFamilyReport(summary, plan, context = {}) {
     + `${plan.reason}\n\n`
     + `${schedule}\n\n`
     + `Что важно:\n${rules}\n\n`
+    + `${audienceBlock}\n\n`
     + `Сгенерировано в «Режим Малыша»`;
+}
+
+function getAudienceReportBlock(audience, plan) {
+  if (audience === 'dad') {
+    return '👨 Как помочь сегодня:\n'
+      + '• Взять на себя вечерний ритуал или прогулку.\n'
+      + '• Не начинать активные игры за час до сна.\n'
+      + `• Поддержать план: ${plan.goal.toLowerCase()}.`;
+  }
+  if (audience === 'grandma') {
+    return '👵 Что важно не сбивать:\n'
+      + '• Не растягивать бодрствование “ещё на чуть-чуть”.\n'
+      + '• Не добавлять сладости/активные игры перед сном.\n'
+      + '• Помочь сохранить спокойный день и ритуал.';
+  }
+  if (audience === 'specialist') {
+    return '🩺 Данные для консультации:\n'
+      + `• Тип плана: ${plan.type}.\n`
+      + `• Цель: ${plan.goal}.\n`
+      + `• Фокус: ${plan.target}.`;
+  }
+  return '🤍 Для близких:\n'
+    + '• Поддержите режим без давления и споров.\n'
+    + '• Главная помощь — спокойный вечер и предсказуемость.\n'
+    + `• Завтра фокус: ${plan.goal.toLowerCase()}.`;
 }
 
 function shiftTime(time, deltaMin) {
