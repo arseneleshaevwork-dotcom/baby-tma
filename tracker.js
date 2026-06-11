@@ -2,6 +2,7 @@
 // Tags, AI analysis after 3+ days, recovery day detection
 
 const TRACKER_KEY = 'babymode_logs';
+const QUICK_SLEEP_KEY = 'babymode_quick_sleep_start';
 let trackerPeriod = 'week';
 let moodSel = '😊';
 let trackerChartInst = null;
@@ -22,6 +23,117 @@ function getLogs() {
   try { return JSON.parse(localStorage.getItem(TRACKER_KEY) || '[]'); } catch(e) { return []; }
 }
 function saveLogs(logs) { localStorage.setItem(TRACKER_KEY, JSON.stringify(logs)); }
+
+function localDateKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+function hm(date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function toMin(t) {
+  if (!t) return 0;
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function calcNightLen(bed, wake) {
+  const bedMin = toMin(bed);
+  const wakeMin = toMin(wake);
+  return bedMin > wakeMin ? (24 * 60 - bedMin) + wakeMin : Math.max(0, wakeMin - bedMin);
+}
+
+function getOrCreateTodayLog(logs) {
+  const today = localDateKey();
+  let log = logs.find(l => l.date === today);
+  if (!log) {
+    const wake = document.getElementById('lgWake')?.value || document.getElementById('wakeTime')?.value || '07:00';
+    const bed = document.getElementById('lgBed')?.value || '19:30';
+    log = {
+      date: today,
+      wake,
+      bed,
+      nap1s: '', nap1e: '', nap2s: '', nap2e: '', nap3s: '', nap3e: '',
+      dayNaps: 0,
+      nightLen: calcNightLen(bed, wake),
+      mood: moodSel,
+      tags: [],
+      note: '',
+      quickNaps: [],
+      nightWakings: 0
+    };
+    logs.push(log);
+  }
+  if (!Array.isArray(log.quickNaps)) log.quickNaps = [];
+  if (!Array.isArray(log.tags)) log.tags = [];
+  return log;
+}
+
+function startQuickSleep() {
+  localStorage.setItem(QUICK_SLEEP_KEY, String(Date.now()));
+  renderQuickSleepControls();
+  showToast('😴 Сон начат');
+}
+
+function finishQuickSleep() {
+  const started = parseInt(localStorage.getItem(QUICK_SLEEP_KEY) || '0');
+  if (!started) { showToast('Сначала нажмите “Уснул”'); return; }
+
+  const start = new Date(started);
+  const end = new Date();
+  const dur = Math.max(1, Math.round((end - start) / 60000));
+  const logs = getLogs();
+  const log = getOrCreateTodayLog(logs);
+
+  log.quickNaps.push({ start: hm(start), end: hm(end), dur });
+  log.dayNaps = (log.dayNaps || 0) + dur;
+  if (!log.nap1s) { log.nap1s = hm(start); log.nap1e = hm(end); }
+  else if (!log.nap2s) { log.nap2s = hm(start); log.nap2e = hm(end); }
+  else if (!log.nap3s) { log.nap3s = hm(start); log.nap3e = hm(end); }
+
+  saveLogs(logs);
+  localStorage.removeItem(QUICK_SLEEP_KEY);
+  renderQuickSleepControls();
+  renderTracker();
+  showToast(`🌤 Сон записан: ${dur} мин`);
+}
+
+function quickSleepTag(tag) {
+  const logs = getLogs();
+  const log = getOrCreateTodayLog(logs);
+  if (tag === 'night_wake') {
+    log.nightWakings = (log.nightWakings || 0) + 1;
+    if (!log.tags.includes('cry_wake')) log.tags.push('cry_wake');
+    showToast('🌙 Ночное пробуждение записано');
+  } else if (tag && !log.tags.includes(tag)) {
+    log.tags.push(tag);
+    showToast('🏷 Отметка добавлена');
+  }
+  saveLogs(logs);
+  renderTracker();
+}
+
+function renderQuickSleepControls() {
+  const status = document.getElementById('quickSleepStatus');
+  const timer = document.getElementById('quickSleepTimer');
+  if (!status || !timer) return;
+
+  const started = parseInt(localStorage.getItem(QUICK_SLEEP_KEY) || '0');
+  if (!started) {
+    status.textContent = 'Сон не запущен';
+    timer.textContent = '—';
+    return;
+  }
+
+  const mins = Math.max(0, Math.round((Date.now() - started) / 60000));
+  status.textContent = `Спит с ${hm(new Date(started))}`;
+  timer.textContent = mins < 60 ? `${mins} мин` : `${Math.floor(mins / 60)}ч ${mins % 60}м`;
+}
+
+if (typeof window !== 'undefined') {
+  setInterval(renderQuickSleepControls, 60000);
+}
 
 function toggleTag(id) {
   if (selectedTags.has(id)) selectedTags.delete(id);
@@ -391,6 +503,7 @@ function setPeriod(p, btn) {
 
 function renderTracker() {
   renderTagButtons();
+  renderQuickSleepControls();
 
   const logs = getLogs();
   const now  = new Date();
@@ -441,6 +554,9 @@ function renderTracker() {
   // Summary stats
   const avgNight = filtered.reduce((s,l) => s+l.nightLen,0) / filtered.length;
   const avgDay   = filtered.reduce((s,l) => s+l.dayNaps,0)  / filtered.length;
+  const age = parseInt(localStorage.getItem('babymode_last_age') || document.getElementById('ageMonths')?.value || '6');
+  const normSummary = typeof SleepIntel !== 'undefined' ? SleepIntel.summarizeSleepLogs(filtered, age) : null;
+  const normStatus = normSummary && typeof SleepIntel !== 'undefined' ? SleepIntel.compareSleepWithNorms(normSummary) : null;
 
   // Tag frequency
   const tagCounts = {};
@@ -453,6 +569,7 @@ function renderTracker() {
       <div class="stat-card"><div class="val">${(avgNight/60).toFixed(1)}ч</div><div class="lbl">Ср. ночной сон</div></div>
       <div class="stat-card"><div class="val">${(avgDay/60).toFixed(1)}ч</div><div class="lbl">Ср. дневной сон</div></div>
     </div>
+    ${normStatus ? renderNormStatus(normStatus) : ''}
     ${topTagInfo ? `<div class="top-tag-row"><span>Частая проблема:</span><span class="top-tag-badge">${topTagInfo.label}</span></div>` : ''}
     <table class="log-table">
       <tr><th>Дата</th><th>Подъём</th><th>Дн. сон</th><th>Укладывание</th><th>Теги</th></tr>
@@ -478,6 +595,22 @@ function renderTracker() {
 
   // Run analysis if 3+ days
   if (logs.length >= 3) analyzeAndSuggest(logs);
+}
+
+function renderNormStatus(normStatus) {
+  const item = (label, data) => `
+    <div class="norm-pill ${data.status}">
+      <span>${label}</span>
+      <strong>${data.label}</strong>
+    </div>
+  `;
+  return `
+    <div class="norm-status-row">
+      ${item('Всего', normStatus.total)}
+      ${item('Ночь', normStatus.night)}
+      ${item('День', normStatus.day)}
+    </div>
+  `;
 }
 
 function exportLog() {

@@ -6,7 +6,8 @@ const {
   buildSleepSuggestions,
   buildTomorrowPlan,
   getSleepCalendar,
-  buildFamilyReport
+  buildFamilyReport,
+  compareSleepWithNorms
 } = require('../sleep-intelligence');
 
 global.getProfile = (age) => ({
@@ -129,4 +130,14 @@ test('builds audience-specific family reports', () => {
   assert(dad.includes('Как помочь сегодня'));
   assert(grandma.includes('Что важно не сбивать'));
   assert(specialist.includes('Данные для консультации'));
+});
+
+test('compares sleep averages with age norms', () => {
+  const summary = summarizeSleepLogs(logs, 12);
+  const status = compareSleepWithNorms(summary);
+
+  assert.strictEqual(status.total.status, 'low');
+  assert.strictEqual(status.night.status, 'low');
+  assert.strictEqual(status.day.status, 'ok');
+  assert(status.total.deltaMin < 0);
 });

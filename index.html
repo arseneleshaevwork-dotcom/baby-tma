@@ -212,6 +212,22 @@
       <div class="diary-streak" id="diaryStreak"></div>
     </div>
 
+    <div class="quick-sleep-card">
+      <div class="qsc-head">
+        <div>
+          <div class="qsc-title">Быстрая запись</div>
+          <div class="qsc-sub" id="quickSleepStatus">Сон не запущен</div>
+        </div>
+        <div class="qsc-timer" id="quickSleepTimer">—</div>
+      </div>
+      <div class="qsc-actions">
+        <button onclick="startQuickSleep();hapticLight()">😴 Уснул</button>
+        <button onclick="finishQuickSleep();hapticSuccess()">🌤 Проснулся</button>
+        <button onclick="quickSleepTag('night_wake');hapticLight()">🌙 Проснулся ночью</button>
+        <button onclick="quickSleepTag('long_soothe');hapticLight()">⏳ Долго укладывали</button>
+      </div>
+    </div>
+
     <div class="tracker-grid">
       <div class="field"><label for="lgWake">🌅 Подъём</label><input type="time" id="lgWake" value="07:00"></div>
       <div class="field"><label for="lgBed">🌙 Укладывание</label><input type="time" id="lgBed" value="19:30"></div>

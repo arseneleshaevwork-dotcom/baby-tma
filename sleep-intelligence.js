@@ -61,6 +61,21 @@ function summarizeSleepLogs(logs, age) {
   };
 }
 
+function compareSleepWithNorms(summary, toleranceMin = 30) {
+  const build = (actual, target) => {
+    const deltaMin = Math.round(actual - target);
+    const status = deltaMin < -toleranceMin ? 'low' : deltaMin > toleranceMin ? 'high' : 'ok';
+    const label = status === 'low' ? 'ниже нормы' : status === 'high' ? 'выше нормы' : 'в норме';
+    return { actualMin: Math.round(actual), targetMin: target, deltaMin, status, label };
+  };
+
+  return {
+    total: build(summary.avgTotal, summary.norms.totalMin),
+    night: build(summary.avgNight, summary.norms.nightMin),
+    day: build(summary.avgDay, summary.norms.dayMin)
+  };
+}
+
 function getAgeSleepMilestone(age) {
   if (age >= 3 && age <= 5) {
     return {
@@ -400,9 +415,9 @@ function shiftTime(time, deltaMin) {
 }
 
 if (typeof window !== 'undefined') {
-  window.SleepIntel = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, getSleepCalendar, buildSleepSuggestions, buildTomorrowPlan, buildFamilyReport };
+  window.SleepIntel = { getSleepNorms, summarizeSleepLogs, compareSleepWithNorms, getAgeSleepMilestone, getSleepCalendar, buildSleepSuggestions, buildTomorrowPlan, buildFamilyReport };
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, getSleepCalendar, buildSleepSuggestions, buildTomorrowPlan, buildFamilyReport };
+  module.exports = { getSleepNorms, summarizeSleepLogs, compareSleepWithNorms, getAgeSleepMilestone, getSleepCalendar, buildSleepSuggestions, buildTomorrowPlan, buildFamilyReport };
 }
