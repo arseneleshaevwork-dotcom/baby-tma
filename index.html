@@ -350,7 +350,7 @@
     <div class="section-title">💡 Советы по ритуалу</div>
     <div style="font-size:.8rem;color:var(--text-mid);line-height:1.7;font-weight:500">
       <p style="margin-bottom:6px">🌸 <b>Повторяйте каждый день</b> — малыш запоминает последовательность за 2–4 недели</p>
-      <p style="margin-bottom:6px">🌸 <b>Приглушайте свет</b> за 30 минут до укладывания — меламонин вырабатывается в темноте</p>
+      <p style="margin-bottom:6px">🌸 <b>Приглушайте свет</b> за 30 минут до укладывания — мелатонин вырабатывается в темноте</p>
       <p style="margin-bottom:6px">🌸 <b>Снизьте активность</b> — никаких игр, телефонов, активных игрушек</p>
       <p>🌸 <b>Температура в комнате</b> — оптимально 18–20°C (по данным NHS)</p>
     </div>
@@ -411,6 +411,7 @@
 <!-- Scripts -->
 <script src="tma.js"></script>
 <script src="chat.js"></script>
+<script src="sleep-intelligence.js"></script>
 <script src="tracker.js"></script>
 <script src="articles.js"></script>
 <script src="subscription.js"></script>
@@ -650,7 +651,8 @@ function toggleWhiteNoise(type, btn) {
   _startWhiteNoise(type);
   btn.classList.add('playing');
   _activeWN = type;
-  showToast('🎵 ' + type === 'rain' ? 'Звук дождя' : type === 'fan' ? 'Вентилятор' : type === 'ocean' ? 'Океан' : 'Белый шум' + ' включён');
+  var noiseName = type === 'rain' ? 'Звук дождя' : type === 'fan' ? 'Вентилятор' : type === 'ocean' ? 'Океан' : 'Белый шум';
+  showToast('🎵 ' + noiseName + ' включён');
 }
 
 function _startWhiteNoise(type) {

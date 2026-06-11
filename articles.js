@@ -459,9 +459,12 @@ function renderArticles() {
   const container = document.getElementById('articlesContainer');
   if (!container) return;
 
+  const unlocked = typeof SUB === 'undefined' || SUB.can('articlesAll');
   const filtered = articleFilter === 'all'
     ? ARTICLES
     : ARTICLES.filter(a => a.category === articleFilter);
+  const visible = unlocked ? filtered : filtered.slice(0, 5);
+  const lockedCount = Math.max(0, filtered.length - visible.length);
 
   // Category filters
   const filtersHtml = Object.entries(CATEGORIES).map(([id, cat]) => `
@@ -471,7 +474,7 @@ function renderArticles() {
     </button>
   `).join('');
 
-  const cardsHtml = filtered.map(a => `
+  const cardsHtml = visible.map(a => `
     <div class="art-card ${openArticleId === a.id ? 'open' : ''}" id="art-${a.id}">
       <div class="art-header" onclick="toggleArticle('${a.id}')">
         <span class="art-emoji">${a.emoji}</span>
@@ -487,7 +490,18 @@ function renderArticles() {
         </div>
       ` : ''}
     </div>
-  `).join('');
+  `).join('') + (!unlocked && lockedCount ? `
+    <div class="art-card art-locked" onclick="openArticlesPaywall()">
+      <div class="art-header">
+        <span class="art-emoji">⭐</span>
+        <div class="art-meta">
+          <div class="art-title">Ещё ${lockedCount} материалов в Premium</div>
+          <div class="art-preview">Регрессы, скачки роста, переходы сна и подробные главы по возрастам</div>
+        </div>
+        <span class="art-chevron">🔒</span>
+      </div>
+    </div>
+  ` : '');
 
   container.innerHTML = `
     <div class="art-filters">${filtersHtml}</div>
@@ -495,7 +509,7 @@ function renderArticles() {
       <input class="art-search" id="artSearch" placeholder="🔍 Поиск статей..." oninput="searchArticles()">
     </div>
     <div class="art-list" id="artList">${cardsHtml}</div>
-    <p class="art-count">${filtered.length} статей</p>
+    <p class="art-count">${unlocked ? filtered.length + ' статей' : visible.length + ' из ' + filtered.length + ' бесплатно'}</p>
   `;
 }
 
@@ -524,7 +538,9 @@ function searchArticles() {
   if (!list) return;
   if (!q) { renderArticles(); return; }
 
-  const results = ARTICLES.filter(a =>
+  const unlocked = typeof SUB === 'undefined' || SUB.can('articlesAll');
+  const source = unlocked ? ARTICLES : ARTICLES.slice(0, 5);
+  const results = source.filter(a =>
     a.title.toLowerCase().includes(q) ||
     a.preview.toLowerCase().includes(q) ||
     a.content.toLowerCase().includes(q)
@@ -543,4 +559,12 @@ function searchArticles() {
           </div>
         </div>`).join('')
     : '<p style="color:var(--tg-hint);text-align:center;padding:20px">Ничего не найдено</p>';
+}
+
+function openArticlesPaywall() {
+  if (typeof SUB !== 'undefined') {
+    SUB.requirePremium('articlesAll', function(){});
+  } else if (typeof showToast === 'function') {
+    showToast('⭐ Полная база знаний доступна в Premium');
+  }
 }

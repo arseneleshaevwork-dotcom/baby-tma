@@ -578,8 +578,18 @@ body::after {
 .analysis-card { border-radius:var(--radius-sm); padding:14px; margin-bottom:10px; animation:blockIn var(--dur-normal) var(--ease-smooth) both; }
 .analysis-warning { background:rgba(255,154,123,.08); border:1.5px solid rgba(255,154,123,.25); }
 .analysis-info    { background:rgba(124,131,232,.08); border:1.5px solid rgba(124,131,232,.25); }
+.analysis-success { background:rgba(93,201,160,.10); border:1.5px solid rgba(93,201,160,.28); }
 .analysis-card-header { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:.85rem; font-weight:700; }
 .analysis-card p { font-size:.8rem; color:var(--text-hint); line-height:1.5; font-weight:500; }
+.sleep-debt-card {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:14px; margin-bottom:12px; border-radius:var(--radius-sm);
+  background:linear-gradient(135deg,rgba(255,154,123,.12),rgba(201,123,219,.10));
+  border:1.5px solid rgba(201,123,219,.18);
+}
+.sdc-label { font-size:.68rem; color:var(--text-hint); text-transform:uppercase; letter-spacing:.06em; font-weight:800; }
+.sdc-value { font-size:1.35rem; color:var(--clr-primary); font-weight:900; line-height:1.1; }
+.sdc-meta { font-size:.75rem; color:var(--text-hint); line-height:1.35; text-align:right; font-weight:600; max-width:52%; }
 .recovery-btn {
   display:block; width:100%; margin-top:10px; padding:10px;
   border:1.5px solid rgba(201,123,219,.25); border-radius:var(--radius-sm);
@@ -642,6 +652,11 @@ body::after {
 .art-title { font-size:.88rem; font-weight:800; margin-bottom:3px; color:var(--text-dark); }
 .art-preview { font-size:.76rem; color:var(--text-hint); line-height:1.4; font-weight:500; }
 .art-chevron { color:var(--text-hint); font-size:.75rem; flex-shrink:0; margin-top:4px; transition:transform var(--dur-fast) var(--ease-smooth); }
+.art-locked {
+  border-style:dashed;
+  background:linear-gradient(135deg,rgba(255,154,123,.10),rgba(201,123,219,.08));
+}
+.art-locked .art-title { color:var(--clr-primary); }
 .art-body {
   padding:0 16px 16px; font-size:.82rem; color:var(--text-mid); line-height:1.65;
   border-top:1px solid var(--border-soft); padding-top:14px;

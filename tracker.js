@@ -97,70 +97,56 @@ function saveLog() {
 
 // ─── AI Analysis ─────────────────────────────────────────────────────────────
 function analyzeAndSuggest(logs) {
-  const recent = logs.slice(-5); // last 5 days
+  const age = parseInt(localStorage.getItem('babymode_last_age') || document.getElementById('ageMonths')?.value || '6');
+  const hasPremium = typeof SUB === 'undefined' || SUB.can('aiAnalysis');
+
+  if (!hasPremium) {
+    renderAnalysisLocked(logs, age);
+    return;
+  }
+
+  if (typeof SleepIntel !== 'undefined') {
+    const summary = SleepIntel.summarizeSleepLogs(logs, age);
+    renderAnalysis(SleepIntel.buildSleepSuggestions(summary, age), summary);
+    return;
+  }
+
+  const recent = logs.slice(-5);
   const avgNight = recent.reduce((s,l) => s + l.nightLen, 0) / recent.length;
-  const avgDay   = recent.reduce((s,l) => s + l.dayNaps, 0)  / recent.length;
-  const badTags  = recent.flatMap(l => l.tags || []);
-  const age      = parseInt(localStorage.getItem('babymode_last_age') || '6');
-
-  // Get norm for age
-  const profile  = typeof getProfile === 'function' ? getProfile(age) : null;
-  const normNight = profile ? profile.nightH * 60 : 600;
-  const normDay   = profile ? profile.dayH   * 60 : 180;
-
-  const deficit = normNight - avgNight; // minutes short on night sleep
   const suggestions = [];
-
-  if (deficit > 30) {
+  if (avgNight < 600) {
     suggestions.push({
       icon: '🌙',
       type: 'warning',
-      title: 'Малыш недосыпает ночью',
-      text: `За последние ${recent.length} дня(ей) средний ночной сон ${(avgNight/60).toFixed(1)}ч при норме ${(normNight/60).toFixed(1)}ч. Попробуйте уложить на 15–20 мин раньше.`,
+      title: 'Ночной сон ниже ориентира',
+      text: 'Попробуйте уложить малыша на 15-20 мин раньше и сохранить спокойный вечерний ритуал.',
       action: 'recovery'
     });
   }
-
-  if (avgDay > (normDay + 30) && age >= 9) {
-    suggestions.push({
-      icon: '☀️',
-      type: 'info',
-      title: 'Дневной сон может мешать ночному',
-      text: `Слишком долгий дневной сон (${(avgDay/60).toFixed(1)}ч) может сокращать ночной. Попробуйте ограничить последний сон до 17:30.`
-    });
-  }
-
-  if (badTags.filter(t => t === 'long_soothe').length >= 2) {
-    suggestions.push({
-      icon: '⏳',
-      type: 'warning',
-      title: 'Долгое укладывание — 2+ дня подряд',
-      text: 'Возможно, малыш укладывается позже оптимального окна сна. Попробуйте сдвинуть укладывание на 15–20 мин раньше.'
-    });
-  }
-
-  if (badTags.filter(t => t === 'regression').length >= 1) {
-    suggestions.push({
-      icon: '📉',
-      type: 'info',
-      title: 'Регресс сна',
-      text: 'Регрессы временны (обычно 2–4 недели). Придерживайтесь режима, добавьте ритуал перед сном: ванна → кормление → колыбельная.'
-    });
-  }
-
   if (suggestions.length > 0) renderAnalysis(suggestions);
 }
 
-function renderAnalysis(suggestions) {
+function renderAnalysis(suggestions, summary) {
   const block = document.getElementById('analysisBlock');
   if (!block) return;
 
   block.innerHTML = `
     <div class="analysis-header">
       <span class="analysis-icon">🤖</span>
-      <span>Анализ режима</span>
+      <span>Персональный анализ</span>
       <span class="analysis-badge">${suggestions.length} совет${suggestions.length > 1 ? 'а' : ''}</span>
     </div>
+    ${summary ? `
+      <div class="sleep-debt-card">
+        <div>
+          <div class="sdc-label">Недосып за ${summary.recent.length} дн.</div>
+          <div class="sdc-value">${summary.sleepDebt ? (summary.sleepDebt / 60).toFixed(1) + 'ч' : 'нет'}</div>
+        </div>
+        <div class="sdc-meta">
+          Норма ${Math.round(summary.norms.totalMin / 60 * 10) / 10}ч/сут · факт ${(summary.avgTotal / 60).toFixed(1)}ч
+        </div>
+      </div>
+    ` : ''}
     ${suggestions.map(s => `
       <div class="analysis-card analysis-${s.type}">
         <div class="analysis-card-header">
@@ -175,6 +161,35 @@ function renderAnalysis(suggestions) {
         ` : ''}
       </div>
     `).join('')}
+  `;
+  block.style.display = 'block';
+}
+
+function renderAnalysisLocked(logs, age) {
+  const block = document.getElementById('analysisBlock');
+  if (!block) return;
+  const summary = typeof SleepIntel !== 'undefined'
+    ? SleepIntel.summarizeSleepLogs(logs, age)
+    : null;
+
+  block.innerHTML = `
+    <div class="analysis-header">
+      <span class="analysis-icon">🤖</span>
+      <span>Персональный анализ</span>
+      <span class="analysis-badge">Premium</span>
+    </div>
+    <div class="analysis-card analysis-info">
+      <div class="analysis-card-header">
+        <span>🌙</span>
+        <strong>${summary && summary.sleepDebt ? 'Вижу признаки недосыпа' : 'Готов анализ режима'}</strong>
+      </div>
+      <p>${summary && summary.sleepDebt
+        ? `По последним записям накопилось около ${(summary.sleepDebt / 60).toFixed(1)}ч недосыпа. Premium покажет причину и план восстановления.`
+        : 'После 3 записей дневника Premium показывает паттерны сна, недосып, регрессы и мягкие корректировки режима.'}</p>
+      <button class="recovery-btn" onclick="document.getElementById('bn-premium')?.click();hapticLight()">
+        ⭐ Открыть Premium-анализ
+      </button>
+    </div>
   `;
   block.style.display = 'block';
 }

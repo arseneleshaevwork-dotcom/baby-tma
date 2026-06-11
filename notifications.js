@@ -1,8 +1,8 @@
 // ─── Notifications & Reminders ────────────────────────────────────────────────
-// Uses Telegram Bot API to send schedule reminders via bot message.
+// Uses in-session reminders. Telegram bot delivery must go through a backend.
 // Fallback: in-session setTimeout reminders with toast notifications.
 
-const BOT_TOKEN = '8999375510:AAFlkiYu-0SabIMT7-XKJPWynRVUlK_R8NQ';
+const NOTIF_ENDPOINT = '';
 const NOTIF_KEY = 'babymode_notif_enabled';
 
 let _notifTimers = [];
@@ -107,14 +107,11 @@ function scheduleReminders(blocks) {
 }
 
 function _sendBotMessage(chatId, text) {
-  fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+  if (!NOTIF_ENDPOINT) return;
+  fetch(NOTIF_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text,
-      parse_mode: 'Markdown'
-    })
+    body: JSON.stringify({ chat_id: chatId, text: text })
   }).catch(() => {}); // silent fail — user is offline
 }
 
