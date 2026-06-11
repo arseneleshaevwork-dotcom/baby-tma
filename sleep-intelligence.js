@@ -164,10 +164,128 @@ function buildSleepSuggestions(summary, age) {
   return suggestions.slice(0, 4);
 }
 
+function buildTomorrowPlan(summary, age, context = {}) {
+  const milestone = getAgeSleepMilestone(age);
+
+  if (summary.sleepDebt >= 90 || summary.trend === 'worse') {
+    return {
+      type: 'recovery',
+      icon: '🌙',
+      goal: 'Компенсировать недосып',
+      title: 'Восстановительный день',
+      target: 'спокойный день + раннее укладывание',
+      reason: `За последние дни накопилось около ${(summary.sleepDebt / 60).toFixed(1)}ч недосыпа, поэтому завтра важнее восстановление, а не идеальная активность.`,
+      schedule: [
+        { label: 'Подъём', value: shiftTime(context.wake || '07:00', 15) },
+        { label: 'Дневной сон', value: 'на 15-20 мин длиннее обычного' },
+        { label: 'Ночь', value: shiftTime(context.bedtime || '20:00', -20) }
+      ],
+      rules: [
+        'Сделайте тихий день: меньше гостей, поездок и активных игр.',
+        'Начните вечерний ритуал на 20 минут раньше.',
+        'Если дневной сон короткий, не компенсируйте поздними активностями вечером.'
+      ],
+      apply: {
+        wakeShift: 15,
+        bedtimeShift: -20,
+        buffer: 20,
+        situation: 'normal'
+      }
+    };
+  }
+
+  if (age >= 12 && age <= 18) {
+    return {
+      type: 'transition',
+      icon: '☀️',
+      goal: 'Мягко держать один дневной сон',
+      title: 'День стабилизации перехода',
+      target: 'один сон в середине дня',
+      reason: milestone ? milestone.text : 'В этом возрасте режим часто перестраивается, поэтому лучше держать понятные якоря дня.',
+      schedule: [
+        { label: 'Подъём', value: context.wake || '07:00' },
+        { label: 'Дневной сон', value: '12:00-13:00 старт' },
+        { label: 'Ночь', value: context.bedtime || '19:30' }
+      ],
+      rules: [
+        'Держите дневной сон в коридоре 12:00-13:00.',
+        'Если малыш просится на второй сон, сделайте короткий отдых до 20 минут.',
+        'Не сдвигайте ночь позже, даже если дневной сон был длинным.'
+      ],
+      apply: {
+        wakeShift: 0,
+        bedtimeShift: 0,
+        buffer: 10,
+        situation: 'normal'
+      }
+    };
+  }
+
+  if (summary.topTag && summary.topTag[0] === 'long_soothe') {
+    return {
+      type: 'settling',
+      icon: '⏳',
+      goal: 'Сократить долгое укладывание',
+      title: 'День точного окна сна',
+      target: 'ритуал раньше, меньше перевозбуждения',
+      reason: 'Долгое укладывание повторяется несколько дней. Часто помогает не менять весь режим, а точнее поймать последнее окно бодрствования.',
+      schedule: [
+        { label: 'Активность', value: 'убрать за 60 мин до сна' },
+        { label: 'Ритуал', value: 'начать на 15 мин раньше' },
+        { label: 'Ночь', value: shiftTime(context.bedtime || '20:00', -15) }
+      ],
+      rules: [
+        'Последний час без активных игр и экранов.',
+        'Сделайте один и тот же короткий ритуал.',
+        'Если плач усиливается, вернитесь к контакту и повторите попытку мягко.'
+      ],
+      apply: {
+        wakeShift: 0,
+        bedtimeShift: -15,
+        buffer: 10,
+        situation: 'normal'
+      }
+    };
+  }
+
+  return {
+    type: 'stable',
+    icon: '✨',
+    goal: 'Сохранить стабильность',
+    title: 'Обычный день по режиму',
+    target: 'сохранить текущие якоря',
+    reason: 'Сон близок к возрастной норме. Завтра лучше ничего резко не менять.',
+    schedule: [
+      { label: 'Подъём', value: context.wake || '07:00' },
+      { label: 'Дневной сон', value: 'по текущему режиму' },
+      { label: 'Ночь', value: context.bedtime || '20:00' }
+    ],
+    rules: [
+      'Сохраняйте подъём и вечерний ритуал.',
+      'Отклонение 15-20 минут допустимо.',
+      'Запишите день в дневник, чтобы видеть тренд.'
+    ],
+    apply: {
+      wakeShift: 0,
+      bedtimeShift: 0,
+      buffer: 0,
+      situation: 'normal'
+    }
+  };
+}
+
+function shiftTime(time, deltaMin) {
+  const parts = String(time || '07:00').split(':').map(Number);
+  const h = Number.isFinite(parts[0]) ? parts[0] : 7;
+  const m = Number.isFinite(parts[1]) ? parts[1] : 0;
+  const total = (h * 60 + m + deltaMin + 24 * 60) % (24 * 60);
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
 if (typeof window !== 'undefined') {
-  window.SleepIntel = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, buildSleepSuggestions };
+  window.SleepIntel = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, buildSleepSuggestions, buildTomorrowPlan };
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, buildSleepSuggestions };
+  module.exports = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, buildSleepSuggestions, buildTomorrowPlan };
 }

@@ -3,7 +3,8 @@ const {
   getSleepNorms,
   summarizeSleepLogs,
   getAgeSleepMilestone,
-  buildSleepSuggestions
+  buildSleepSuggestions,
+  buildTomorrowPlan
 } = require('../sleep-intelligence');
 
 global.getProfile = (age) => ({
@@ -65,4 +66,33 @@ test('builds actionable suggestions for debt and repeated tags', () => {
   assert(suggestions.some(item => item.title === 'Накопился недосып'));
   assert(suggestions.some(item => item.title === 'Повторяющийся паттерн'));
   assert(suggestions.some(item => item.title === 'Переход на один сон'));
+});
+
+test('builds a recovery tomorrow plan from sleep debt', () => {
+  const summary = summarizeSleepLogs(logs, 12);
+  const plan = buildTomorrowPlan(summary, 12, { wake: '07:00', bedtime: '20:30' });
+
+  assert.strictEqual(plan.type, 'recovery');
+  assert.strictEqual(plan.goal, 'Компенсировать недосып');
+  assert.deepStrictEqual(plan.apply, {
+    wakeShift: 15,
+    bedtimeShift: -20,
+    buffer: 20,
+    situation: 'normal'
+  });
+  assert(plan.rules.some(rule => rule.includes('тихий день')));
+});
+
+test('builds a transition tomorrow plan for 12 to 18 months without debt', () => {
+  const stableLogs = [
+    { nightLen: 690, dayNaps: 100, tags: [] },
+    { nightLen: 680, dayNaps: 95, tags: [] },
+    { nightLen: 675, dayNaps: 100, tags: [] }
+  ];
+  const summary = summarizeSleepLogs(stableLogs, 14);
+  const plan = buildTomorrowPlan(summary, 14, { wake: '07:00', bedtime: '19:30' });
+
+  assert.strictEqual(plan.type, 'transition');
+  assert.strictEqual(plan.goal, 'Мягко держать один дневной сон');
+  assert(plan.rules.some(rule => rule.includes('12:00-13:00')));
 });

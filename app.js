@@ -305,6 +305,40 @@ function onBuffer(val){
   refreshSchedule();
 }
 
+function applyPlanToGenerator(plan){
+  if (!plan || !plan.apply) return;
+  const wakeInput=document.getElementById('wakeTime');
+  const bufferSlider=document.getElementById('bufferSlider');
+  const bufferVal=document.getElementById('bufferVal');
+
+  if (wakeInput && plan.apply.wakeShift) {
+    wakeInput.value=shiftClock(wakeInput.value||'07:00', plan.apply.wakeShift);
+  }
+
+  const buffer=Math.max(0,Math.min(30,plan.apply.buffer||0));
+  _bufferMin=buffer;
+  if(bufferSlider) bufferSlider.value=String(buffer);
+  if(bufferVal) bufferVal.textContent=buffer+' мин';
+  window._appliedPlanBuffer=buffer;
+
+  if(plan.apply.situation){
+    const btn=document.getElementById('sit-'+plan.apply.situation);
+    if(btn && typeof selectSituation==='function') selectSituation(plan.apply.situation,btn);
+  }
+
+  if(typeof generate==='function') generate();
+  if(typeof goPage==='function') goPage('schedule',document.getElementById('bn-schedule'));
+  if(typeof showToast==='function') showToast('📅 План на завтра применён к режиму');
+}
+
+function shiftClock(time,deltaMin){
+  const parts=String(time||'07:00').split(':').map(Number);
+  const h=Number.isFinite(parts[0])?parts[0]:7;
+  const m=Number.isFinite(parts[1])?parts[1]:0;
+  const total=(h*60+m+deltaMin+24*60)%(24*60);
+  return`${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+}
+
 function shiftNap(napIdx,delta){
   _blockShifts[napIdx]=(_blockShifts[napIdx]||0)+delta;
   refreshSchedule();
@@ -349,14 +383,16 @@ function generate(){
   _feedType=document.getElementById('feedType').value;
   _activity=document.getElementById('activity').value;
   _situation=window._currentSituation||'normal';
-  _p=getProfile(_age); _blockShifts={}; _bufferMin=0;
+  const planBuffer=Number.isFinite(window._appliedPlanBuffer)?window._appliedPlanBuffer:0;
+  _p=getProfile(_age); _blockShifts={}; _bufferMin=planBuffer;
   localStorage.setItem('babymode_last_age', String(_age));
-  document.getElementById('bufferSlider').value=0;
-  document.getElementById('bufferVal').textContent='0 мин';
+  document.getElementById('bufferSlider').value=String(planBuffer);
+  document.getElementById('bufferVal').textContent=planBuffer+' мин';
+  delete window._appliedPlanBuffer;
 
   const adj=getSituationAdjustment(_situation);
   const activity=adj.activity||_activity;
-  const{blocks,daySegs,profile:p}=buildSchedule(_age,_wakeMin,_feedType,activity,adj.buffer,{});
+  const{blocks,daySegs,profile:p}=buildSchedule(_age,_wakeMin,_feedType,activity,adj.buffer+planBuffer,{});
   renderSchedule(blocks,daySegs,p);
 
   // Confetti burst on first-ever generation

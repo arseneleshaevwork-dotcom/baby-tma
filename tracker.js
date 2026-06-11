@@ -129,6 +129,10 @@ function analyzeAndSuggest(logs) {
 function renderAnalysis(suggestions, summary) {
   const block = document.getElementById('analysisBlock');
   if (!block) return;
+  const age = parseInt(localStorage.getItem('babymode_last_age') || document.getElementById('ageMonths')?.value || '6');
+  const plan = summary && typeof SleepIntel !== 'undefined'
+    ? SleepIntel.buildTomorrowPlan(summary, age, _getTomorrowPlanContext())
+    : null;
 
   block.innerHTML = `
     <div class="analysis-header">
@@ -147,6 +151,7 @@ function renderAnalysis(suggestions, summary) {
         </div>
       </div>
     ` : ''}
+    ${plan ? renderTomorrowPlan(plan) : ''}
     ${suggestions.map(s => `
       <div class="analysis-card analysis-${s.type}">
         <div class="analysis-card-header">
@@ -163,6 +168,59 @@ function renderAnalysis(suggestions, summary) {
     `).join('')}
   `;
   block.style.display = 'block';
+}
+
+function _getTomorrowPlanContext() {
+  const logs = getLogs();
+  const last = logs[logs.length - 1] || {};
+  return {
+    wake: last.wake || document.getElementById('wakeTime')?.value || '07:00',
+    bedtime: last.bed || '20:00'
+  };
+}
+
+function renderTomorrowPlan(plan) {
+  const rows = plan.schedule.map(item => `
+    <div class="tp-row">
+      <span>${item.label}</span>
+      <strong>${item.value}</strong>
+    </div>
+  `).join('');
+  const rules = plan.rules.map(rule => `<li>${rule}</li>`).join('');
+
+  return `
+    <div class="tomorrow-plan-card">
+      <div class="tp-head">
+        <div class="tp-icon">${plan.icon}</div>
+        <div>
+          <div class="tp-kicker">План на завтра</div>
+          <div class="tp-title">${plan.title}</div>
+        </div>
+      </div>
+      <div class="tp-goal">${plan.goal}</div>
+      <p class="tp-reason">${plan.reason}</p>
+      <div class="tp-schedule">${rows}</div>
+      <ul class="tp-rules">${rules}</ul>
+      <button class="recovery-btn" onclick="applyTomorrowPlan();hapticSuccess()">
+        📅 Применить к режиму
+      </button>
+    </div>
+  `;
+}
+
+function applyTomorrowPlan() {
+  const age = parseInt(localStorage.getItem('babymode_last_age') || document.getElementById('ageMonths')?.value || '6');
+  const summary = typeof SleepIntel !== 'undefined'
+    ? SleepIntel.summarizeSleepLogs(getLogs(), age)
+    : null;
+  if (!summary) return;
+
+  const plan = SleepIntel.buildTomorrowPlan(summary, age, _getTomorrowPlanContext());
+  localStorage.setItem('babymode_tomorrow_plan', JSON.stringify(plan));
+
+  if (typeof applyPlanToGenerator === 'function') {
+    applyPlanToGenerator(plan);
+  }
 }
 
 function renderAnalysisLocked(logs, age) {
@@ -184,8 +242,8 @@ function renderAnalysisLocked(logs, age) {
         <strong>${summary && summary.sleepDebt ? 'Вижу признаки недосыпа' : 'Готов анализ режима'}</strong>
       </div>
       <p>${summary && summary.sleepDebt
-        ? `По последним записям накопилось около ${(summary.sleepDebt / 60).toFixed(1)}ч недосыпа. Premium покажет причину и план восстановления.`
-        : 'После 3 записей дневника Premium показывает паттерны сна, недосып, регрессы и мягкие корректировки режима.'}</p>
+        ? `По последним записям накопилось около ${(summary.sleepDebt / 60).toFixed(1)}ч недосыпа. Premium покажет причину и план на завтра.`
+        : 'После 3 записей дневника Premium показывает паттерны сна, недосып и план на завтра.'}</p>
       <button class="recovery-btn" onclick="document.getElementById('bn-premium')?.click();hapticLight()">
         ⭐ Открыть Premium-анализ
       </button>
