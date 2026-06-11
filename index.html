@@ -3,34 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Режим Малыша</title>
-<meta name="description" content="Научно обоснованный генератор режима дня для малыша">
+<title>Режим Малыша — Умный режим дня для малыша</title>
+<meta name="description" content="Научно обоснованный генератор режима дня для малыша. Дневник сна, консультант и ритуал засыпания для молодых мам.">
 
-<!-- Critical inline CSS — рендерится мгновенно без внешних запросов -->
+<!-- Critical inline CSS -->
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{height:100%;background:#07071a;color:#f1f5f9;font-family:-apple-system,system-ui,sans-serif}
-  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 100% 40% at 50% 0%,rgba(139,92,246,.15),transparent);pointer-events:none;z-index:0}
+  html,body{height:100%;background:#FFF9F5;color:#3D2C3E;font-family:-apple-system,sans-serif}
 </style>
 
-<!-- Telegram SDK — синхронно, нужен до DOMContentLoaded -->
+<!-- Telegram SDK -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-<!-- Google Fonts — non-blocking (не блокирует рендер) -->
+<!-- Google Fonts — Nunito (non-blocking) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 
-<!-- Chart.js — async, не блокирует загрузку -->
+<!-- Chart.js -->
 <script>
 (function(){
   var s=document.createElement('script');
   s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
   s.async=true;
   s.onerror=function(){
-    // Заглушка если Chart.js не загрузился
     window.Chart=function(){return{destroy:function(){},update:function(){}};};
     window.Chart.prototype={};
-    console.warn('Chart.js не загрузился, графики отключены');
   };
   document.head.appendChild(s);
 })();
@@ -40,14 +37,24 @@
 </head>
 <body>
 
-<!-- HEADER -->
+<!-- ═══════════════════════════════════════════════════════
+     HEADER
+═══════════════════════════════════════════════════════ -->
 <div class="app-header">
-  <span class="hero" role="img" aria-label="Малыш">👶</span>
-  <h1>Режим Малыша</h1>
+  <div class="baby-avatar-wrap" onclick="editBabyPhoto()" style="cursor:pointer">
+    <div class="baby-avatar-emoji" id="babyAvatarEmoji">👶</div>
+    <img id="babyAvatarImg" class="baby-avatar" src="" alt="Малыш" style="display:none">
+    <div class="baby-avatar-edit">✏️</div>
+  </div>
+  <div class="baby-name" id="babyNameDisplay" style="display:none"></div>
+  <h1 id="appTitle">Режим Малыша</h1>
   <p>Научно обоснованный генератор расписания</p>
+  <div class="trial-badge" id="trial-header-badge" style="display:none">🌸 Premium</div>
 </div>
 
-<!-- PAGE: HOME -->
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: HOME
+═══════════════════════════════════════════════════════ -->
 <div id="page-home" class="page active">
   <div class="card">
     <div class="form-grid">
@@ -96,33 +103,46 @@
         </select>
       </div>
     </div>
+
+    <!-- Ситуация дня (Premium) -->
+    <div style="margin-bottom:12px">
+      <label style="display:block;font-size:.68rem;font-weight:800;color:var(--clr-primary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Ситуация дня</label>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button class="situation-btn active" id="sit-normal" onclick="selectSituation('normal',this)">😊 Обычный</button>
+        <button class="situation-btn" id="sit-sick" onclick="selectSituation('sick',this)" title="Premium">🤒 Болезнь ⭐</button>
+        <button class="situation-btn" id="sit-travel" onclick="selectSituation('travel',this)" title="Premium">✈️ Поездка ⭐</button>
+        <button class="situation-btn" id="sit-heat" onclick="selectSituation('heat',this)" title="Premium">☀️ Жара ⭐</button>
+        <button class="situation-btn" id="sit-guests" onclick="selectSituation('guests',this)" title="Premium">👨‍👩‍👧 Гости ⭐</button>
+      </div>
+    </div>
+
     <button class="gen-btn" id="btn-generate" onclick="generateAndSwitch()">✨ Сгенерировать режим дня</button>
   </div>
 
   <div class="card">
     <div class="section-title">Как это работает</div>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div style="display:flex;gap:10px;align-items:flex-start">
-        <span style="font-size:1.4rem">🔬</span>
-        <div><div style="font-size:.85rem;font-weight:600;margin-bottom:2px">Научная основа</div><div style="font-size:.78rem;color:var(--tg-hint)">Wake windows из рекомендаций AAP, ВОЗ, NHS</div></div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:flex-start">
-        <span style="font-size:1.4rem">⚙️</span>
-        <div><div style="font-size:.85rem;font-weight:600;margin-bottom:2px">Гибкость</div><div style="font-size:.78rem;color:var(--tg-hint)">Настраивайте режим под свой день с буфером времени</div></div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:flex-start">
-        <span style="font-size:1.4rem">📊</span>
-        <div><div style="font-size:.85rem;font-weight:600;margin-bottom:2px">Дневник</div><div style="font-size:.78rem;color:var(--tg-hint)">Ведите статистику и смотрите графики за неделю</div></div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:flex-start">
-        <span style="font-size:1.4rem">💬</span>
-        <div><div style="font-size:.85rem;font-weight:600;margin-bottom:2px">Консультант</div><div style="font-size:.78rem;color:var(--tg-hint)">Ответы на 40+ частых вопросов мам</div></div>
-      </div>
+    <div class="how-item">
+      <div class="how-icon sleep-bg">🔬</div>
+      <div><div class="how-title">Научная основа</div><div class="how-sub">Wake windows из рекомендаций AAP, ВОЗ, NHS</div></div>
+    </div>
+    <div class="how-item">
+      <div class="how-icon feed-bg">⚙️</div>
+      <div><div class="how-title">Гибкость</div><div class="how-sub">Настраивайте режим под свой день с буфером</div></div>
+    </div>
+    <div class="how-item">
+      <div class="how-icon stats-bg">📊</div>
+      <div><div class="how-title">Дневник</div><div class="how-sub">Ведите статистику и смотрите графики за неделю</div></div>
+    </div>
+    <div class="how-item">
+      <div class="how-icon chat-bg">💬</div>
+      <div><div class="how-title">Консультант</div><div class="how-sub">Ответы на 40+ частых вопросов мам</div></div>
     </div>
   </div>
 </div>
 
-<!-- PAGE: SCHEDULE -->
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: SCHEDULE
+═══════════════════════════════════════════════════════ -->
 <div id="page-schedule" class="page">
   <div class="card">
     <div class="flex-bar">
@@ -153,15 +173,23 @@
     <div class="daybar" id="dayBar"></div>
     <div class="daybar-labels"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
     <div class="legend">
-      <div class="legend-item"><div class="legend-dot" style="background:#6366f1"></div>Сон</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Активность</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div>Кормление</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#db2777"></div>Прогулка</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#7C83E8"></div>Сон</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#5DC9A0"></div>Активность</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#FF9A7B"></div>Кормление</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#F48FB1"></div>Прогулка</div>
     </div>
+  </div>
+  <!-- Share card button -->
+  <div style="padding:0 0 8px">
+    <button class="share-btn" onclick="openShareCard();hapticLight()" style="margin-bottom:0">
+      📱 Поделиться с папой / бабушкой
+    </button>
   </div>
 </div>
 
-<!-- PAGE: CHAT -->
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: CHAT
+═══════════════════════════════════════════════════════ -->
 <div id="page-chat" class="page">
   <div class="card">
     <div class="section-title">Быстрые темы</div>
@@ -174,7 +202,9 @@
   </div>
 </div>
 
-<!-- PAGE: TRACKER (Smart Sleep Diary) -->
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: TRACKER
+═══════════════════════════════════════════════════════ -->
 <div id="page-tracker" class="page">
   <div class="card">
     <div class="diary-header">
@@ -191,9 +221,7 @@
       <div class="field"><label for="lgNap2E">🌤 Сон 2 конец</label><input type="time" id="lgNap2E"></div>
     </div>
 
-    <div class="field" style="margin-bottom:8px">
-      <label>🏷 Отметки дня</label>
-    </div>
+    <div class="field" style="margin-bottom:8px"><label>🏷 Отметки дня</label></div>
     <div class="sleep-tags" id="sleepTags"></div>
 
     <div class="field" style="margin:10px 0 8px"><label>😊 Настроение малыша</label></div>
@@ -209,9 +237,7 @@
     <button class="save-log-btn" id="btn-save-log" onclick="saveLog();hapticSuccess()">💾 Сохранить день</button>
   </div>
 
-  <!-- AI Analysis block (shown after 3+ days) -->
-  <div class="card" id="analysisBlock" style="display:none">
-  </div>
+  <div class="card" id="analysisBlock" style="display:none"></div>
 
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -230,45 +256,121 @@
   </div>
 </div>
 
-<!-- PAGE: ARTICLES -->
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: ARTICLES
+═══════════════════════════════════════════════════════ -->
 <div id="page-articles" class="page">
   <div class="card" style="padding-bottom:8px">
     <div class="diary-header">
       <div class="section-title" style="margin-bottom:0">📚 База знаний</div>
-      <span style="font-size:.72rem;color:var(--tg-hint)">18 статей</span>
+      <span style="font-size:.72rem;color:var(--text-hint);font-weight:600">18 статей</span>
     </div>
-    <p style="font-size:.82rem;color:var(--tg-hint);margin-top:4px">Научно обоснованные статьи о сне, кормлении и развитии</p>
+    <p style="font-size:.82rem;color:var(--text-hint);margin-top:4px;font-weight:500">Научно обоснованные статьи о сне, кормлении и развитии</p>
   </div>
   <div id="articlesContainer"></div>
 </div>
 
-<!-- PAGE: PREMIUM -->
-<div id="page-premium" class="page">
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: RITUAL (ритуал засыпания)
+═══════════════════════════════════════════════════════ -->
+<div id="page-ritual" class="page">
+  <div class="ritual-hero">
+    <span class="ritual-hero-emoji">🌙</span>
+    <h2>Ритуал засыпания</h2>
+    <p>Пошаговый вечерний ритуал для спокойного сна</p>
+  </div>
+
   <div class="card">
-    <div class="premium-hero">
-      <span class="lock">📋</span>
-      <h2>Мануал для мамы</h2>
-      <p>30+ страниц научно обоснованных рекомендаций, таблиц норм сна, меню прикорма и советов</p>
-      <div id="premiumStatus">🔒 Демо-режим</div>
+    <div class="section-title">Шаги ритуала</div>
+    <div id="ritualSteps">
+      <div class="ritual-step" id="rs-0" onclick="activateRitualStep(0)">
+        <div class="rs-num">🛁</div>
+        <div class="rs-info">
+          <div class="rs-title">Купание</div>
+          <div class="rs-sub">Тёплая вода 37°C, 10–15 минут</div>
+        </div>
+        <div class="rs-timer" id="rt-0">10:00</div>
+      </div>
+      <div class="ritual-step" id="rs-1" onclick="activateRitualStep(1)">
+        <div class="rs-num">💆</div>
+        <div class="rs-info">
+          <div class="rs-title">Массаж</div>
+          <div class="rs-sub">Лёгкие поглаживания, 5–10 минут</div>
+        </div>
+        <div class="rs-timer" id="rt-1">7:00</div>
+      </div>
+      <div class="ritual-step" id="rs-2" onclick="activateRitualStep(2)">
+        <div class="rs-num">🍼</div>
+        <div class="rs-info">
+          <div class="rs-title">Кормление</div>
+          <div class="rs-sub">Спокойно, без яркого света</div>
+        </div>
+        <div class="rs-timer" id="rt-2">15:00</div>
+      </div>
+      <div class="ritual-step" id="rs-3" onclick="activateRitualStep(3)">
+        <div class="rs-num">📖</div>
+        <div class="rs-info">
+          <div class="rs-title">Сказка / колыбельная</div>
+          <div class="rs-sub">Спокойным голосом, одна и та же</div>
+        </div>
+        <div class="rs-timer" id="rt-3">5:00</div>
+      </div>
+      <div class="ritual-step" id="rs-4" onclick="activateRitualStep(4)">
+        <div class="rs-num">😴</div>
+        <div class="rs-info">
+          <div class="rs-title">Укладывание</div>
+          <div class="rs-sub">Положить сонного, но ещё не спящего</div>
+        </div>
+        <div class="rs-timer" id="rt-4">—</div>
+      </div>
     </div>
-    <div class="features-grid">
-      <div class="feat-item"><div class="fi">🌙</div><div class="ft">Нормы сна 0–3 года</div></div>
-      <div class="feat-item"><div class="fi">🍼</div><div class="ft">Меню прикорма по месяцам</div></div>
-      <div class="feat-item"><div class="fi">📅</div><div class="ft">Расписание с пояснениями</div></div>
-      <div class="feat-item"><div class="fi">💡</div><div class="ft">40+ ответов на вопросы</div></div>
-      <div class="feat-item"><div class="fi">😴</div><div class="ft">Гайд по регрессам сна</div></div>
-      <div class="feat-item"><div class="fi">🛁</div><div class="ft">Уход, купание, массаж</div></div>
+
+    <div style="margin-top:14px">
+      <button class="ritual-start-btn" id="ritualStartBtn" onclick="startRitual()">
+        ▶️ Начать ритуал
+      </button>
     </div>
-    <div class="price-block">
-      <div class="price">299 <span>руб</span></div>
-      <p>Разовая покупка · PDF на вашей почте</p>
+  </div>
+
+  <div class="card">
+    <div class="section-title">🎵 Белый шум</div>
+    <p style="font-size:.78rem;color:var(--text-hint);margin-bottom:12px;font-weight:500">Помогает малышу засыпать и не просыпаться</p>
+    <div class="white-noise-player">
+      <button class="wn-btn" id="wn-rain" onclick="toggleWhiteNoise('rain', this)">🌧️<br>Дождь</button>
+      <button class="wn-btn" id="wn-fan" onclick="toggleWhiteNoise('fan', this)">🌀<br>Вентилятор</button>
+      <button class="wn-btn" id="wn-ocean" onclick="toggleWhiteNoise('ocean', this)">🌊<br>Океан</button>
+      <button class="wn-btn" id="wn-shh" onclick="toggleWhiteNoise('shh', this)">🤫<br>Шшш</button>
     </div>
-    <button class="buy-btn" onclick="buyPremium();hapticMedium()">🔓 Получить мануал за 299 руб</button>
-    <button class="demo-btn" onclick="generatePDF();hapticLight()">👀 Скачать пример (PDF)</button>
+    <p style="font-size:.7rem;color:var(--text-hint);margin-top:10px;font-weight:500;text-align:center">
+      💡 Исследования показывают: белый шум снижает время засыпания на 36%
+    </p>
+  </div>
+
+  <div class="card card-mint">
+    <div class="section-title">💡 Советы по ритуалу</div>
+    <div style="font-size:.8rem;color:var(--text-mid);line-height:1.7;font-weight:500">
+      <p style="margin-bottom:6px">🌸 <b>Повторяйте каждый день</b> — малыш запоминает последовательность за 2–4 недели</p>
+      <p style="margin-bottom:6px">🌸 <b>Приглушайте свет</b> за 30 минут до укладывания — меламонин вырабатывается в темноте</p>
+      <p style="margin-bottom:6px">🌸 <b>Снизьте активность</b> — никаких игр, телефонов, активных игрушек</p>
+      <p>🌸 <b>Температура в комнате</b> — оптимально 18–20°C (по данным NHS)</p>
+    </div>
   </div>
 </div>
 
-<!-- BOTTOM NAV -->
+<!-- ═══════════════════════════════════════════════════════
+     PAGE: PREMIUM / SUBSCRIPTION
+═══════════════════════════════════════════════════════ -->
+<div id="page-premium" class="page">
+  <!-- Rendered by subscription.js renderPremiumPage() -->
+  <div style="text-align:center;padding:40px 20px;color:var(--text-hint)">
+    <div style="font-size:2rem;margin-bottom:8px">✨</div>
+    <div>Загружаем...</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     BOTTOM NAV
+═══════════════════════════════════════════════════════ -->
 <nav class="bottom-nav" role="navigation" aria-label="Основная навигация">
   <button class="bnav-item active" id="bn-home" onclick="goPage('home',this)" aria-label="Главная">
     <span class="icon">🏠</span><span>Главная</span>
@@ -276,38 +378,56 @@
   <button class="bnav-item" id="bn-schedule" onclick="goPage('schedule',this)" aria-label="Режим дня">
     <span class="icon">📅</span><span>Режим</span>
   </button>
-  <button class="bnav-item" id="bn-articles" onclick="goPage('articles',this);renderArticles()" aria-label="Статьи">
-    <span class="icon">📚</span><span>Статьи</span>
+  <button class="bnav-item" id="bn-ritual" onclick="goPage('ritual',this)" aria-label="Ритуал сна">
+    <span class="icon">🌙</span><span>Ритуал</span>
   </button>
   <button class="bnav-item" id="bn-tracker" onclick="goPage('tracker',this)" aria-label="Дневник">
     <span class="icon">📓</span><span>Дневник</span>
   </button>
-  <button class="bnav-item" id="bn-premium" onclick="goPage('premium',this)" aria-label="PRO версия">
-    <span class="icon">⭐</span><span>PRO</span>
+  <button class="bnav-item" id="bn-premium" onclick="goPage('premium',this);renderPremiumPage()" aria-label="Premium">
+    <span class="icon">⭐</span><span>Premium</span>
   </button>
 </nav>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+<!-- Share modal -->
+<div id="shareModal" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(61,44,62,.7);backdrop-filter:blur(10px);align-items:flex-end;justify-content:center">
+  <div style="background:var(--white);border-radius:32px 32px 0 0;padding:28px 24px 40px;width:100%;max-width:440px">
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="font-size:1.1rem;font-weight:900;color:var(--text-dark);margin-bottom:4px">Поделиться расписанием</div>
+      <div style="font-size:.8rem;color:var(--text-hint);font-weight:500">Отправьте папе, бабушке или няне</div>
+    </div>
+    <div class="share-card-preview" id="shareCardPreview">
+      <div class="baby-avatar-emoji" style="width:48px;height:48px;font-size:28px;margin:0 auto 8px" id="shareCardAvatar">👶</div>
+      <div class="share-title" id="shareCardTitle">Режим дня малыша</div>
+      <div class="share-sub" id="shareCardSub">Сгенерировано в Режим Малыша</div>
+    </div>
+    <button class="share-btn" onclick="doShareSchedule();hapticMedium()">📤 Отправить в Telegram</button>
+    <button class="cta-outline-btn" style="margin-top:8px" onclick="closeShareModal();hapticLight()">Закрыть</button>
+  </div>
+</div>
+
+<!-- Scripts -->
 <script src="tma.js"></script>
 <script src="chat.js"></script>
 <script src="tracker.js"></script>
 <script src="articles.js"></script>
-<script src="premium.js"></script>
+<script src="subscription.js"></script>
 <script src="onboarding.js"></script>
 <script src="notifications.js"></script>
 <script src="app.js"></script>
+
 <script>
-// ECC motion-ui: device adaptation heuristic
+// ─── Low-end device detection ────────────────────────────────────────────────
 var _isLowEnd = (function(){
   if (typeof navigator === 'undefined') return false;
-  var mem = navigator.deviceMemory;
-  var cores = navigator.hardwareConcurrency;
+  var mem = navigator.deviceMemory, cores = navigator.hardwareConcurrency;
   return (mem !== undefined && mem <= 2) || (mem === undefined && cores <= 4);
 })();
 if (_isLowEnd) document.documentElement.classList.add('low-end');
 
-// Navigation
+// ─── Navigation ──────────────────────────────────────────────────────────────
 function goPage(id, btn) {
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
   document.querySelectorAll('.bnav-item').forEach(function(b) { b.classList.remove('active'); });
@@ -315,24 +435,21 @@ function goPage(id, btn) {
   btn.classList.add('active');
   if (typeof hapticSel === 'function') hapticSel();
   if (id === 'tracker' && typeof renderTracker === 'function') renderTracker();
+  if (id === 'ritual') initRitualPage();
+  if (id === 'articles' && typeof renderArticles === 'function') renderArticles();
   if (id === 'schedule' && document.getElementById('schedTitle') && !document.getElementById('schedTitle').textContent) {
     if (typeof showToast === 'function') showToast('Сначала сгенерируйте расписание на главной 👆');
   }
-  window.scrollTo({top: 0, behavior: 'smooth'});
+  window.scrollTo({top:0, behavior:'smooth'});
 }
 
-// Generate + loading shimmer + switch tab
+// ─── Generate + switch ───────────────────────────────────────────────────────
 function generateAndSwitch() {
   var btn = document.getElementById('btn-generate');
   if (btn) { btn.classList.add('loading'); btn.textContent = '⏳ Генерирую...'; }
-
-  // Use requestAnimationFrame so shimmer renders BEFORE generate() runs
   requestAnimationFrame(function() {
     try {
-      if (typeof generate !== 'function') {
-        if (typeof showToast === 'function') showToast('Ошибка: generate не загружена');
-        return;
-      }
+      if (typeof generate !== 'function') { if (typeof showToast === 'function') showToast('Ошибка: generate не загружена'); return; }
       generate();
       if (typeof hapticSuccess === 'function') hapticSuccess();
       goPage('schedule', document.getElementById('bn-schedule'));
@@ -345,15 +462,317 @@ function generateAndSwitch() {
   });
 }
 
-// Init after all scripts loaded
+// ─── Situation selector ──────────────────────────────────────────────────────
+var _currentSituation = 'normal';
+function selectSituation(sit, btn) {
+  if (sit !== 'normal') {
+    if (!SUB.can('scheduleProfiles')) {
+      if (typeof hapticLight === 'function') hapticLight();
+      SUB.requirePremium('scheduleProfiles', function(){});
+      return;
+    }
+  }
+  document.querySelectorAll('.situation-btn').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  _currentSituation = sit;
+  window._currentSituation = sit;
+}
+
+// ─── Baby avatar editing ─────────────────────────────────────────────────────
+function editBabyPhoto() {
+  var input = document.createElement('input');
+  input.type = 'file'; input.accept = 'image/*';
+  input.onchange = function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev) {
+      var b64 = ev.target.result;
+      localStorage.setItem('babymode_photo', b64);
+      _applyBabyPhoto(b64);
+      if (typeof hapticSuccess === 'function') hapticSuccess();
+      showToast('📸 Фото малыша обновлено!');
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function _applyBabyPhoto(b64) {
+  var img = document.getElementById('babyAvatarImg');
+  var emoji = document.getElementById('babyAvatarEmoji');
+  if (!img) return;
+  if (b64) {
+    img.src = b64; img.style.display = 'block';
+    if (emoji) emoji.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    if (emoji) emoji.style.display = 'flex';
+  }
+  // Also update share card
+  var sa = document.getElementById('shareCardAvatar');
+  if (sa) {
+    if (b64) {
+      sa.style.backgroundImage = 'url(' + b64 + ')';
+      sa.style.backgroundSize = 'cover';
+      sa.textContent = '';
+    }
+  }
+}
+
+function _applyBabyName(name) {
+  var el = document.getElementById('babyNameDisplay');
+  var title = document.getElementById('appTitle');
+  if (name) {
+    if (el) { el.textContent = name + ''; el.style.display = 'block'; }
+    if (title) title.textContent = 'Режим Малыша';
+    var sc = document.getElementById('shareCardTitle');
+    if (sc) sc.textContent = 'Режим дня — ' + name;
+  } else {
+    if (el) el.style.display = 'none';
+  }
+}
+
+// Situation buttons styles (added dynamically)
+var _sitStyle = document.createElement('style');
+_sitStyle.textContent = `
+  .situation-btn {
+    padding:7px 12px; border-radius:20px; border:1.5px solid var(--border-soft);
+    background:var(--white); color:var(--text-mid); font-size:.78rem; font-weight:700;
+    font-family:'Nunito',inherit; cursor:pointer; touch-action:manipulation;
+    transition:all .15s; box-shadow:var(--shadow-sm);
+  }
+  .situation-btn.active {
+    background:var(--grad-primary); border-color:transparent; color:#fff; box-shadow:var(--shadow-btn);
+  }
+  .situation-btn:active { transform:scale(.95); }
+`;
+document.head.appendChild(_sitStyle);
+
+// ─── Ritual page ─────────────────────────────────────────────────────────────
+var _ritualTimer = null;
+var _ritualActive = false;
+var _ritualStep = -1;
+var _ritualTimes = [600, 420, 900, 300, 0]; // seconds per step
+var _ritualRemaining = [..._ritualTimes];
+
+function initRitualPage() {
+  // Reset visual state
+  document.querySelectorAll('.ritual-step').forEach(function(el) {
+    el.classList.remove('active-step', 'done-step');
+  });
+  var btn = document.getElementById('ritualStartBtn');
+  if (btn) btn.textContent = '▶️ Начать ритуал';
+}
+
+function activateRitualStep(idx) {
+  if (!_ritualActive) return;
+  _switchRitualStep(idx);
+}
+
+function _switchRitualStep(idx) {
+  clearInterval(_ritualTimer);
+  _ritualStep = idx;
+  document.querySelectorAll('.ritual-step').forEach(function(el, i) {
+    el.classList.remove('active-step');
+    if (i < idx) el.classList.add('done-step');
+    else el.classList.remove('done-step');
+  });
+  var step = document.getElementById('rs-' + idx);
+  if (step) step.classList.add('active-step');
+  _ritualRemaining[idx] = _ritualTimes[idx];
+  if (_ritualTimes[idx] > 0) {
+    _updateRitualTimer(idx, _ritualRemaining[idx]);
+    _ritualTimer = setInterval(function() {
+      _ritualRemaining[idx]--;
+      _updateRitualTimer(idx, _ritualRemaining[idx]);
+      if (_ritualRemaining[idx] <= 0) {
+        clearInterval(_ritualTimer);
+        if (typeof hapticMedium === 'function') hapticMedium();
+        if (idx < 4) {
+          showToast('✅ Шаг выполнен! Переходите к следующему');
+          setTimeout(function() { _switchRitualStep(idx + 1); }, 1000);
+        } else {
+          showToast('🌙 Ритуал завершён! Спокойной ночи малышу ♡');
+          _ritualActive = false;
+          var btn = document.getElementById('ritualStartBtn');
+          if (btn) btn.textContent = '▶️ Начать ритуал';
+        }
+      }
+    }, 1000);
+  }
+}
+
+function _updateRitualTimer(idx, secs) {
+  var el = document.getElementById('rt-' + idx);
+  if (!el) return;
+  var m = Math.floor(secs / 60), s = secs % 60;
+  el.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+function startRitual() {
+  if (_ritualActive) {
+    clearInterval(_ritualTimer);
+    _ritualActive = false;
+    _ritualStep = -1;
+    _ritualRemaining = [..._ritualTimes];
+    initRitualPage();
+    // Reset timers display
+    var times = ['10:00','7:00','15:00','5:00','—'];
+    times.forEach(function(t, i) { var el = document.getElementById('rt-'+i); if(el) el.textContent = t; });
+    var btn = document.getElementById('ritualStartBtn');
+    if (btn) btn.textContent = '▶️ Начать ритуал';
+    return;
+  }
+  _ritualActive = true;
+  _ritualRemaining = [..._ritualTimes];
+  var btn = document.getElementById('ritualStartBtn');
+  if (btn) btn.textContent = '⏹ Остановить';
+  _switchRitualStep(0);
+  if (typeof hapticSuccess === 'function') hapticSuccess();
+  showToast('🌙 Ритуал начат! Шаг 1: Купание');
+}
+
+// ─── White noise (using AudioContext) ────────────────────────────────────────
+var _audioCtx = null;
+var _whiteNoiseNode = null;
+var _activeWN = null;
+
+function toggleWhiteNoise(type, btn) {
+  if (_activeWN === type) {
+    _stopWhiteNoise();
+    btn.classList.remove('playing');
+    _activeWN = null;
+    return;
+  }
+  _stopWhiteNoise();
+  document.querySelectorAll('.wn-btn').forEach(function(b) { b.classList.remove('playing'); });
+  _startWhiteNoise(type);
+  btn.classList.add('playing');
+  _activeWN = type;
+  showToast('🎵 ' + type === 'rain' ? 'Звук дождя' : type === 'fan' ? 'Вентилятор' : type === 'ocean' ? 'Океан' : 'Белый шум' + ' включён');
+}
+
+function _startWhiteNoise(type) {
+  try {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    var bufferSize = 2 * _audioCtx.sampleRate;
+    var noiseBuffer = _audioCtx.createBuffer(1, bufferSize, _audioCtx.sampleRate);
+    var data = noiseBuffer.getChannelData(0);
+    var b = [0, 0, 0, 0, 0, 0, 0]; // pink noise filter state
+    for (var i = 0; i < bufferSize; i++) {
+      var white = Math.random() * 2 - 1;
+      if (type === 'rain' || type === 'shh') {
+        // Pink noise approximation
+        b[0] = 0.99886 * b[0] + white * 0.0555179;
+        b[1] = 0.99332 * b[1] + white * 0.0750759;
+        b[2] = 0.96900 * b[2] + white * 0.1538520;
+        b[3] = 0.86650 * b[3] + white * 0.3104856;
+        b[4] = 0.55000 * b[4] + white * 0.5329522;
+        b[5] = -0.7616 * b[5] - white * 0.0168980;
+        data[i] = (b[0]+b[1]+b[2]+b[3]+b[4]+b[5]+b[6]+white*0.5362) * 0.11;
+        b[6] = white * 0.115926;
+      } else {
+        data[i] = white * 0.3;
+      }
+    }
+    _whiteNoiseNode = _audioCtx.createBufferSource();
+    _whiteNoiseNode.buffer = noiseBuffer;
+    _whiteNoiseNode.loop = true;
+    var gainNode = _audioCtx.createGain();
+    gainNode.gain.value = type === 'shh' ? 0.4 : 0.6;
+    _whiteNoiseNode.connect(gainNode);
+    gainNode.connect(_audioCtx.destination);
+    _whiteNoiseNode.start();
+  } catch(e) {
+    showToast('🔇 Белый шум недоступен в этом браузере');
+  }
+}
+
+function _stopWhiteNoise() {
+  try {
+    if (_whiteNoiseNode) { _whiteNoiseNode.stop(); _whiteNoiseNode = null; }
+    if (_audioCtx) { _audioCtx.close(); _audioCtx = null; }
+  } catch(e) {}
+}
+
+// ─── Share card ──────────────────────────────────────────────────────────────
+function openShareCard() {
+  if (!SUB.can('shareCard')) {
+    SUB.requirePremium('shareCard', function(){});
+    return;
+  }
+  var modal = document.getElementById('shareModal');
+  if (modal) { modal.style.display = 'flex'; }
+  var name = localStorage.getItem('babymode_baby_name') || '';
+  var scTitle = document.getElementById('shareCardTitle');
+  if (scTitle) scTitle.textContent = name ? ('Режим дня — ' + name) : 'Режим дня малыша';
+  var photo = localStorage.getItem('babymode_photo');
+  var sa = document.getElementById('shareCardAvatar');
+  if (sa && photo) { sa.style.backgroundImage = 'url('+photo+')'; sa.style.backgroundSize='cover'; sa.textContent=''; }
+}
+
+function closeShareModal() {
+  var modal = document.getElementById('shareModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function doShareSchedule() {
+  var blocks = window._lastBlocks || [];
+  var name = localStorage.getItem('babymode_baby_name') || 'малыша';
+  var text = '👶 Режим дня ' + name + '\n\n';
+  blocks.slice(0, 8).forEach(function(b) { text += b.time + ' — ' + b.title + '\n'; });
+  text += '\n🔗 Режим Малыша';
+
+  if (window.Telegram && Telegram.WebApp && Telegram.WebApp.switchInlineQuery) {
+    Telegram.WebApp.switchInlineQuery(text);
+  } else if (navigator.share) {
+    navigator.share({ text: text });
+  } else {
+    navigator.clipboard.writeText(text).then(function() {
+      showToast('📋 Скопировано в буфер обмена!');
+    });
+  }
+  closeShareModal();
+  if (typeof hapticSuccess === 'function') hapticSuccess();
+}
+
+// ─── showToast (global) ──────────────────────────────────────────────────────
+function showToast(msg, dur) {
+  var t = document.getElementById('toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, dur || 3000);
+}
+
+// ─── DOMContentLoaded init ───────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', function() {
   if (typeof tmaInit === 'function') tmaInit();
+
+  // Init subscription first
+  if (typeof SUB !== 'undefined') SUB.init();
+
+  // Restore baby photo & name
+  var savedPhoto = localStorage.getItem('babymode_photo');
+  var savedName  = localStorage.getItem('babymode_baby_name');
+  if (savedPhoto) _applyBabyPhoto(savedPhoto);
+  if (savedName)  _applyBabyName(savedName);
+
   var topicsEl = document.getElementById('chatTopics');
   if (topicsEl && typeof initTopics === 'function') initTopics(topicsEl);
   if (typeof initChat === 'function') initChat();
-  if (typeof initPremium === 'function') initPremium();
+  if (typeof renderPremiumPage === 'function') renderPremiumPage();
   if (typeof renderTracker === 'function') renderTracker();
-  if (typeof initOnboarding === 'function') initOnboarding();
+
+  // Show trial offer on first launch (after 3s)
+  var hasLaunched = localStorage.getItem('babymode_launched');
+  if (!hasLaunched && typeof initOnboarding === 'function') {
+    localStorage.setItem('babymode_launched', '1');
+    initOnboarding();
+  } else if (!hasLaunched) {
+    localStorage.setItem('babymode_launched', '1');
+  }
 });
 </script>
 </body>
