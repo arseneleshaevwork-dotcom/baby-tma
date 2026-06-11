@@ -1138,3 +1138,203 @@ button:focus-visible, input:focus-visible, select:focus-visible {
 .mt-12 { margin-top:12px; }
 .mb-8  { margin-bottom:8px; }
 .mb-12 { margin-bottom:12px; }
+
+/* ─── FAB: Floating Quick-Sleep Button ─────────────────────────────────────── */
+#fabSleepWrap {
+  position: fixed;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  right: 16px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: none;
+}
+#fabSleepTimer {
+  background: rgba(61,44,62,.85);
+  color: #fff;
+  font-size: .72rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.fab-sleep {
+  pointer-events: all;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #C97BDB, #FF9A7B);
+  color: #fff;
+  font-size: .68rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(201,123,219,.5);
+  transition: transform .15s, box-shadow .15s;
+  padding: 8px 0 6px;
+}
+.fab-sleep span:first-child { font-size: 1.5rem; line-height: 1; }
+.fab-sleep:active { transform: scale(.93); }
+.fab-sleep.active {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  box-shadow: 0 4px 20px rgba(34,197,94,.45);
+  animation: fab-pulse 2s infinite;
+}
+@keyframes fab-pulse {
+  0%,100% { box-shadow: 0 4px 20px rgba(34,197,94,.45); }
+  50%      { box-shadow: 0 4px 32px rgba(34,197,94,.75); }
+}
+
+/* ─── Quick Event Row ─────────────────────────────────────────────────────── */
+.quick-event-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 4px;
+}
+.qe-label { font-size:.72rem; color:var(--text-hint); font-weight:600; flex-shrink:0; }
+.qe-btn {
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1.5px solid rgba(201,123,219,.35);
+  background: rgba(201,123,219,.08);
+  color: #C97BDB;
+  font-size: .75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.qe-btn:active { background:rgba(201,123,219,.2); border-color:#C97BDB; }
+
+/* ─── Diary Limit Banner ──────────────────────────────────────────────────── */
+.diary-limit-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(135deg,rgba(201,123,219,.12),rgba(255,154,123,.1));
+  border: 1.5px solid rgba(201,123,219,.25);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-top: 12px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.diary-limit-banner:active { background:rgba(201,123,219,.2); }
+.dlb-icon { font-size:1.3rem; flex-shrink:0; }
+.dlb-text { flex:1; }
+.dlb-text strong { display:block; font-size:.82rem; color:var(--text-dark); }
+.dlb-text span { font-size:.72rem; color:var(--text-hint); }
+.dlb-cta { font-size:.75rem; font-weight:800; color:#C97BDB; white-space:nowrap; }
+
+/* ─── Chat Age Note ───────────────────────────────────────────────────────── */
+.chat-age-note {
+  display: block;
+  margin-top: 8px;
+  font-size: .73rem;
+  font-weight: 600;
+  color: #C97BDB;
+  background: rgba(201,123,219,.1);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+/* ─── Home Insight Card ───────────────────────────────────────────────────── */
+.home-insight-card { padding: 16px; }
+
+.hic-pill {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.hic-pill > span { font-size: 1.6rem; flex-shrink: 0; margin-top: 1px; }
+.hic-pill > div strong { display: block; font-size: .85rem; color: var(--text-dark); margin-bottom: 3px; }
+.hic-pill > div p { font-size: .75rem; color: var(--text-hint); margin: 0; line-height: 1.4; }
+
+.hic-pill-now  { background: rgba(239,68,68,.09); border: 1.5px solid rgba(239,68,68,.25); }
+.hic-pill-soon { background: rgba(245,158,11,.09); border: 1.5px solid rgba(245,158,11,.25); }
+.hic-pill-info { background: rgba(139,92,246,.09); border: 1.5px solid rgba(139,92,246,.2); }
+.hic-pill-ok   { background: rgba(34,197,94,.09);  border: 1.5px solid rgba(34,197,94,.25); }
+
+/* tomorrow plan block */
+.hic-plan {
+  background: linear-gradient(135deg,rgba(201,123,219,.1),rgba(255,154,123,.08));
+  border: 1.5px solid rgba(201,123,219,.2);
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.hic-plan-label { font-size: .72rem; font-weight: 800; color: #C97BDB; margin-bottom: 8px; text-transform: uppercase; letter-spacing: .06em; }
+.hic-plan-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: .82rem; font-weight: 700; color: var(--text-dark); }
+.hic-plan-goal { font-size: .72rem; color: var(--text-hint); font-weight: 500; }
+.hic-plan-schedule { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 10px; }
+.hic-plan-schedule span { font-size: .75rem; color: var(--text-hint); }
+.hic-plan-schedule em { font-style: normal; }
+.hic-plan-schedule strong { color: var(--text-dark); }
+.hic-plan-apply {
+  width: 100%;
+  padding: 8px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg,#C97BDB,#FF9A7B);
+  color: #fff;
+  font-size: .78rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.hic-plan-apply:active { opacity: .85; }
+
+/* stats mini row */
+.hic-stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.hic-stat {
+  flex: 1;
+  min-width: 80px;
+  background: rgba(255,255,255,.6);
+  border-radius: 10px;
+  padding: 8px 10px;
+  text-align: center;
+}
+.hic-stat span { display: block; font-size: .95rem; font-weight: 800; color: var(--text-dark); }
+.hic-stat small { font-size: .65rem; color: var(--text-hint); font-weight: 600; }
+.hic-debt { font-size: .75rem !important; }
+
+/* ─── Chat Personal Block (AI agent v2) ───────────────────────────────────── */
+.chat-personal-block {
+  background: linear-gradient(135deg, rgba(99,102,241,.08), rgba(201,123,219,.08));
+  border: 1.5px solid rgba(99,102,241,.2);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.cpb-label {
+  font-size: .72rem;
+  font-weight: 800;
+  color: #6366f1;
+  margin-bottom: 6px;
+}
+.cpb-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.cpb-stats span {
+  font-size: .75rem;
+  color: var(--text-hint);
+}
+.cpb-stats b { color: var(--text-dark); }

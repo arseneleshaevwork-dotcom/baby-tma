@@ -60,7 +60,7 @@
     <div class="form-grid">
       <div class="field">
         <label for="ageMonths">Возраст малыша</label>
-        <select id="ageMonths">
+        <select id="ageMonths" onchange="_onAgeChange(this.value)">
           <option value="1">1 месяц</option>
           <option value="2">2 месяца</option>
           <option value="3">3 месяца</option>
@@ -117,6 +117,22 @@
     </div>
 
     <button class="gen-btn" id="btn-generate" onclick="generateAndSwitch()">✨ Сгенерировать режим дня</button>
+  </div>
+
+  <!-- ─── SMART HOME CARD: Что сейчас с малышом ──────────── -->
+  <div class="card home-insight-card" id="homeInsightCard" style="display:none">
+    <!-- baby status pill -->
+    <div class="hic-status" id="hicStatus"></div>
+
+    <!-- tomorrow plan preview -->
+    <div class="hic-plan" id="hicPlan" style="display:none">
+      <div class="hic-plan-label">📅 План на завтра</div>
+      <div class="hic-plan-body" id="hicPlanBody"></div>
+      <button class="hic-plan-apply" onclick="applyPlanFromHome();hapticSuccess()">Применить к режиму →</button>
+    </div>
+
+    <!-- sleep stats mini row (if 3+ diary days) -->
+    <div class="hic-stats" id="hicStats" style="display:none"></div>
   </div>
 
   <div class="card">
@@ -250,6 +266,15 @@
     </div>
 
     <input class="note-input" id="lgNote" placeholder="Заметка: зубы, прогулка, гости...">
+
+    <!-- Quick event buttons -->
+    <div class="quick-event-row">
+      <span class="qe-label">Быстро отметить:</span>
+      <button class="qe-btn" onclick="quickSleepTag('teeth');hapticLight()">🦷 Зубы</button>
+      <button class="qe-btn" onclick="quickSleepTag('illness');hapticLight()">🤒 Болен</button>
+      <button class="qe-btn" onclick="quickSleepTag('travel');hapticLight()">🚗 Гости/поездка</button>
+    </div>
+
     <button class="save-log-btn" id="btn-save-log" onclick="saveLog();hapticSuccess()">💾 Сохранить день</button>
   </div>
 
@@ -283,6 +308,41 @@
     </div>
     <p style="font-size:.82rem;color:var(--text-hint);margin-top:4px;font-weight:500">Научно обоснованные статьи о сне, кормлении и развитии</p>
   </div>
+
+  <!-- ─── RED FLAGS CARD ──────────────────────────────────────── -->
+  <div class="card red-flags-card">
+    <div class="rf-header" onclick="toggleRedFlags()" id="rfHeader">
+      <div class="rf-title">🚨 Красные флаги — когда срочно к врачу</div>
+      <span class="rf-chevron" id="rfChevron">▼</span>
+    </div>
+    <div class="rf-body" id="rfBody" style="display:none">
+      <div class="rf-item"><span>🌡️</span><span>Температура выше 38°C у ребёнка до 3 мес.</span></div>
+      <div class="rf-item"><span>🌡️</span><span>Температура выше 39.5°C у ребёнка любого возраста</span></div>
+      <div class="rf-item"><span>😮‍💨</span><span>Затруднённое дыхание, синюшность губ</span></div>
+      <div class="rf-item"><span>⚡</span><span>Судороги, потеря сознания</span></div>
+      <div class="rf-item"><span>🔴</span><span>Сыпь, которая не бледнеет при нажатии</span></div>
+      <div class="rf-item"><span>😴</span><span>Малыш очень вялый, не реагирует, трудно разбудить</span></div>
+      <div class="rf-item"><span>🍼</span><span>Отказ от кормления более 8 часов</span></div>
+      <div class="rf-item"><span>💧</span><span>Менее 4 мокрых подгузников за 12 часов</span></div>
+      <div class="rf-call">
+        <strong>При любом из этих симптомов — вызывайте скорую или звоните педиатру</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── PROBLEM ROUTES ──────────────────────────────────────── -->
+  <div class="card prob-routes-card">
+    <div class="prob-routes-title">🗺️ Найти решение по проблеме</div>
+    <div class="prob-routes-grid">
+      <button class="prob-route-btn" onclick="setArticleFilter('sleep');toggleArticle('sleep-regression')">📉 Регресс сна</button>
+      <button class="prob-route-btn" onclick="setArticleFilter('sleep');toggleArticle('night-waking')">🌙 Ночные пробуждения</button>
+      <button class="prob-route-btn" onclick="setArticleFilter('sleep');toggleArticle('overexcitement')">⚡ Перевозбуждение</button>
+      <button class="prob-route-btn" onclick="setArticleFilter('sleep');toggleArticle('bedtime-ritual')">🛁 Долго не засыпает</button>
+      <button class="prob-route-btn" onclick="setArticleFilter('development');toggleArticle('colic')">😣 Колики</button>
+      <button class="prob-route-btn" onclick="setArticleFilter('sleep');toggleArticle('nap-transition')">🔄 Переход на 1 сон</button>
+    </div>
+  </div>
+
   <div id="articlesContainer"></div>
 </div>
 
@@ -404,6 +464,17 @@
     <span class="icon">⭐</span><span>Premium</span>
   </button>
 </nav>
+
+<!-- ═══════════════════════════════════════════════════════
+     FLOATING QUICK-SLEEP BUTTON (global, always visible)
+═══════════════════════════════════════════════════════ -->
+<div id="fabSleepWrap">
+  <div id="fabSleepTimer" style="display:none"></div>
+  <button id="fabSleepBtn" class="fab-sleep" onclick="fabToggleSleep()" aria-label="Быстрая запись сна">
+    <span id="fabSleepIcon">😴</span>
+    <span id="fabSleepLabel">Уснул</span>
+  </button>
+</div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
@@ -755,6 +826,160 @@ function doShareSchedule() {
   if (typeof hapticSuccess === 'function') hapticSuccess();
 }
 
+// ─── Home Insights: Smart card on home page ──────────────────────────────────
+function _onAgeChange(val) {
+  localStorage.setItem('babymode_last_age', String(val));
+  renderHomeInsights();
+}
+
+function renderHomeInsights() {
+  const card = document.getElementById('homeInsightCard');
+  if (!card || typeof SleepIntel === 'undefined') return;
+
+  const age = parseInt(localStorage.getItem('babymode_last_age') || document.getElementById('ageMonths')?.value || '0');
+  if (!age) return;
+
+  card.style.display = 'block';
+
+  // ── Status pill: milestone or regression ──
+  const statusEl = document.getElementById('hicStatus');
+  if (statusEl) {
+    const milestone = SleepIntel.getAgeSleepMilestone(age);
+    const calendar  = SleepIntel.getSleepCalendar(age, 4);
+    const current   = calendar.find(e => e.status === 'now');
+    const soon      = calendar.find(e => e.status === 'soon');
+
+    if (current) {
+      statusEl.innerHTML = `
+        <div class="hic-pill hic-pill-now">
+          <span>${current.icon}</span>
+          <div>
+            <strong>${current.title}</strong>
+            <p>${current.text}</p>
+          </div>
+        </div>`;
+    } else if (soon) {
+      const monthsUntil = Math.max(1, soon.from - age);
+      statusEl.innerHTML = `
+        <div class="hic-pill hic-pill-soon">
+          <span>${soon.icon}</span>
+          <div>
+            <strong>Через ~${monthsUntil} мес.: ${soon.title}</strong>
+            <p>${soon.text}</p>
+          </div>
+        </div>`;
+    } else if (milestone) {
+      statusEl.innerHTML = `
+        <div class="hic-pill hic-pill-info">
+          <span>${milestone.icon}</span>
+          <div>
+            <strong>${milestone.title}</strong>
+            <p>${milestone.text}</p>
+          </div>
+        </div>`;
+    } else {
+      // generic norm card
+      const norms = SleepIntel.getSleepNorms(age);
+      statusEl.innerHTML = `
+        <div class="hic-pill hic-pill-ok">
+          <span>✨</span>
+          <div>
+            <strong>${age} мес. — норма сна ${Math.round(norms.totalMin/60*10)/10}ч/сут</strong>
+            <p>Ночной сон ${Math.round(norms.nightMin/60*10)/10}ч · Дневной ${Math.round(norms.dayMin/60*10)/10}ч · по рекомендациям ВОЗ</p>
+          </div>
+        </div>`;
+    }
+  }
+
+  // ── Tomorrow plan (if 3+ diary days) ──
+  const logs = typeof getLogs === 'function' ? getLogs() : [];
+  const planEl  = document.getElementById('hicPlan');
+  const statsEl = document.getElementById('hicStats');
+
+  if (logs.length >= 3) {
+    const summary = SleepIntel.summarizeSleepLogs(logs, age);
+    const ctx     = { wake: logs[logs.length-1]?.wake || '07:00', bedtime: logs[logs.length-1]?.bed || '20:00' };
+    const plan    = SleepIntel.buildTomorrowPlan(summary, age, ctx);
+
+    // Store for apply button
+    window._homePlan = plan;
+
+    if (planEl) {
+      planEl.style.display = 'block';
+      const bodyEl = document.getElementById('hicPlanBody');
+      if (bodyEl) {
+        bodyEl.innerHTML = `
+          <div class="hic-plan-row">
+            <span>${plan.icon} ${plan.title}</span>
+            <span class="hic-plan-goal">${plan.goal}</span>
+          </div>
+          <div class="hic-plan-schedule">
+            ${plan.schedule.map(s => `<span><em>${s.label}:</em> <strong>${s.value}</strong></span>`).join('')}
+          </div>`;
+      }
+    }
+
+    // Mini stats row
+    if (statsEl) {
+      const debt = summary.sleepDebt ? `⚡ Недосып: ${(summary.sleepDebt/60).toFixed(1)}ч` : '✅ Сон в норме';
+      const trend = { improving:'📈 Улучшается', worse:'📉 Ухудшается', flat:'📊 Стабильно' }[summary.trend];
+      statsEl.style.display = 'flex';
+      statsEl.innerHTML = `
+        <div class="hic-stat"><span>${(summary.avgNight/60).toFixed(1)}ч</span><small>Ночной сон</small></div>
+        <div class="hic-stat"><span>${(summary.avgDay/60).toFixed(1)}ч</span><small>Дневной сон</small></div>
+        <div class="hic-stat"><span class="hic-debt">${debt}</span><small>${trend}</small></div>`;
+    }
+  }
+}
+
+function applyPlanFromHome() {
+  const plan = window._homePlan;
+  if (!plan) { showToast('Сначала добавьте 3+ записи в дневнике'); return; }
+  if (typeof applyPlanToGenerator === 'function') applyPlanToGenerator(plan);
+}
+
+// ─── FAB: Floating Quick-Sleep Button ────────────────────────────────────────
+function fabToggleSleep() {
+  const started = parseInt(localStorage.getItem(typeof QUICK_SLEEP_KEY !== 'undefined' ? QUICK_SLEEP_KEY : 'babymode_quick_sleep_start') || '0');
+  if (started) {
+    if (typeof finishQuickSleep === 'function') finishQuickSleep();
+  } else {
+    if (typeof startQuickSleep === 'function') startQuickSleep();
+  }
+  _updateFab();
+}
+
+function _updateFab() {
+  const fab = document.getElementById('fabSleepBtn');
+  const icon = document.getElementById('fabSleepIcon');
+  const label = document.getElementById('fabSleepLabel');
+  const timer = document.getElementById('fabSleepTimer');
+  if (!fab) return;
+
+  const key = typeof QUICK_SLEEP_KEY !== 'undefined' ? QUICK_SLEEP_KEY : 'babymode_quick_sleep_start';
+  const started = parseInt(localStorage.getItem(key) || '0');
+
+  if (started) {
+    const mins = Math.max(0, Math.round((Date.now() - started) / 60000));
+    const display = mins < 60 ? `${mins} мин` : `${Math.floor(mins/60)}ч ${mins % 60}м`;
+    fab.classList.add('active');
+    icon.textContent = '⏹';
+    label.textContent = 'Проснулся';
+    if (timer) {
+      timer.style.display = 'block';
+      timer.textContent = `😴 ${display}`;
+    }
+  } else {
+    fab.classList.remove('active');
+    icon.textContent = '😴';
+    label.textContent = 'Уснул';
+    if (timer) timer.style.display = 'none';
+  }
+}
+
+// Update FAB timer every 30 seconds
+setInterval(_updateFab, 30000);
+
 // ─── showToast (global) ──────────────────────────────────────────────────────
 function showToast(msg, dur) {
   var t = document.getElementById('toast');
@@ -782,6 +1007,12 @@ window.addEventListener('DOMContentLoaded', function() {
   if (typeof initChat === 'function') initChat();
   if (typeof renderPremiumPage === 'function') renderPremiumPage();
   if (typeof renderTracker === 'function') renderTracker();
+
+  // Sync FAB state on load
+  _updateFab();
+
+  // Render home insights card
+  setTimeout(renderHomeInsights, 200);
 
   // Show trial offer on first launch (after 3s)
   var hasLaunched = localStorage.getItem('babymode_launched');

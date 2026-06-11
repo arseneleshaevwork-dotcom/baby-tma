@@ -568,3 +568,13 @@ function openArticlesPaywall() {
     showToast('⭐ Полная база знаний доступна в Premium');
   }
 }
+
+function toggleRedFlags() {
+  const body    = document.getElementById('rfBody');
+  const chevron = document.getElementById('rfChevron');
+  if (!body) return;
+  const open = body.style.display === 'none';
+  body.style.display    = open ? 'block' : 'none';
+  if (chevron) chevron.textContent = open ? '▲' : '▼';
+  if (typeof hapticLight === 'function') hapticLight();
+}

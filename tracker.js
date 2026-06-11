@@ -73,6 +73,7 @@ function getOrCreateTodayLog(logs) {
 function startQuickSleep() {
   localStorage.setItem(QUICK_SLEEP_KEY, String(Date.now()));
   renderQuickSleepControls();
+  if (typeof _updateFab === 'function') _updateFab();
   showToast('😴 Сон начат');
 }
 
@@ -95,6 +96,7 @@ function finishQuickSleep() {
   saveLogs(logs);
   localStorage.removeItem(QUICK_SLEEP_KEY);
   renderQuickSleepControls();
+  if (typeof _updateFab === 'function') _updateFab();
   renderTracker();
   showToast(`🌤 Сон записан: ${dur} мин`);
 }
@@ -501,15 +503,23 @@ function setPeriod(p, btn) {
   renderTracker();
 }
 
+function _getDiaryLimit() {
+  if (typeof SUB === 'undefined') return Infinity;
+  if (SUB.can('diaryUnlimited')) return Infinity;
+  return 7; // free tier: last 7 days only
+}
+
 function renderTracker() {
   renderTagButtons();
   renderQuickSleepControls();
 
   const logs = getLogs();
   const now  = new Date();
-  const days  = trackerPeriod === 'week' ? 7 : 30;
+  const diaryLimit = _getDiaryLimit();
+  const days  = trackerPeriod === 'week' ? 7 : (diaryLimit === Infinity ? 30 : Math.min(7, diaryLimit));
   const cutoff = new Date(now - days * 86400000).toISOString().slice(0,10);
-  const filtered = logs.filter(l => l.date >= cutoff).sort((a,b) => a.date.localeCompare(b.date));
+  const allFiltered = logs.filter(l => l.date >= cutoff).sort((a,b) => a.date.localeCompare(b.date));
+  const filtered = diaryLimit === Infinity ? allFiltered : allFiltered.slice(-diaryLimit);
 
   if (!filtered.length) {
     const chart = document.getElementById('trackerChart');
@@ -590,10 +600,23 @@ function renderTracker() {
   }
   html += '</table>';
 
+  // Show limit banner if free user has more logs than shown
+  if (diaryLimit !== Infinity && logs.length > diaryLimit) {
+    html += `
+      <div class="diary-limit-banner" onclick="document.getElementById('bn-premium')?.click();hapticLight()">
+        <span class="dlb-icon">🔒</span>
+        <div class="dlb-text">
+          <strong>Показано ${diaryLimit} из ${logs.length} дней</strong>
+          <span>Полная история — в Premium</span>
+        </div>
+        <span class="dlb-cta">Открыть ⭐</span>
+      </div>`;
+  }
+
   const table = document.getElementById('trackerTable');
   if (table) table.innerHTML = html;
 
-  // Run analysis if 3+ days
+  // Run analysis on full logs (not limited view)
   if (logs.length >= 3) analyzeAndSuggest(logs);
 }
 

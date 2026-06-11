@@ -55,6 +55,37 @@ const FAQ = [
 
 const TOPICS = ['Сон','Кормление','Плач','Развитие','Уход'];
 
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function _getBabyContext() {
+  const age = parseInt(localStorage.getItem('babymode_last_age') || '0');
+  const name = localStorage.getItem('babymode_baby_name') || '';
+  return { age, name };
+}
+
+function _injectAgeContext(answer, age) {
+  if (!age) return answer;
+  // Append age-specific note if not already covered by keyword match
+  const ageNote = _getAgeNote(age);
+  return ageNote ? answer + `\n\n<span class="chat-age-note">👶 Для ${age} мес.: ${ageNote}</span>` : answer;
+}
+
+function _getAgeNote(age) {
+  if (age >= 3 && age <= 5)  return 'Возможен регресс сна 4 мес. — сохраняйте ритуал.'
+  if (age >= 6 && age <= 8)  return 'Норма сна: 14–15ч/сут. 2–3 дневных сна.'
+  if (age >= 9 && age <= 11) return 'Норма: 14–15ч. Скачок развития 8–10 мес. может нарушать сон.'
+  if (age >= 12 && age <= 18) return 'Норма: 11–14ч. Пора перехода на 1 дневной сон.'
+  if (age >= 19 && age <= 36) return 'Норма: 11–13ч. Дневной сон 1 раз.'
+  return '';
+}
+
 function findAnswer(q) {
   const low = q.toLowerCase();
   let best = null, bestScore = 0;
@@ -65,9 +96,38 @@ function findAnswer(q) {
     }
     if (score > bestScore) { bestScore = score; best = item; }
   }
-  if (best && bestScore > 0) return best.a;
-  // Generic fallback
-  return 'Не нашла точного ответа на ваш вопрос 🤔 Попробуйте переформулировать или выберите тему из кнопок выше. Если вопрос срочный — обратитесь к педиатру. <strong>Вы справляетесь! 💜</strong>';
+  const { age, name } = _getBabyContext();
+  const baseAnswer = best && bestScore > 0
+    ? _injectAgeContext(best.a, age)
+    : `Не нашла точного ответа 🤔 Попробуйте переформулировать или выберите тему из кнопок выше. Если вопрос срочный — обратитесь к педиатру. <strong>Вы справляетесь! 💜</strong>`;
+
+  // v2: prepend personal diary context if premium and 3+ days
+  const canPersonalize = typeof SUB === 'undefined' || SUB.can('aiAnalysis');
+  if (canPersonalize && typeof getLogs === 'function' && typeof SleepIntel !== 'undefined') {
+    const logs = getLogs();
+    if (logs.length >= 3 && age) {
+      const summary = SleepIntel.summarizeSleepLogs(logs, age);
+      const norms   = SleepIntel.getSleepNorms(age);
+      const nightOk = summary.avgNight >= norms.nightMin - 30;
+      const debt    = summary.sleepDebt >= 60;
+      const babyRef = escapeHtml(name || 'малыш');
+      const trendTxt = { improving: 'улучшается 📈', worse: 'ухудшается 📉', flat: 'стабильный 📊' }[summary.trend] || '';
+
+      const personalBlock = `<div class="chat-personal-block">
+        <div class="cpb-label">📊 По данным дневника ${babyRef} (${logs.length} дн.):</div>
+        <div class="cpb-stats">
+          <span>🌙 Ночной: <b>${(summary.avgNight/60).toFixed(1)}ч</b> ${nightOk ? '✅' : '⚠️'}</span>
+          <span>☀️ Дневной: <b>${(summary.avgDay/60).toFixed(1)}ч</b></span>
+          ${debt ? `<span>⚡ Недосып: <b>${(summary.sleepDebt/60).toFixed(1)}ч</b></span>` : ''}
+          ${trendTxt ? `<span>Тренд: ${trendTxt}</span>` : ''}
+        </div>
+      </div>`;
+
+      return personalBlock + baseAnswer;
+    }
+  }
+
+  return baseAnswer;
 }
 
 function chatSend() {
@@ -88,9 +148,11 @@ function chatTopic(t) {
 
 function addMsg(text, role) {
   const box = document.getElementById('chatMessages');
+  if (!box) return;
   const div = document.createElement('div');
   div.className = 'msg ' + role;
-  div.innerHTML = text;
+  if (role === 'user') div.textContent = text;
+  else div.innerHTML = text;
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
 }
@@ -103,7 +165,16 @@ let _chatInited = false;
 function initChat() {
   if (_chatInited) return;
   _chatInited = true;
-  addMsg('Привет! 👋 Я — консультант по режиму и уходу за малышом. Задайте любой вопрос или выберите тему ниже. <strong>Ответы основаны на рекомендациях ВОЗ, AAP и NHS.</strong>', 'bot');
+  const { age, name } = _getBabyContext();
+  const safeName = escapeHtml(name);
+  const babyInfo = name && age
+    ? `Мне известно, что ${safeName} ${age} мес. — отвечаю с учётом этого. `
+    : name
+    ? `Мне известно, что вашего малыша зовут ${safeName}. `
+    : age
+    ? `Мне известно, что малышу ${age} мес. `
+    : '';
+  addMsg(`Привет! 👋 Я — консультант по режиму и уходу за малышом. ${babyInfo}Задайте любой вопрос или выберите тему ниже. <strong>Ответы основаны на рекомендациях ВОЗ, AAP и NHS.</strong>`, 'bot');
 }
 
 let _topicsInited = false;
