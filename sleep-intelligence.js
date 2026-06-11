@@ -93,6 +93,70 @@ function getAgeSleepMilestone(age) {
   return null;
 }
 
+const SLEEP_CALENDAR_EVENTS = [
+  {
+    id: 'regression-4m',
+    from: 3,
+    to: 5,
+    icon: '📉',
+    title: 'Регресс сна 4 мес.',
+    label: '3-5 мес.',
+    text: 'Сон может стать поверхностнее из-за созревания циклов. Главная задача — сохранить ритуал.'
+  },
+  {
+    id: 'growth-8m',
+    from: 7,
+    to: 10,
+    icon: '🧠',
+    title: 'Скачок развития 8-10 мес.',
+    label: '7-10 мес.',
+    text: 'Новые навыки, тревога разлуки и ночные пробуждения часто приходят вместе.'
+  },
+  {
+    id: 'transition-1nap',
+    from: 12,
+    to: 18,
+    icon: '☀️',
+    title: 'Переход 2→1 сон',
+    label: '12-18 мес.',
+    text: 'Если второй сон срывается несколько дней подряд, постепенно держите один сон около полудня.'
+  },
+  {
+    id: 'regression-18m',
+    from: 17,
+    to: 20,
+    icon: '💬',
+    title: 'Регресс 18 мес.',
+    label: '17-20 мес.',
+    text: 'Речь, самостоятельность и границы могут давать протесты перед укладыванием.'
+  },
+  {
+    id: 'nap-drop',
+    from: 30,
+    to: 36,
+    icon: '🌤',
+    title: 'Отказ от дневного сна',
+    label: '2.5-3 года',
+    text: 'Некоторые дети начинают пропускать сон. Сначала заменяйте его тихим часом, не убирайте резко.'
+  }
+];
+
+function getSleepCalendar(age, lookAheadMonths = 6) {
+  return SLEEP_CALENDAR_EVENTS
+    .map(event => {
+      let status = 'later';
+      if (age >= event.from && age <= event.to) status = 'now';
+      else if (event.from > age && event.from - age <= lookAheadMonths) status = 'soon';
+      return { ...event, status };
+    })
+    .filter(event => event.status !== 'later' || event.from > age)
+    .sort((a, b) => {
+      const rank = { now: 0, soon: 1, later: 2 };
+      return rank[a.status] - rank[b.status] || a.from - b.from;
+    })
+    .slice(0, 3);
+}
+
 function buildSleepSuggestions(summary, age) {
   const suggestions = [];
   const { recent, norms, avgNight, avgDay, sleepDebt, topTag, trend } = summary;
@@ -283,9 +347,9 @@ function shiftTime(time, deltaMin) {
 }
 
 if (typeof window !== 'undefined') {
-  window.SleepIntel = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, buildSleepSuggestions, buildTomorrowPlan };
+  window.SleepIntel = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, getSleepCalendar, buildSleepSuggestions, buildTomorrowPlan };
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, buildSleepSuggestions, buildTomorrowPlan };
+  module.exports = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, getSleepCalendar, buildSleepSuggestions, buildTomorrowPlan };
 }

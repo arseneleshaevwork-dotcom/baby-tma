@@ -133,6 +133,7 @@ function renderAnalysis(suggestions, summary) {
   const plan = summary && typeof SleepIntel !== 'undefined'
     ? SleepIntel.buildTomorrowPlan(summary, age, _getTomorrowPlanContext())
     : null;
+  const calendar = typeof SleepIntel !== 'undefined' ? SleepIntel.getSleepCalendar(age) : [];
 
   block.innerHTML = `
     <div class="analysis-header">
@@ -151,6 +152,7 @@ function renderAnalysis(suggestions, summary) {
         </div>
       </div>
     ` : ''}
+    ${calendar.length ? renderSleepCalendar(calendar) : ''}
     ${plan ? renderTomorrowPlan(plan) : ''}
     ${suggestions.map(s => `
       <div class="analysis-card analysis-${s.type}">
@@ -168,6 +170,30 @@ function renderAnalysis(suggestions, summary) {
     `).join('')}
   `;
   block.style.display = 'block';
+}
+
+function renderSleepCalendar(calendar) {
+  const labels = { now: 'сейчас', soon: 'скоро', later: 'позже' };
+  const items = calendar.map(item => `
+    <div class="sc-item sc-${item.status}">
+      <div class="sc-icon">${item.icon}</div>
+      <div class="sc-body">
+        <div class="sc-top">
+          <strong>${item.title}</strong>
+          <span>${labels[item.status]}</span>
+        </div>
+        <div class="sc-label">${item.label}</div>
+        <p>${item.text}</p>
+      </div>
+    </div>
+  `).join('');
+
+  return `
+    <div class="sleep-calendar-card">
+      <div class="sc-title">📆 Календарь сна</div>
+      ${items}
+    </div>
+  `;
 }
 
 function _getTomorrowPlanContext() {
@@ -242,8 +268,8 @@ function renderAnalysisLocked(logs, age) {
         <strong>${summary && summary.sleepDebt ? 'Вижу признаки недосыпа' : 'Готов анализ режима'}</strong>
       </div>
       <p>${summary && summary.sleepDebt
-        ? `По последним записям накопилось около ${(summary.sleepDebt / 60).toFixed(1)}ч недосыпа. Premium покажет причину и план на завтра.`
-        : 'После 3 записей дневника Premium показывает паттерны сна, недосып и план на завтра.'}</p>
+        ? `По последним записям накопилось около ${(summary.sleepDebt / 60).toFixed(1)}ч недосыпа. Premium покажет причину, календарь скачков и план на завтра.`
+        : 'После 3 записей дневника Premium показывает паттерны сна, календарь скачков и план на завтра.'}</p>
       <button class="recovery-btn" onclick="document.getElementById('bn-premium')?.click();hapticLight()">
         ⭐ Открыть Premium-анализ
       </button>

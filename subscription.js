@@ -268,7 +268,7 @@ function _featuresList(unlocked) {
     { icon:'📚', title:'База знаний', sub:unlocked ? 'Все главы и статьи' : '5 статей бесплатно', premium:true },
     { icon:'⚙️', title:'Профили ситуаций', sub:'Болезнь, путешествие, жара', premium:true },
     { icon:'🤖', title:'AI анализ дневника', sub:'Недосып, паттерны, регрессы', premium:true },
-    { icon:'📉', title:'Скачки и переходы сна', sub:'Подсказки по возрасту малыша', premium:true },
+    { icon:'📆', title:'Календарь сна', sub:'Скачки, регрессы и переходы', premium:true },
     { icon:'🌙', title:'Ритуал засыпания', sub:'Таймер + белый шум', premium:false },
     { icon:'📱', title:'Красивая карточка', sub:'Поделиться с папой и бабушкой', premium:true },
     { icon:'🔔', title:'Умные напоминания', sub:'Кастомные push-уведомления', premium:true },

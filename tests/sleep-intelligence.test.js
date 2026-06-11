@@ -4,7 +4,8 @@ const {
   summarizeSleepLogs,
   getAgeSleepMilestone,
   buildSleepSuggestions,
-  buildTomorrowPlan
+  buildTomorrowPlan,
+  getSleepCalendar
 } = require('../sleep-intelligence');
 
 global.getProfile = (age) => ({
@@ -95,4 +96,12 @@ test('builds a transition tomorrow plan for 12 to 18 months without debt', () =>
   assert.strictEqual(plan.type, 'transition');
   assert.strictEqual(plan.goal, 'Мягко держать один дневной сон');
   assert(plan.rules.some(rule => rule.includes('12:00-13:00')));
+});
+
+test('builds age sleep calendar with current and upcoming windows', () => {
+  const calendar = getSleepCalendar(8);
+
+  assert(calendar.some(item => item.status === 'now' && item.title === 'Скачок развития 8-10 мес.'));
+  assert(calendar.some(item => item.status === 'soon' && item.title === 'Переход 2→1 сон'));
+  assert(calendar.every(item => ['now', 'soon', 'later'].includes(item.status)));
 });
