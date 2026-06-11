@@ -294,13 +294,24 @@ function suggestRecoveryDay() {
 }
 
 function shareLog() {
-  const logs = getLogs().slice(-7);
+  const logs = getLogs();
   if (!logs.length) { showToast('Нет данных для отправки'); return; }
-  const avg = l => logs.reduce((s,d) => s + (d[l]||0), 0) / logs.length;
-  const text = `👶 Дневник сна малыша (${logs.length} дней)\n\n`
-    + `🌙 Средний ночной сон: ${(avg('nightLen')/60).toFixed(1)}ч\n`
-    + `☀️ Средний дневной сон: ${(avg('dayNaps')/60).toFixed(1)}ч\n\n`
-    + `📊 Подробный режим: t.me/babymode1_bot/babymode`;
+  if (typeof SUB !== 'undefined' && !SUB.can('shareCard')) {
+    SUB.requirePremium('shareCard', function(){});
+    return;
+  }
+
+  const age = parseInt(localStorage.getItem('babymode_last_age') || document.getElementById('ageMonths')?.value || '6');
+  const summary = typeof SleepIntel !== 'undefined'
+    ? SleepIntel.summarizeSleepLogs(logs, age)
+    : null;
+  const plan = summary && typeof SleepIntel !== 'undefined'
+    ? SleepIntel.buildTomorrowPlan(summary, age, _getTomorrowPlanContext())
+    : null;
+  const babyName = localStorage.getItem('babymode_baby_name') || '';
+  const text = summary && plan && typeof SleepIntel !== 'undefined'
+    ? SleepIntel.buildFamilyReport(summary, plan, { babyName })
+    : _buildSimpleLogShare(logs);
 
   const tg = window.Telegram && window.Telegram.WebApp;
   if (tg && tg.switchInlineQuery) {
@@ -309,6 +320,15 @@ function shareLog() {
     navigator.clipboard && navigator.clipboard.writeText(text);
     showToast('📋 Скопировано в буфер');
   }
+}
+
+function _buildSimpleLogShare(logs) {
+  const recent = logs.slice(-7);
+  const avg = l => recent.reduce((s,d) => s + (d[l]||0), 0) / recent.length;
+  return `👶 Дневник сна малыша (${recent.length} дней)\n\n`
+    + `🌙 Средний ночной сон: ${(avg('nightLen')/60).toFixed(1)}ч\n`
+    + `☀️ Средний дневной сон: ${(avg('dayNaps')/60).toFixed(1)}ч\n\n`
+    + `📊 Подробный режим: t.me/babymode1_bot/babymode`;
 }
 
 function setPeriod(p, btn) {

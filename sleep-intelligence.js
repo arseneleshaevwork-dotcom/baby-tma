@@ -338,6 +338,31 @@ function buildTomorrowPlan(summary, age, context = {}) {
   };
 }
 
+function buildFamilyReport(summary, plan, context = {}) {
+  const name = context.babyName ? String(context.babyName).trim() : 'малыша';
+  const days = summary.recent.length;
+  const debt = summary.sleepDebt ? `${(summary.sleepDebt / 60).toFixed(1)}ч` : 'нет';
+  const trendText = {
+    improving: 'сон улучшается',
+    worse: 'сон ухудшается',
+    flat: 'сон стабильный'
+  }[summary.trend] || 'сон стабильный';
+
+  const rules = plan.rules.slice(0, 3).map(rule => `• ${rule}`).join('\n');
+  const schedule = plan.schedule.map(item => `• ${item.label}: ${item.value}`).join('\n');
+
+  return `👶 Дневник сна ${name} (${days} дн.)\n\n`
+    + `🌙 Ночной сон: ${(summary.avgNight / 60).toFixed(1)}ч в среднем\n`
+    + `☀️ Дневной сон: ${(summary.avgDay / 60).toFixed(1)}ч в среднем\n`
+    + `📉 Недосып: ${debt}\n`
+    + `📊 Тренд: ${trendText}\n\n`
+    + `📅 План на завтра: ${plan.title}\n`
+    + `${plan.reason}\n\n`
+    + `${schedule}\n\n`
+    + `Что важно:\n${rules}\n\n`
+    + `Сгенерировано в «Режим Малыша»`;
+}
+
 function shiftTime(time, deltaMin) {
   const parts = String(time || '07:00').split(':').map(Number);
   const h = Number.isFinite(parts[0]) ? parts[0] : 7;
@@ -347,9 +372,9 @@ function shiftTime(time, deltaMin) {
 }
 
 if (typeof window !== 'undefined') {
-  window.SleepIntel = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, getSleepCalendar, buildSleepSuggestions, buildTomorrowPlan };
+  window.SleepIntel = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, getSleepCalendar, buildSleepSuggestions, buildTomorrowPlan, buildFamilyReport };
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, getSleepCalendar, buildSleepSuggestions, buildTomorrowPlan };
+  module.exports = { getSleepNorms, summarizeSleepLogs, getAgeSleepMilestone, getSleepCalendar, buildSleepSuggestions, buildTomorrowPlan, buildFamilyReport };
 }

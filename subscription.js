@@ -86,7 +86,7 @@ const SUB = (() => {
       articlesAll:     '📚 Все статьи доступны в Premium',
       aiAnalysis:      '🤖 AI анализ — в Premium',
       scheduleProfiles:'⚙️ Профили ситуаций — в Premium',
-      shareCard:       '📱 Красивая карточка — в Premium',
+      shareCard:       '📱 Отчёт для семьи — в Premium',
       notifications:   '🔔 Напоминания — в Premium',
     };
     const msg = msgs[feature] || '⭐ Эта функция доступна в Premium';
@@ -270,7 +270,7 @@ function _featuresList(unlocked) {
     { icon:'🤖', title:'AI анализ дневника', sub:'Недосып, паттерны, регрессы', premium:true },
     { icon:'📆', title:'Календарь сна', sub:'Скачки, регрессы и переходы', premium:true },
     { icon:'🌙', title:'Ритуал засыпания', sub:'Таймер + белый шум', premium:false },
-    { icon:'📱', title:'Красивая карточка', sub:'Поделиться с папой и бабушкой', premium:true },
+    { icon:'📱', title:'Отчёт для семьи', sub:'Сон, недосып и план на завтра', premium:true },
     { icon:'🔔', title:'Умные напоминания', sub:'Кастомные push-уведомления', premium:true },
   ];
 
