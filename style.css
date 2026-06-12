@@ -182,16 +182,16 @@ body::after {
 }
 .bnav-item {
   flex:1; display:flex; flex-direction:column; align-items:center;
-  justify-content:center; min-height:68px; padding:8px 4px;
+  justify-content:center; min-height:68px; padding:8px 2px;
   background:none; border:none; color:var(--text-hint);
-  font-size:.65rem; font-weight:700; font-family:'Nunito',inherit;
+  font-size:.6rem; font-weight:700; font-family:'Nunito',inherit;
   letter-spacing:.01em; cursor:pointer; gap:3px; touch-action:manipulation;
   transition: color var(--dur-fast) var(--ease-sharp),
               transform var(--dur-fast) var(--ease-sharp);
   position:relative;
 }
 .bnav-item .icon {
-  font-size:1.5rem; line-height:1;
+  font-size:1.35rem; line-height:1;
   transition: transform var(--dur-normal) var(--ease-bounce);
 }
 .bnav-item:active { transform:scale(.88); }
@@ -319,6 +319,12 @@ body::after {
 .how-icon.chat-bg    { background:linear-gradient(135deg,#F8F0FF,#ECD9FF); }
 .how-title { font-size:.88rem; font-weight:700; margin-bottom:2px; color:var(--text-dark); }
 .how-sub   { font-size:.76rem; color:var(--text-hint); line-height:1.4; }
+.ai-home-btn {
+  width:100%; min-height:44px; margin-top:12px; border:0; border-radius:14px;
+  background:var(--grad-primary); color:#fff; font-family:'Nunito',inherit;
+  font-size:.86rem; font-weight:900; cursor:pointer; box-shadow:var(--shadow-btn);
+}
+.ai-home-btn:active { transform:scale(.98); box-shadow:none; }
 
 /* ═══════════════════════════════════════════════════════
    FLEX BAR (buffer slider)

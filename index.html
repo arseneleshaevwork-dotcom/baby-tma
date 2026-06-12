@@ -153,6 +153,7 @@
       <div class="how-icon chat-bg">💬</div>
       <div><div class="how-title">Консультант</div><div class="how-sub">Ответы на 40+ частых вопросов мам</div></div>
     </div>
+    <button class="ai-home-btn" onclick="goPage('chat',document.getElementById('bn-chat'));hapticLight()">💬 Задать вопрос ИИ</button>
   </div>
 </div>
 
@@ -453,6 +454,9 @@
   </button>
   <button class="bnav-item" id="bn-schedule" onclick="goPage('schedule',this)" aria-label="Режим дня">
     <span class="icon">📅</span><span>Режим</span>
+  </button>
+  <button class="bnav-item" id="bn-chat" onclick="goPage('chat',this)" aria-label="ИИ консультант">
+    <span class="icon">💬</span><span>ИИ</span>
   </button>
   <button class="bnav-item" id="bn-ritual" onclick="goPage('ritual',this)" aria-label="Ритуал сна">
     <span class="icon">🌙</span><span>Ритуал</span>
