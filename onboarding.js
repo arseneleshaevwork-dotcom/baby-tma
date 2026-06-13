@@ -41,6 +41,7 @@ let _onboardEl = null;
 
 function initOnboarding() {
   if (localStorage.getItem(ONBOARD_KEY)) return;
+  if (window.BabyAnalytics) BabyAnalytics.track('onboarding_start');
   _renderOnboarding();
 }
 
@@ -90,8 +91,11 @@ function _renderSlide(idx) {
             placeholder="Имя малыша..." maxlength="20"
             value="${localStorage.getItem('babymode_baby_name') || ''}"
             oninput="this.value=this.value.replace(/[^а-яёА-ЯЁa-zA-Z\\s-]/g,'')">
+          <input class="ob-name-input ob-birth-input" id="obBabyBirthdate" type="date"
+            max="${new Date().toISOString().slice(0, 10)}"
+            value="${localStorage.getItem('babymode_baby_birthdate') || ''}">
         </div>
-        <p style="font-size:.72rem;color:var(--text-hint);font-weight:500;text-align:center">Можно пропустить</p>
+        <p style="font-size:.72rem;color:var(--text-hint);font-weight:500;text-align:center">Дата нужна, чтобы поздравлять и давать подсказки по возрасту. Можно пропустить</p>
       </div>
     `;
     setTimeout(() => {
@@ -184,10 +188,20 @@ function _saveCurrent() {
   const s = SLIDES[_currentSlide];
   if (s.type === 'name') {
     const inp = document.getElementById('obBabyName');
-    if (inp && inp.value.trim()) {
-      const name = inp.value.trim();
-      localStorage.setItem('babymode_baby_name', name);
-      if (typeof _applyBabyName === 'function') _applyBabyName(name);
+    const birth = document.getElementById('obBabyBirthdate');
+    const name = inp && inp.value.trim() ? inp.value.trim() : '';
+    const birthdate = birth && birth.value ? birth.value : '';
+    if (name || birthdate) {
+      if (name) localStorage.setItem('babymode_baby_name', name);
+      if (birthdate) localStorage.setItem('babymode_baby_birthdate', birthdate);
+      if (window.BabyAnalytics) {
+        BabyAnalytics.saveBabyProfile({
+          name,
+          birthdate,
+          ageMonths: localStorage.getItem('babymode_last_age') || ''
+        });
+      }
+      if (name && typeof _applyBabyName === 'function') _applyBabyName(name);
     }
   }
 }
@@ -200,6 +214,7 @@ function skipOnboarding() {
 function finishOnboarding() {
   _saveCurrent();
   localStorage.setItem(ONBOARD_KEY, '1');
+  if (window.BabyAnalytics) BabyAnalytics.track('onboarding_complete');
 
   if (_onboardEl) {
     _onboardEl.classList.remove('ob-visible');

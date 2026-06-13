@@ -393,6 +393,15 @@ function generate(){
   const adj=getSituationAdjustment(_situation);
   const activity=adj.activity||_activity;
   const{blocks,daySegs,profile:p}=buildSchedule(_age,_wakeMin,_feedType,activity,adj.buffer+planBuffer,{});
+  if (window.BabyAnalytics) {
+    BabyAnalytics.track('schedule_generated', {
+      age_months: _age,
+      wake_time: document.getElementById('wakeTime').value,
+      feed_type: _feedType,
+      activity,
+      situation: _situation
+    });
+  }
   renderSchedule(blocks,daySegs,p);
 
   // Confetti burst on first-ever generation

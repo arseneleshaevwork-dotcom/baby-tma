@@ -1047,6 +1047,7 @@ body::after {
 }
 .ob-name-input:focus { border-color:var(--clr-primary); box-shadow:0 0 0 4px rgba(201,123,219,.12); }
 .ob-name-input::placeholder { color:var(--text-hint); font-weight:500; }
+.ob-birth-input { margin-top:10px; font-size:.92rem; color:var(--text-mid); }
 
 /* Photo upload in onboarding */
 .ob-photo-area {

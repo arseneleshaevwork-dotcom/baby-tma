@@ -41,6 +41,7 @@ const SUB = (() => {
     _trialDaysLeft = TRIAL_DAYS;
     _renderHeaderBadge();
     _showConfetti();
+    if (window.BabyAnalytics) BabyAnalytics.track('trial_started');
     showToast('🎉 7 дней Premium бесплатно активированы!');
   }
 
@@ -50,6 +51,7 @@ const SUB = (() => {
     _trialActive = false;
     _renderHeaderBadge();
     _showConfetti();
+    if (window.BabyAnalytics) BabyAnalytics.track('premium_activated');
   }
 
   // Check if user has access to a feature
@@ -300,6 +302,7 @@ function handleStartTrial() {
 
 function handleSubscribe(plan) {
   // Placeholder for actual payment integration (Telegram Stars / ЮКасса)
+  if (window.BabyAnalytics) BabyAnalytics.track('subscribe_clicked', { plan });
   showToast('🚀 Оплата скоро будет доступна!');
   // For demo: activate premium after 1.5s
   setTimeout(() => {

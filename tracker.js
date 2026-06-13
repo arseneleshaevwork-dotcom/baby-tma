@@ -72,6 +72,7 @@ function getOrCreateTodayLog(logs) {
 
 function startQuickSleep() {
   localStorage.setItem(QUICK_SLEEP_KEY, String(Date.now()));
+  if (window.BabyAnalytics) BabyAnalytics.track('sleep_started');
   renderQuickSleepControls();
   if (typeof _updateFab === 'function') _updateFab();
   showToast('😴 Сон начат');
@@ -95,6 +96,7 @@ function finishQuickSleep() {
 
   saveLogs(logs);
   localStorage.removeItem(QUICK_SLEEP_KEY);
+  if (window.BabyAnalytics) BabyAnalytics.track('sleep_finished', { duration_min: dur });
   renderQuickSleepControls();
   if (typeof _updateFab === 'function') _updateFab();
   renderTracker();
@@ -113,6 +115,7 @@ function quickSleepTag(tag) {
     showToast('🏷 Отметка добавлена');
   }
   saveLogs(logs);
+  if (window.BabyAnalytics) BabyAnalytics.track('quick_tag_added', { tag });
   renderTracker();
 }
 
@@ -195,6 +198,14 @@ function saveLog() {
     note
   });
   saveLogs(logs);
+  if (window.BabyAnalytics) {
+    BabyAnalytics.track('diary_saved', {
+      night_min: nightLen,
+      day_naps_min: dayNaps,
+      tags_count: selectedTags.size,
+      has_note: !!note
+    });
+  }
 
   selectedTags.clear();
   renderTagButtons();

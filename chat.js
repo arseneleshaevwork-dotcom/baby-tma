@@ -134,6 +134,7 @@ function chatSend() {
   const inp = document.getElementById('chatInput');
   const q = inp.value.trim();
   if (!q) return;
+  if (window.BabyAnalytics) BabyAnalytics.track('ai_question_sent', { length: q.length });
   addMsg(q, 'user');
   inp.value = '';
   setTimeout(() => addMsg(findAnswer(q), 'bot'), 400);

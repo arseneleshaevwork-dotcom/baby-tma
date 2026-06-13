@@ -500,6 +500,8 @@
 </div>
 
 <!-- Scripts -->
+<script src="analytics-config.js"></script>
+<script src="analytics.js"></script>
 <script src="tma.js"></script>
 <script src="chat.js"></script>
 <script src="sleep-intelligence.js"></script>
@@ -525,6 +527,11 @@ function goPage(id, btn) {
   document.querySelectorAll('.bnav-item').forEach(function(b) { b.classList.remove('active'); });
   document.getElementById('page-' + id).classList.add('active');
   btn.classList.add('active');
+  if (window.BabyAnalytics) {
+    BabyAnalytics.track('page_open', { page: id });
+    if (id === 'chat') BabyAnalytics.track('ai_opened');
+    if (id === 'premium') BabyAnalytics.track('premium_opened');
+  }
   if (typeof hapticSel === 'function') hapticSel();
   if (id === 'tracker' && typeof renderTracker === 'function') renderTracker();
   if (id === 'ritual') initRitualPage();
@@ -995,6 +1002,8 @@ function showToast(msg, dur) {
 
 // ─── DOMContentLoaded init ───────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', function() {
+  if (window.BabyAnalytics) BabyAnalytics.track('app_open');
+
   if (typeof tmaInit === 'function') tmaInit();
 
   // Init subscription first
