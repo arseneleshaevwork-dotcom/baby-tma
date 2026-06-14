@@ -4,15 +4,39 @@ The Mini App is static on GitHub Pages. Central analytics requires a backend end
 
 ## Supabase setup
 
+Project:
+
+```text
+https://supabase.com/dashboard/project/jfyprwisnrubhhowipdm
+```
+
+Deployed endpoints:
+
+```text
+https://jfyprwisnrubhhowipdm.functions.supabase.co/analytics-events
+https://jfyprwisnrubhhowipdm.functions.supabase.co/telegram-webhook
+```
+
 1. Create a Supabase project.
-2. Run `supabase/schema.sql` in SQL Editor.
+2. Run `supabase/schema.sql` in SQL Editor, or run `supabase db push`.
 3. Deploy `supabase/functions/analytics-events`.
-4. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` for the Edge Function.
-5. Copy the function URL into `analytics-config.js`:
+4. Deploy `supabase/functions/telegram-webhook`.
+5. Copy the analytics function URL into `analytics-config.js`:
 
 ```js
 window.BABY_ANALYTICS_ENDPOINT = 'https://<project-ref>.functions.supabase.co/analytics-events';
 ```
+
+## Telegram webhook
+
+To see users who press `/start` but never open the Mini App, set the bot token as a Supabase secret and then register the webhook:
+
+```bash
+supabase secrets set TELEGRAM_BOT_TOKEN='<telegram_bot_token>' --project-ref jfyprwisnrubhhowipdm
+curl "https://api.telegram.org/bot<telegram_bot_token>/setWebhook?url=https://jfyprwisnrubhhowipdm.functions.supabase.co/telegram-webhook"
+```
+
+Do not commit Telegram bot tokens to the repository.
 
 ## Core events
 

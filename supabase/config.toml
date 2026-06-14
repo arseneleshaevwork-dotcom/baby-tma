@@ -1,0 +1,7 @@
+project_id = "baby-tma"
+
+[functions.analytics-events]
+verify_jwt = false
+
+[functions.telegram-webhook]
+verify_jwt = false

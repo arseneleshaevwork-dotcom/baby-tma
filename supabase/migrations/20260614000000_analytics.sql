@@ -53,9 +53,3 @@ create index if not exists users_telegram_id_idx
 alter table public.users enable row level security;
 alter table public.babies enable row level security;
 alter table public.events enable row level security;
-
--- Useful funnel query:
--- select event_name, count(*) from public.events
--- where created_at >= now() - interval '7 days'
--- group by event_name
--- order by count(*) desc;
