@@ -33,7 +33,7 @@
 })();
 </script>
 
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=adready1">
 </head>
 <body>
 
@@ -49,6 +49,7 @@
   <div class="baby-name" id="babyNameDisplay" style="display:none"></div>
   <h1 id="appTitle">Режим Малыша</h1>
   <p>Научно обоснованный генератор расписания</p>
+  <p class="medical-note">Не заменяет консультацию врача</p>
   <div class="trial-badge" id="trial-header-badge" style="display:none">🌸 Premium</div>
 </div>
 
@@ -212,6 +213,7 @@
     <div class="section-title">Быстрые темы</div>
     <div class="chat-topics" id="chatTopics"></div>
     <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-disclaimer">ИИ-подсказки помогают с режимом и дневником. При температуре, вялости, проблемах с дыханием или резком ухудшении обращайтесь к врачу.</div>
     <div class="chat-input-row">
       <input class="chat-input" id="chatInput" placeholder="Задайте вопрос..." onkeydown="chatKeydown(event)">
       <button class="chat-send" id="btn-chat-send" onclick="chatSend();hapticLight()" aria-label="Отправить">➤</button>
@@ -501,9 +503,9 @@
 
 <!-- Scripts -->
 <script src="analytics-config.js"></script>
-<script src="analytics.js"></script>
+<script src="analytics.js?v=adready1"></script>
 <script src="tma.js"></script>
-<script src="chat.js?v=341c860"></script>
+<script src="chat.js?v=adready1"></script>
 <script src="sleep-intelligence.js"></script>
 <script src="tracker.js?v=d55c9a8"></script>
 <script src="articles.js"></script>

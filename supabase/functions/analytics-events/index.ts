@@ -91,6 +91,7 @@ Deno.serve(async (req) => {
       baby_name: baby.name || null,
       baby_birthdate: baby.birthdate || null,
       baby_age_months: babyAgeMonths,
+      attribution: event.attribution || {},
       payload: event.payload || {},
       page: event.page || null,
       user_agent: event.user_agent || null,

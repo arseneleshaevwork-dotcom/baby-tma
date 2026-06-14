@@ -267,6 +267,22 @@
 
       <div class="card wide">
         <div class="section-title">
+          <h2>Источники рекламы</h2>
+          <span class="muted">UTM / start_param</span>
+        </div>
+        <div id="sources"></div>
+      </div>
+
+      <div class="card wide">
+        <div class="section-title">
+          <h2>Вопросы ИИ</h2>
+          <span class="muted">последние 50</span>
+        </div>
+        <div id="aiQuestions"></div>
+      </div>
+
+      <div class="card wide">
+        <div class="section-title">
           <h2>Малыши</h2>
           <span class="muted" id="babyCount"></span>
         </div>
@@ -318,6 +334,8 @@
       funnel: document.getElementById('funnel'),
       dropoffs: document.getElementById('dropoffs'),
       upcomingDates: document.getElementById('upcomingDates'),
+      sources: document.getElementById('sources'),
+      aiQuestions: document.getElementById('aiQuestions'),
       babies: document.getElementById('babies'),
       babyCount: document.getElementById('babyCount'),
       events: document.getElementById('events')
@@ -382,6 +400,8 @@
       renderFunnel(data.funnel || []);
       renderDropoffs(data);
       renderUpcomingDates(data.upcoming_dates || []);
+      renderSources(data.sources || []);
+      renderAiQuestions(data.ai_questions || []);
       renderBabies(data.babies || []);
       renderEvents(data.recent_events || []);
     }
@@ -443,6 +463,51 @@
                 <td>${escapeHtml(item.type === 'birthday' ? `День рождения, ${item.age_label}` : item.age_label)}</td>
                 <td>${escapeHtml(item.birthdate || 'Не указана')}</td>
                 <td class="mono">${escapeHtml(shortId(item.client_id || item.user_id || ''))}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderSources(items) {
+      if (!items.length) {
+        els.sources.innerHTML = '<div class="empty">Источников пока нет</div>';
+        return;
+      }
+      els.sources.innerHTML = `
+        <table>
+          <thead><tr><th>Источник</th><th>Кампания</th><th>Уник.</th><th>App</th><th>Профиль</th><th>Режим</th></tr></thead>
+          <tbody>
+            ${items.map(item => `
+              <tr>
+                <td>${escapeHtml(item.source)}</td>
+                <td>${escapeHtml(item.campaign)}</td>
+                <td>${number(item.users)}</td>
+                <td>${number(item.app_opens)}</td>
+                <td>${number(item.profiles)}</td>
+                <td>${number(item.schedules)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderAiQuestions(items) {
+      if (!items.length) {
+        els.aiQuestions.innerHTML = '<div class="empty">Вопросов пока нет</div>';
+        return;
+      }
+      els.aiQuestions.innerHTML = `
+        <table>
+          <thead><tr><th>Время</th><th>Вопрос</th><th>Пользователь</th></tr></thead>
+          <tbody>
+            ${items.map(item => `
+              <tr>
+                <td>${formatDateTime(item.created_at)}</td>
+                <td>${escapeHtml(item.question)}</td>
+                <td class="mono">${escapeHtml(shortId(item.telegram_id || item.client_id || ''))}</td>
               </tr>
             `).join('')}
           </tbody>

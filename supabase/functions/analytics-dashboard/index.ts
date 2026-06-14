@@ -60,7 +60,7 @@ Deno.serve(async (req) => {
   const [eventsResult, babiesResult] = await Promise.all([
     supabase
       .from('events')
-      .select('id,event_name,user_id,client_id,telegram_id,payload,created_at')
+      .select('id,event_name,user_id,client_id,telegram_id,attribution,payload,created_at')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(5000),
@@ -136,10 +136,49 @@ function buildDashboard({ events, babies, rangeDays, generatedAt }: {
     })),
     opened_and_left: openedAndLeft,
     bot_started_not_opened: botStartedNotOpened,
+    sources: buildSources(events),
+    ai_questions: buildAiQuestions(events),
     babies: babies.map(formatBaby).sort(byProfileCompleteness),
     upcoming_dates: buildUpcomingBabyDates({ babies, now: generatedAt, horizonDays: 45 }),
     recent_events: [...events].sort(byCreatedDesc).slice(0, 100).map(formatEvent)
   };
+}
+
+function buildSources(events: any[]) {
+  const sources = new Map<string, any>();
+  for (const event of events) {
+    const attribution = event.attribution || event.payload?.attribution || {};
+    const campaign = attribution.utm_campaign || attribution.start_param || 'unknown';
+    const source = attribution.utm_source || attribution.start_param || 'unknown';
+    const key = `${source}:${campaign}`;
+    if (!sources.has(key)) {
+      sources.set(key, { source, campaign, events: 0, users: new Set<string>(), app_opens: 0, profiles: 0, schedules: 0 });
+    }
+    const row = sources.get(key);
+    row.events += 1;
+    if (event.event_name === 'app_open') row.app_opens += 1;
+    if (event.event_name === 'profile_saved') row.profiles += 1;
+    if (event.event_name === 'schedule_generated') row.schedules += 1;
+    const userKey = identityFor(event);
+    if (userKey) row.users.add(userKey);
+  }
+  return [...sources.values()]
+    .map(row => ({ ...row, users: row.users.size }))
+    .sort((a, b) => Number(a.campaign === 'unknown') - Number(b.campaign === 'unknown') || b.users - a.users || b.events - a.events)
+    .slice(0, 20);
+}
+
+function buildAiQuestions(events: any[]) {
+  return [...events]
+    .filter(event => event.event_name === 'ai_question_sent' && event.payload && event.payload.question)
+    .sort(byCreatedDesc)
+    .slice(0, 50)
+    .map(event => ({
+      question: String(event.payload.question || '').slice(0, 300),
+      created_at: event.created_at || null,
+      client_id: event.client_id || null,
+      telegram_id: event.telegram_id || null
+    }));
 }
 
 function buildUpcomingBabyDates({ babies, now, horizonDays }: { babies: any[]; now: string; horizonDays: number }) {

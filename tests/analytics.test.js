@@ -1,7 +1,8 @@
 const assert = require('assert');
 const {
   createAnalytics,
-  normalizeBabyProfile
+  normalizeBabyProfile,
+  getAttribution
 } = require('../analytics');
 
 function test(name, fn) {
@@ -63,6 +64,32 @@ test('tracks events with client, telegram and baby context', () => {
   assert.strictEqual(queue[0].telegram_user.id, 42);
   assert.strictEqual(queue[0].baby.name, 'Миша');
   assert.deepStrictEqual(queue[0].payload, { source: 'test' });
+});
+
+test('captures utm and telegram start parameters for ad attribution', () => {
+  const storage = makeStorage();
+  const analytics = createAnalytics({
+    storage,
+    now: () => 1700000000000,
+    randomId: () => 'fixed-id',
+    telegram: { WebApp: { initDataUnsafe: { start_param: 'tg_ad_sleep_test' } } },
+    location: { href: 'https://example.test/app?utm_source=telegram&utm_campaign=sleep_june&utm_content=creative_1' },
+    navigator: { userAgent: 'test-agent', language: 'ru' }
+  });
+
+  analytics.track('app_open');
+
+  const queue = JSON.parse(storage.getItem('babymode_analytics_queue'));
+  assert.deepStrictEqual(queue[0].attribution, {
+    utm_source: 'telegram',
+    utm_medium: '',
+    utm_campaign: 'sleep_june',
+    utm_content: 'creative_1',
+    utm_term: '',
+    start_param: 'tg_ad_sleep_test',
+    referrer: ''
+  });
+  assert.deepStrictEqual(getAttribution({ storage }), queue[0].attribution);
 });
 
 test('saves baby profile and tracks profile_saved', () => {

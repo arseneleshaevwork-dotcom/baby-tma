@@ -34,6 +34,7 @@ create table if not exists public.events (
   baby_name text,
   baby_birthdate date,
   baby_age_months integer,
+  attribution jsonb not null default '{}'::jsonb,
   payload jsonb not null default '{}'::jsonb,
   page text,
   user_agent text,

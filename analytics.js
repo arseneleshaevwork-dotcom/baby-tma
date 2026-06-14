@@ -5,6 +5,7 @@ const ANALYTICS_CLIENT_KEY = 'babymode_client_id';
 const BABY_NAME_KEY = 'babymode_baby_name';
 const BABY_BIRTHDATE_KEY = 'babymode_baby_birthdate';
 const BABY_AGE_KEY = 'babymode_last_age';
+const ATTRIBUTION_KEY = 'babymode_attribution';
 const DEFAULT_ENDPOINT = '';
 const MAX_QUEUE = 200;
 
@@ -34,6 +35,7 @@ function createAnalytics(env = {}) {
   const locationRef = env.location || (typeof window !== 'undefined' ? window.location : null);
   const navigatorRef = env.navigator || (typeof navigator !== 'undefined' ? navigator : null);
   const sessionId = randomId();
+  const attribution = getAttribution({ storage, location: locationRef, telegram, documentRef: env.document });
 
   function getClientId() {
     if (!storage) return randomId();
@@ -106,6 +108,7 @@ function createAnalytics(env = {}) {
         first_name: tgUser.first_name || '',
         language_code: tgUser.language_code || ''
       } : null,
+      attribution,
       baby: getBabyProfile(),
       page: locationRef ? locationRef.href : '',
       user_agent: navigatorRef ? navigatorRef.userAgent || '' : '',
@@ -126,6 +129,52 @@ function createAnalytics(env = {}) {
   return { track, flush, getBabyProfile, saveBabyProfile, _readQueue: readQueue };
 }
 
+function getAttribution(env = {}) {
+  const storage = env.storage || (typeof localStorage !== 'undefined' ? localStorage : null);
+  const locationRef = env.location || (typeof window !== 'undefined' ? window.location : null);
+  const telegram = env.telegram || (typeof window !== 'undefined' ? window.Telegram : null);
+  const documentRef = env.documentRef || (typeof document !== 'undefined' ? document : null);
+
+  const stored = readStoredAttribution(storage);
+  const parsed = parseAttribution({ location: locationRef, telegram, documentRef });
+  const hasNewData = Object.values(parsed).some(Boolean);
+  const attribution = hasNewData ? { ...stored, ...parsed } : stored;
+  if (storage && hasNewData) storage.setItem(ATTRIBUTION_KEY, JSON.stringify(attribution));
+  return attribution;
+}
+
+function readStoredAttribution(storage) {
+  const empty = {
+    utm_source: '',
+    utm_medium: '',
+    utm_campaign: '',
+    utm_content: '',
+    utm_term: '',
+    start_param: '',
+    referrer: ''
+  };
+  if (!storage) return empty;
+  try { return { ...empty, ...JSON.parse(storage.getItem(ATTRIBUTION_KEY) || '{}') }; }
+  catch (e) { return empty; }
+}
+
+function parseAttribution({ location, telegram, documentRef }) {
+  const href = location && location.href ? location.href : 'https://example.test/';
+  const url = new URL(href, 'https://example.test/');
+  const tgStartParam = telegram && telegram.WebApp && telegram.WebApp.initDataUnsafe
+    ? telegram.WebApp.initDataUnsafe.start_param || ''
+    : '';
+  return {
+    utm_source: url.searchParams.get('utm_source') || '',
+    utm_medium: url.searchParams.get('utm_medium') || '',
+    utm_campaign: url.searchParams.get('utm_campaign') || '',
+    utm_content: url.searchParams.get('utm_content') || '',
+    utm_term: url.searchParams.get('utm_term') || '',
+    start_param: url.searchParams.get('startapp') || url.searchParams.get('tgWebAppStartParam') || tgStartParam || '',
+    referrer: documentRef && documentRef.referrer ? documentRef.referrer : ''
+  };
+}
+
 function makeId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return `evt_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
@@ -138,5 +187,5 @@ if (typeof window !== 'undefined') {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { createAnalytics, normalizeBabyProfile };
+  module.exports = { createAnalytics, getAttribution, normalizeBabyProfile, parseAttribution };
 }
