@@ -55,6 +55,48 @@ const FAQ = [
 
 const TOPICS = ['Сон','Кормление','Плач','Развитие','Уход'];
 
+const INTENTS = [
+  {
+    id: 'urgent',
+    topic: 'Безопасность',
+    patterns: [
+      'температура', '39', '40', 'вялый', 'вялая', 'судороги', 'задыхается',
+      'синеет', 'рвота', 'обезвоживание', 'кровь', 'травма', 'упал', 'не дышит'
+    ],
+    answer: '<strong>Похоже на ситуацию, где нужна медицинская оценка.</strong> Если есть температура 39+, вялость, затруднённое дыхание, судороги, признаки обезвоживания, кровь, сильная рвота или резкое ухудшение — лучше срочно связаться с педиатром или вызвать скорую. Пока ждёте помощь: держите малыша рядом, предлагайте питьё/грудь маленькими порциями и не давайте лекарства сверх инструкции врача.'
+  },
+  {
+    id: 'sleep_bad',
+    topic: 'Сон',
+    patterns: ['плохо спит', 'не спит', 'спит плохо', 'часто встает', 'часто просыпается', 'каждый час', 'ночью просыпается', 'сон испортился'],
+    answer: '<strong>Если малыш плохо спит ночью</strong>, сначала проверьте 4 вещи: ✦ не перегулял ли перед сном ✦ не короткое ли последнее окно бодрствования ✦ достаточно ли дневного сна ✦ нет ли сильной ассоциации на засыпание (грудь/качание каждый цикл). Практичный шаг на сегодня: начните ритуал на 20–30 минут раньше, приглушите свет, оставьте один спокойный способ укладывания и 3 дня записывайте дневной/ночной сон в дневник.'
+  },
+  {
+    id: 'day_naps',
+    topic: 'Сон',
+    patterns: ['днем не спит', 'дневной сон', 'короткие сны', 'сон 30 минут', 'просыпается через 30', 'просыпается через 40'],
+    answer: '<strong>Короткие дневные сны</strong> часто связаны с окном бодрствования. Если сон 25–40 минут: попробуйте укладывать на 10–15 минут раньше 2–3 дня подряд. Если малыш проснулся бодрым — возможно, недогул; если плачет и трёт глаза — чаще перегул. Помогает одинаковый ритуал, затемнение, белый шум и спокойное продление сна 5–10 минут.'
+  },
+  {
+    id: 'schedule',
+    topic: 'Режим',
+    patterns: ['режим', 'распорядок', 'график', 'наладить день', 'как выстроить', 'как наладить', 'расписание'],
+    answer: '<strong>Чтобы наладить режим</strong>, начните не с идеального расписания, а с 3 якорей: подъём примерно в одно время, подходящие окна бодрствования и спокойный вечерний ритуал. В приложении сгенерируйте режим по возрасту, затем 3 дня отмечайте фактический сон. Если малыш засыпает тяжело — двигайте укладывание на 10–15 минут, а не перестраивайте весь день сразу.'
+  },
+  {
+    id: 'wake_windows',
+    topic: 'Сон',
+    patterns: ['окно', 'бодрствование', 'сколько бодрствовать', 'гулять между снами', 'между снами'],
+    answer: '<strong>Окна бодрствования</strong> лучше подбирать по возрасту и поведению: если малыш долго засыпает и веселится — окно может быть коротким; если плачет, трёт глаза и “перегорает” — окно длинное. Двигайте окно маленькими шагами по 10–15 минут и смотрите на 2–3 дня, не на один сон.'
+  },
+  {
+    id: 'feeding_refusal',
+    topic: 'Кормление',
+    patterns: ['не ест', 'отказывается от еды', 'отказывается от груди', 'мало ест', 'плохо ест', 'не берет грудь'],
+    answer: '<strong>Если малыш стал хуже есть</strong>, проверьте сон, зубы, болезнь и не слишком ли большие порции. Не заставляйте: лучше чаще предлагать маленькие объёмы, убрать отвлечения и следить за мокрыми подгузниками. Если есть вялость, мало мочи, высокая температура или отказ от питья — нужна связь с врачом.'
+  }
+];
+
 function escapeHtml(value) {
   return String(value || '')
     .replace(/&/g, '&amp;')
@@ -65,8 +107,9 @@ function escapeHtml(value) {
 }
 
 function _getBabyContext() {
-  const age = parseInt(localStorage.getItem('babymode_last_age') || '0');
-  const name = localStorage.getItem('babymode_baby_name') || '';
+  const storage = typeof localStorage !== 'undefined' ? localStorage : null;
+  const age = parseInt((storage && storage.getItem('babymode_last_age')) || '0');
+  const name = (storage && storage.getItem('babymode_baby_name')) || '';
   return { age, name };
 }
 
@@ -87,19 +130,28 @@ function _getAgeNote(age) {
 }
 
 function findAnswer(q) {
-  const low = q.toLowerCase();
+  const low = normalizeQuestion(q);
   let best = null, bestScore = 0;
-  for (const item of FAQ) {
+  const candidates = [...INTENTS, ...FAQ.map(item => ({
+    id: item.t,
+    topic: item.t,
+    patterns: item.k,
+    answer: item.a
+  }))];
+
+  for (const item of candidates) {
     let score = 0;
-    for (const k of item.k) {
-      if (low.includes(k)) score += k.length;
+    for (const k of item.patterns) {
+      const normalizedKey = normalizeQuestion(k);
+      if (low.includes(normalizedKey)) score += normalizedKey.length + 10;
+      else if (hasTokenOverlap(low, normalizedKey)) score += 4;
     }
     if (score > bestScore) { bestScore = score; best = item; }
   }
   const { age, name } = _getBabyContext();
-  const baseAnswer = best && bestScore > 0
-    ? _injectAgeContext(best.a, age)
-    : `Не нашла точного ответа 🤔 Попробуйте переформулировать или выберите тему из кнопок выше. Если вопрос срочный — обратитесь к педиатру. <strong>Вы справляетесь! 💜</strong>`;
+  const baseAnswer = best && bestScore >= 4
+    ? _injectAgeContext(best.answer, age)
+    : buildFallbackAnswer(q, age, name);
 
   // v2: prepend personal diary context if premium and 3+ days
   const canPersonalize = typeof SUB === 'undefined' || SUB.can('aiAnalysis');
@@ -128,6 +180,30 @@ function findAnswer(q) {
   }
 
   return baseAnswer;
+}
+
+function normalizeQuestion(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function hasTokenOverlap(question, pattern) {
+  const qTokens = new Set(question.split(' ').filter(token => token.length >= 4));
+  const pTokens = pattern.split(' ').filter(token => token.length >= 4);
+  if (!pTokens.length) return false;
+  return pTokens.some(token => qTokens.has(token));
+}
+
+function buildFallbackAnswer(q, age, name) {
+  const babyRef = escapeHtml(name || 'малыша');
+  const ageText = age ? ` Возраст ${age} мес. я учту.` : '';
+  return `<strong>Уточните пару деталей, и я дам конкретный план.</strong>${ageText}<br><br>
+  Напишите: 1) возраст ${babyRef}, 2) что именно происходит, 3) когда началось, 4) сон/кормление за сегодня. Например: “6 мес, просыпается каждые 40 минут ночью, днём спал 3 раза”.<br><br>
+  Если есть температура, вялость, проблемы с дыханием, судороги, обезвоживание или резкое ухудшение — лучше сразу связаться с педиатром.`;
 }
 
 function chatSend() {
@@ -188,4 +264,11 @@ function initTopics(container) {
     b.onclick = () => { chatTopic(t); if(typeof hapticLight==='function') hapticLight(); };
     container.appendChild(b);
   });
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = {
+    findAnswer,
+    normalizeQuestion
+  };
 }
