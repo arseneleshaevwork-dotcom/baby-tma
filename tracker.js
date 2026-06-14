@@ -25,7 +25,7 @@ function getLogs() {
 function saveLogs(logs) { localStorage.setItem(TRACKER_KEY, JSON.stringify(logs)); }
 
 function localDateKey(date = new Date()) {
-  return date.toISOString().slice(0, 10);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function hm(date) {
@@ -35,13 +35,58 @@ function hm(date) {
 function toMin(t) {
   if (!t) return 0;
   const [h, m] = t.split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return 0;
   return h * 60 + m;
 }
 
+function calcDuration(start, end) {
+  if (!start || !end) return 0;
+  const startMin = toMin(start);
+  const endMin = toMin(end);
+  if (startMin === endMin) return 0;
+  return endMin > startMin ? endMin - startMin : (24 * 60 - startMin) + endMin;
+}
+
+function calcDayNaps(pairs) {
+  return (pairs || []).reduce((sum, pair) => sum + calcDuration(pair[0], pair[1]), 0);
+}
+
 function calcNightLen(bed, wake) {
-  const bedMin = toMin(bed);
-  const wakeMin = toMin(wake);
-  return bedMin > wakeMin ? (24 * 60 - bedMin) + wakeMin : Math.max(0, wakeMin - bedMin);
+  return calcDuration(bed, wake);
+}
+
+function mergeManualLog(existing = {}, manual = {}) {
+  const quickNaps = Array.isArray(existing.quickNaps) ? existing.quickNaps : [];
+  const manualDayNaps = calcDayNaps([
+    [manual.nap1s, manual.nap1e],
+    [manual.nap2s, manual.nap2e],
+    [manual.nap3s, manual.nap3e]
+  ]);
+  const quickDayNaps = quickNaps.reduce((sum, nap) => sum + (Number(nap.dur) || 0), 0);
+  const selected = Array.isArray(manual.selectedTags) ? manual.selectedTags : [];
+  const existingTags = Array.isArray(existing.tags) ? existing.tags : [];
+  const tags = [...new Set([...existingTags, ...selected])];
+  const note = String(manual.note || '').trim() || existing.note || '';
+
+  return {
+    ...existing,
+    date: manual.date,
+    wake: manual.wake,
+    bed: manual.bed,
+    nap1s: manual.nap1s,
+    nap1e: manual.nap1e,
+    nap2s: manual.nap2s,
+    nap2e: manual.nap2e,
+    nap3s: manual.nap3s,
+    nap3e: manual.nap3e,
+    dayNaps: manualDayNaps + quickDayNaps,
+    nightLen: calcNightLen(manual.bed, manual.wake),
+    mood: manual.mood,
+    tags,
+    note,
+    quickNaps,
+    nightWakings: Number(existing.nightWakings || 0)
+  };
 }
 
 function getOrCreateTodayLog(logs) {
@@ -177,32 +222,25 @@ function saveLog() {
 
   if (!wake || !bed) { showToast('Укажите время подъёма и укладывания'); return; }
 
-  const toMin = t => { if (!t) return 0; const [h,m]=t.split(':'); return +h*60+ +m; };
-  const dur   = (s,e) => s&&e ? Math.max(0,toMin(e)-toMin(s)) : 0;
-
-  const dayNaps = dur(nap1s,nap1e) + dur(nap2s,nap2e) + dur(nap3s,nap3e);
-
-  // Night sleep: time from bed to wake (handles midnight crossing)
-  const bedMin  = toMin(bed);
-  const wakeMin = toMin(wake);
-  const nightLen = bedMin > wakeMin ? (24*60 - bedMin) + wakeMin : Math.max(0, wakeMin - bedMin);
-
-  const today = new Date().toISOString().slice(0,10);
-  const logs  = getLogs().filter(l => l.date !== today);
-  logs.push({
+  const today = localDateKey();
+  const logs = getLogs();
+  const existing = logs.find(l => l.date === today) || {};
+  const log = mergeManualLog(existing, {
     date: today, wake, bed,
     nap1s, nap1e, nap2s, nap2e, nap3s, nap3e,
-    dayNaps, nightLen,
+    selectedTags: [...selectedTags],
     mood: moodSel,
-    tags: [...selectedTags],
     note
   });
-  saveLogs(logs);
+  const nextLogs = logs.filter(l => l.date !== today);
+  nextLogs.push(log);
+  nextLogs.sort((a, b) => a.date.localeCompare(b.date));
+  saveLogs(nextLogs);
   if (window.BabyAnalytics) {
     BabyAnalytics.track('diary_saved', {
-      night_min: nightLen,
-      day_naps_min: dayNaps,
-      tags_count: selectedTags.size,
+      night_min: log.nightLen,
+      day_naps_min: log.dayNaps,
+      tags_count: log.tags.length,
       has_note: !!note
     });
   }
@@ -528,7 +566,7 @@ function renderTracker() {
   const now  = new Date();
   const diaryLimit = _getDiaryLimit();
   const days  = trackerPeriod === 'week' ? 7 : (diaryLimit === Infinity ? 30 : Math.min(7, diaryLimit));
-  const cutoff = new Date(now - days * 86400000).toISOString().slice(0,10);
+  const cutoff = localDateKey(new Date(now - days * 86400000));
   const allFiltered = logs.filter(l => l.date >= cutoff).sort((a,b) => a.date.localeCompare(b.date));
   const filtered = diaryLimit === Infinity ? allFiltered : allFiltered.slice(-diaryLimit);
 
@@ -662,4 +700,15 @@ function exportLog() {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'baby_log.txt'; a.click();
   showToast('📥 Файл скачан');
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = {
+    calcDayNaps,
+    calcDuration,
+    calcNightLen,
+    localDateKey,
+    mergeManualLog,
+    toMin
+  };
 }
