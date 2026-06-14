@@ -15,17 +15,38 @@ Deployed endpoints:
 ```text
 https://jfyprwisnrubhhowipdm.functions.supabase.co/analytics-events
 https://jfyprwisnrubhhowipdm.functions.supabase.co/telegram-webhook
+https://jfyprwisnrubhhowipdm.functions.supabase.co/analytics-dashboard
 ```
 
 1. Create a Supabase project.
 2. Run `supabase/schema.sql` in SQL Editor, or run `supabase db push`.
 3. Deploy `supabase/functions/analytics-events`.
 4. Deploy `supabase/functions/telegram-webhook`.
-5. Copy the analytics function URL into `analytics-config.js`:
+5. Deploy `supabase/functions/analytics-dashboard`.
+6. Copy the analytics function URL into `analytics-config.js`:
 
 ```js
 window.BABY_ANALYTICS_ENDPOINT = 'https://<project-ref>.functions.supabase.co/analytics-events';
 ```
+
+## Admin dashboard
+
+Static page:
+
+```text
+https://arseneleshaevwork-dotcom.github.io/baby-tma/admin.html
+```
+
+The page calls `analytics-dashboard` and sends the admin token in the `x-admin-token` header. The token must exist only in Supabase secrets and in a local private note for the project owner.
+
+Set or rotate the token:
+
+```bash
+supabase secrets set ADMIN_TOKEN='<strong_random_token>' --project-ref jfyprwisnrubhhowipdm
+supabase functions deploy analytics-dashboard --project-ref jfyprwisnrubhhowipdm
+```
+
+Do not commit `ADMIN_TOKEN`, service role keys, or Telegram bot tokens to the repository.
 
 ## Telegram webhook
 

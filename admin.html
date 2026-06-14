@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Режим малыша — админка</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --line: #d9dee7;
+      --text: #18202c;
+      --muted: #697386;
+      --accent: #2563eb;
+      --danger: #b42318;
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .layout {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 26px;
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .controls {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    input,
+    select {
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      padding: 0 10px;
+      min-width: 120px;
+    }
+
+    input[type="password"] {
+      min-width: 240px;
+    }
+
+    button {
+      height: 38px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      padding: 0 14px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: .6;
+      cursor: default;
+    }
+
+    .status {
+      min-height: 20px;
+      margin-bottom: 14px;
+      color: var(--muted);
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .metrics {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-bottom: 16px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      min-height: 30px;
+    }
+
+    .metric-value {
+      margin-top: 8px;
+      font-size: 30px;
+      line-height: 1;
+      font-weight: 700;
+    }
+
+    .sections {
+      grid-template-columns: 1fr 1fr;
+      align-items: start;
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 17px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 9px 8px;
+      border-top: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+    }
+
+    .wide {
+      grid-column: 1 / -1;
+    }
+
+    .empty {
+      padding: 16px 8px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+    }
+
+    @media (max-width: 900px) {
+      .topbar { align-items: stretch; flex-direction: column; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .sections { grid-template-columns: 1fr; }
+      input[type="password"] { min-width: 100%; }
+    }
+
+    @media (max-width: 560px) {
+      .layout { padding: 18px 12px 32px; }
+      .metrics { grid-template-columns: 1fr; }
+      .controls { display: grid; grid-template-columns: 1fr; }
+      button, input, select { width: 100%; }
+      .card { padding: 12px; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="layout">
+    <div class="topbar">
+      <div>
+        <h1>Админка</h1>
+        <div class="muted" id="generated">Данные не загружены</div>
+      </div>
+      <form class="controls" id="filters">
+        <label>
+          Период
+          <select id="days">
+            <option value="7">7 дней</option>
+            <option value="30" selected>30 дней</option>
+            <option value="90">90 дней</option>
+            <option value="365">365 дней</option>
+          </select>
+        </label>
+        <label>
+          Admin token
+          <input id="token" type="password" autocomplete="off" placeholder="Вставьте токен">
+        </label>
+        <button id="reload" type="submit">Обновить</button>
+      </form>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <section class="grid metrics" id="metrics"></section>
+
+    <section class="grid sections">
+      <div class="card">
+        <div class="section-title">
+          <h2>Воронка</h2>
+          <span class="muted" id="range"></span>
+        </div>
+        <div id="funnel"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <h2>Потери</h2>
+        </div>
+        <table>
+          <tbody id="dropoffs"></tbody>
+        </table>
+      </div>
+
+      <div class="card wide">
+        <div class="section-title">
+          <h2>Малыши</h2>
+          <span class="muted" id="babyCount"></span>
+        </div>
+        <div id="babies"></div>
+      </div>
+
+      <div class="card wide">
+        <div class="section-title">
+          <h2>Последние события</h2>
+          <span class="muted">до 100 строк</span>
+        </div>
+        <div id="events"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const ADMIN_ENDPOINT = 'https://jfyprwisnrubhhowipdm.functions.supabase.co/analytics-dashboard';
+    const TOKEN_KEY = 'babymode_admin_token';
+    const metricLabels = [
+      ['bot_start', 'Запустили бот'],
+      ['app_open', 'Открыли mini app'],
+      ['onboarding_start', 'Начали онбординг'],
+      ['onboarding_complete', 'Завершили онбординг'],
+      ['profile_saved', 'Сохранили малыша'],
+      ['schedule_generated', 'Получили режим'],
+      ['ai_opened', 'Открыли ИИ'],
+      ['ai_question_sent', 'Вопросы ИИ'],
+      ['sleep_started', 'Старт сна'],
+      ['sleep_finished', 'Сон завершен'],
+      ['diary_saved', 'Записи дневника'],
+      ['premium_opened', 'Открыли Premium'],
+      ['trial_started', 'Старт trial'],
+      ['subscribe_clicked', 'Клик подписки']
+    ];
+
+    const els = {
+      form: document.getElementById('filters'),
+      days: document.getElementById('days'),
+      token: document.getElementById('token'),
+      reload: document.getElementById('reload'),
+      status: document.getElementById('status'),
+      generated: document.getElementById('generated'),
+      range: document.getElementById('range'),
+      metrics: document.getElementById('metrics'),
+      funnel: document.getElementById('funnel'),
+      dropoffs: document.getElementById('dropoffs'),
+      babies: document.getElementById('babies'),
+      babyCount: document.getElementById('babyCount'),
+      events: document.getElementById('events')
+    };
+
+    init();
+
+    function init() {
+      const url = new URL(window.location.href);
+      const tokenFromUrl = url.searchParams.get('token');
+      if (tokenFromUrl) {
+        localStorage.setItem(TOKEN_KEY, tokenFromUrl);
+        els.token.value = tokenFromUrl;
+        url.searchParams.delete('token');
+        history.replaceState(null, '', url.toString());
+      } else {
+        els.token.value = localStorage.getItem(TOKEN_KEY) || '';
+      }
+
+      els.form.addEventListener('submit', event => {
+        event.preventDefault();
+        loadDashboard();
+      });
+
+      if (els.token.value) loadDashboard();
+      else setStatus('Введите admin token и нажмите “Обновить”.');
+    }
+
+    async function loadDashboard() {
+      const token = els.token.value.trim();
+      const days = els.days.value;
+      if (!token) {
+        setStatus('Нужен admin token.', true);
+        return;
+      }
+
+      localStorage.setItem(TOKEN_KEY, token);
+      setLoading(true);
+      setStatus('Загружаю данные...');
+
+      try {
+        const response = await fetch(`${ADMIN_ENDPOINT}?days=${encodeURIComponent(days)}`, {
+          headers: { 'x-admin-token': token }
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'request_failed');
+        renderDashboard(data);
+        setStatus('');
+      } catch (error) {
+        setStatus(error.message === 'unauthorized'
+          ? 'Неверный admin token.'
+          : `Ошибка загрузки: ${error.message}`, true);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderDashboard(data) {
+      els.generated.textContent = `Обновлено: ${formatDateTime(data.generated_at)}`;
+      els.range.textContent = `${data.range_days} дней`;
+      renderMetrics(data);
+      renderFunnel(data.funnel || []);
+      renderDropoffs(data);
+      renderBabies(data.babies || []);
+      renderEvents(data.recent_events || []);
+    }
+
+    function renderMetrics(data) {
+      const totals = data.totals || {};
+      const unique = data.unique_users || {};
+      els.metrics.innerHTML = metricLabels.map(([key, label]) => `
+        <article class="card">
+          <div class="metric-label">${escapeHtml(label)}</div>
+          <div class="metric-value">${number(totals[key])}</div>
+          <div class="muted">${number(unique[key])} уник.</div>
+        </article>
+      `).join('');
+    }
+
+    function renderFunnel(funnel) {
+      if (!funnel.length) {
+        els.funnel.innerHTML = '<div class="empty">Нет данных</div>';
+        return;
+      }
+      const first = funnel[0]?.users || 0;
+      els.funnel.innerHTML = `
+        <table>
+          <thead><tr><th>Шаг</th><th>Пользователи</th><th>Конверсия</th></tr></thead>
+          <tbody>
+            ${funnel.map(step => `
+              <tr>
+                <td>${escapeHtml(step.label)}</td>
+                <td>${number(step.users)}</td>
+                <td>${first ? Math.round((step.users / first) * 100) : 0}%</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderDropoffs(data) {
+      els.dropoffs.innerHTML = `
+        <tr><th>Запустили бот, но не открыли app</th><td>${number(data.bot_started_not_opened)}</td></tr>
+        <tr><th>Открыли app и ничего не сделали</th><td>${number(data.opened_and_left)}</td></tr>
+      `;
+    }
+
+    function renderBabies(babies) {
+      els.babyCount.textContent = `${babies.length} профилей`;
+      if (!babies.length) {
+        els.babies.innerHTML = '<div class="empty">Пока нет сохраненных профилей</div>';
+        return;
+      }
+      els.babies.innerHTML = `
+        <table>
+          <thead><tr><th>Имя</th><th>Дата рождения</th><th>Возраст</th><th>Обновлено</th><th>Client</th></tr></thead>
+          <tbody>
+            ${babies.map(baby => `
+              <tr>
+                <td>${escapeHtml(baby.name)}</td>
+                <td>${escapeHtml(baby.birthdate || 'Не указана')}</td>
+                <td>${escapeHtml(baby.age_label || 'Не указан')}</td>
+                <td>${formatDateTime(baby.updated_at)}</td>
+                <td class="mono">${escapeHtml(shortId(baby.client_id || baby.user_id || ''))}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderEvents(events) {
+      if (!events.length) {
+        els.events.innerHTML = '<div class="empty">Событий за период нет</div>';
+        return;
+      }
+      els.events.innerHTML = `
+        <table>
+          <thead><tr><th>Время</th><th>Событие</th><th>Пользователь</th><th>Payload</th></tr></thead>
+          <tbody>
+            ${events.map(event => `
+              <tr>
+                <td>${formatDateTime(event.created_at)}</td>
+                <td>${escapeHtml(event.event_name)}</td>
+                <td class="mono">${escapeHtml(shortId(event.telegram_id || event.client_id || event.user_id || ''))}</td>
+                <td class="mono">${escapeHtml(JSON.stringify(event.payload || {}))}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function setStatus(message, isError = false) {
+      els.status.textContent = message;
+      els.status.classList.toggle('error', Boolean(isError));
+    }
+
+    function setLoading(isLoading) {
+      els.reload.disabled = isLoading;
+      els.reload.textContent = isLoading ? 'Загрузка...' : 'Обновить';
+    }
+
+    function formatDateTime(value) {
+      if (!value) return '—';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '—';
+      return date.toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    function number(value) {
+      return Number(value || 0).toLocaleString('ru-RU');
+    }
+
+    function shortId(value) {
+      const text = String(value || '');
+      return text.length > 18 ? `${text.slice(0, 9)}...${text.slice(-6)}` : text || '—';
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+    }
+  </script>
+</body>
+</html>
