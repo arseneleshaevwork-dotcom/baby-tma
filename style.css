@@ -79,7 +79,8 @@ body {
   color: var(--text-dark);
   min-height: 100vh;
   overflow-x: hidden;
-  padding-bottom: calc(76px + var(--safe-bottom));
+  padding-bottom: calc(116px + var(--safe-bottom));
+  scroll-padding-bottom: calc(116px + var(--safe-bottom));
 }
 
 /* Background decorative blobs */
@@ -206,7 +207,12 @@ body::after {
 /* ═══════════════════════════════════════════════════════
    PAGES
 ═══════════════════════════════════════════════════════ */
-.page { display:none; padding:0 16px; position:relative; z-index:1; }
+.page {
+  display:none;
+  padding:0 16px calc(116px + var(--safe-bottom));
+  position:relative;
+  z-index:1;
+}
 .page.active {
   display:block;
   animation: pageIn var(--dur-normal) var(--ease-smooth) both;
