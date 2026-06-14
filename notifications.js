@@ -37,11 +37,11 @@ function _showNotifPrompt() {
         ]
       }, function(btnId) {
         if (btnId === 'yes') {
-          localStorage.setItem(NOTIF_KEY, 'tg');
+          _setNotificationPreference('tg');
           if (typeof showToast === 'function') showToast('✅ Напоминания включены!');
           if (typeof hapticSuccess === 'function') hapticSuccess();
         } else {
-          localStorage.setItem(NOTIF_KEY, 'no');
+          _setNotificationPreference('no');
         }
       });
     } catch(e) {
@@ -57,7 +57,7 @@ function _showInAppPrompt() {
   if (typeof showToast === 'function') {
     showToast('💡 Напоминания: нажмите кнопку 🔔 после генерации расписания');
   }
-  localStorage.setItem(NOTIF_KEY, 'pending');
+  _setNotificationPreference('pending');
 }
 
 // Called after schedule is generated — schedules in-session reminders
@@ -119,7 +119,7 @@ function _sendBotMessage(chatId, text) {
 function toggleNotifications() {
   const cur = localStorage.getItem(NOTIF_KEY);
   if (cur === 'tg' || cur === 'pending') {
-    localStorage.setItem(NOTIF_KEY, 'no');
+    _setNotificationPreference('no');
     _notifTimers.forEach(t => clearTimeout(t));
     _notifTimers = [];
     if (typeof showToast === 'function') showToast('🔕 Напоминания отключены');
@@ -130,4 +130,20 @@ function toggleNotifications() {
 
 function isNotificationsEnabled() {
   return localStorage.getItem(NOTIF_KEY) === 'tg' || localStorage.getItem(NOTIF_KEY) === 'pending';
+}
+
+function _setNotificationPreference(value) {
+  localStorage.setItem(NOTIF_KEY, value);
+  if (!window.BabyAnalytics) return;
+
+  const enabled = value === 'tg' || value === 'pending';
+  BabyAnalytics.track(enabled ? 'notifications_enabled' : 'notifications_disabled', {
+    channel: value === 'tg' ? 'telegram' : 'in_app',
+    telegram_user_id: _tgUserId || null,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/Moscow',
+    birthday_reminders: enabled,
+    age_milestones: enabled,
+    schedule_reminders: enabled
+  });
+  BabyAnalytics.flush();
 }

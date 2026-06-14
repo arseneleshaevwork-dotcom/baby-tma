@@ -40,6 +40,15 @@ Deno.serve(async (req) => {
       payload: { text },
       language: from.language_code || null
     });
+
+    await supabase.from('notification_settings').upsert({
+      user_id: user?.id || null,
+      telegram_id: from.id,
+      chat_id: chatId,
+      enabled: false,
+      timezone: 'Europe/Moscow',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'telegram_id' });
   }
 
   if (text.startsWith('/start')) {

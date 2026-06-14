@@ -259,6 +259,14 @@
 
       <div class="card wide">
         <div class="section-title">
+          <h2>Ближайшие даты</h2>
+          <span class="muted">45 дней</span>
+        </div>
+        <div id="upcomingDates"></div>
+      </div>
+
+      <div class="card wide">
+        <div class="section-title">
           <h2>Малыши</h2>
           <span class="muted" id="babyCount"></span>
         </div>
@@ -292,7 +300,10 @@
       ['diary_saved', 'Записи дневника'],
       ['premium_opened', 'Открыли Premium'],
       ['trial_started', 'Старт trial'],
-      ['subscribe_clicked', 'Клик подписки']
+      ['subscribe_clicked', 'Клик подписки'],
+      ['notifications_enabled', 'Включили напоминания'],
+      ['notifications_disabled', 'Отключили напоминания'],
+      ['notification_sent', 'Отправлено уведомлений']
     ];
 
     const els = {
@@ -306,6 +317,7 @@
       metrics: document.getElementById('metrics'),
       funnel: document.getElementById('funnel'),
       dropoffs: document.getElementById('dropoffs'),
+      upcomingDates: document.getElementById('upcomingDates'),
       babies: document.getElementById('babies'),
       babyCount: document.getElementById('babyCount'),
       events: document.getElementById('events')
@@ -369,6 +381,7 @@
       renderMetrics(data);
       renderFunnel(data.funnel || []);
       renderDropoffs(data);
+      renderUpcomingDates(data.upcoming_dates || []);
       renderBabies(data.babies || []);
       renderEvents(data.recent_events || []);
     }
@@ -411,6 +424,29 @@
       els.dropoffs.innerHTML = `
         <tr><th>Запустили бот, но не открыли app</th><td>${number(data.bot_started_not_opened)}</td></tr>
         <tr><th>Открыли app и ничего не сделали</th><td>${number(data.opened_and_left)}</td></tr>
+      `;
+    }
+
+    function renderUpcomingDates(items) {
+      if (!items.length) {
+        els.upcomingDates.innerHTML = '<div class="empty">В ближайшие 45 дней дат нет</div>';
+        return;
+      }
+      els.upcomingDates.innerHTML = `
+        <table>
+          <thead><tr><th>Когда</th><th>Малыш</th><th>Событие</th><th>Дата рождения</th><th>Client</th></tr></thead>
+          <tbody>
+            ${items.map(item => `
+              <tr>
+                <td>${item.days_until === 0 ? 'Сегодня' : `через ${item.days_until} дн.`}</td>
+                <td>${escapeHtml(item.name)}</td>
+                <td>${escapeHtml(item.type === 'birthday' ? `День рождения, ${item.age_label}` : item.age_label)}</td>
+                <td>${escapeHtml(item.birthdate || 'Не указана')}</td>
+                <td class="mono">${escapeHtml(shortId(item.client_id || item.user_id || ''))}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
       `;
     }
 

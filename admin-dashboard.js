@@ -12,7 +12,10 @@ const TRACKED_EVENTS = [
   'diary_saved',
   'premium_opened',
   'trial_started',
-  'subscribe_clicked'
+  'subscribe_clicked',
+  'notifications_enabled',
+  'notifications_disabled',
+  'notification_sent'
 ];
 
 const FUNNEL_EVENTS = [
@@ -23,7 +26,11 @@ const FUNNEL_EVENTS = [
   { event: 'ai_opened', label: 'Открыли ИИ' }
 ];
 
-function buildAdminDashboard({ events = [], babies = [], generatedAt, rangeDays = 30 } = {}) {
+const { buildUpcomingBabyDates } = typeof require === 'function'
+  ? require('./baby-milestones')
+  : { buildUpcomingBabyDates: () => [] };
+
+function buildAdminDashboard({ events = [], babies = [], generatedAt, rangeDays = 30, now = new Date() } = {}) {
   const totals = Object.fromEntries(TRACKED_EVENTS.map(event => [event, 0]));
   const usersByEvent = Object.fromEntries(TRACKED_EVENTS.map(event => [event, new Set()]));
   const userEvents = new Map();
@@ -75,6 +82,7 @@ function buildAdminDashboard({ events = [], babies = [], generatedAt, rangeDays 
     opened_and_left: openedAndLeft,
     bot_started_not_opened: botStartedNotOpened,
     babies: babies.map(formatBaby).sort(byProfileCompleteness),
+    upcoming_dates: buildUpcomingBabyDates({ babies, now, horizonDays: 45 }),
     recent_events: [...events].sort(byCreatedDesc).slice(0, 100).map(formatEvent)
   };
 }

@@ -30,7 +30,7 @@ test('builds admin totals, funnel and baby table from raw analytics rows', () =>
       user_id: 'u1',
       client_id: 'c1',
       name: 'Миша',
-      birthdate: '2025-12-01',
+      birthdate: '2025-12-20',
       age_months: 6,
       updated_at: '2026-06-10T10:02:00.000Z'
     },
@@ -49,7 +49,8 @@ test('builds admin totals, funnel and baby table from raw analytics rows', () =>
     events,
     babies,
     generatedAt: '2026-06-14T00:00:00.000Z',
-    rangeDays: 30
+    rangeDays: 30,
+    now: '2026-06-14T00:00:00.000Z'
   });
 
   assert.strictEqual(dashboard.range_days, 30);
@@ -63,6 +64,8 @@ test('builds admin totals, funnel and baby table from raw analytics rows', () =>
   assert.strictEqual(dashboard.babies.length, 2);
   assert.strictEqual(dashboard.babies[0].name, 'Миша');
   assert.strictEqual(dashboard.babies[0].age_label, '6 мес.');
+  assert.strictEqual(dashboard.upcoming_dates[0].name, 'Миша');
+  assert.strictEqual(dashboard.upcoming_dates[0].event_date, '2026-06-20');
   assert.strictEqual(dashboard.recent_events.length, 9);
   assert.strictEqual(dashboard.recent_events[0].event_name, 'premium_opened');
 });

@@ -20,7 +20,10 @@ const trackedEvents = [
   'diary_saved',
   'premium_opened',
   'trial_started',
-  'subscribe_clicked'
+  'subscribe_clicked',
+  'notifications_enabled',
+  'notifications_disabled',
+  'notification_sent'
 ];
 
 const funnelEvents = [
@@ -30,6 +33,8 @@ const funnelEvents = [
   { event: 'schedule_generated', label: 'Получили режим' },
   { event: 'ai_opened', label: 'Открыли ИИ' }
 ];
+
+const milestoneMonths = [1, 3, 6, 9, 12, 18, 24, 36];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -132,7 +137,53 @@ function buildDashboard({ events, babies, rangeDays, generatedAt }: {
     opened_and_left: openedAndLeft,
     bot_started_not_opened: botStartedNotOpened,
     babies: babies.map(formatBaby).sort(byProfileCompleteness),
+    upcoming_dates: buildUpcomingBabyDates({ babies, now: generatedAt, horizonDays: 45 }),
     recent_events: [...events].sort(byCreatedDesc).slice(0, 100).map(formatEvent)
+  };
+}
+
+function buildUpcomingBabyDates({ babies, now, horizonDays }: { babies: any[]; now: string; horizonDays: number }) {
+  const nowDate = toUtcDateOnly(now);
+  const maxDate = addDays(nowDate, horizonDays);
+  const items: any[] = [];
+
+  for (const baby of babies) {
+    if (!baby.birthdate) continue;
+    const birth = parseDateOnly(baby.birthdate);
+    if (!birth) continue;
+
+    const birthday = nextBirthday(birth, nowDate);
+    if (birthday >= nowDate && birthday <= maxDate) {
+      const years = birthday.getUTCFullYear() - birth.getUTCFullYear();
+      items.push(formatMilestone(baby, 'birthday', birthday, nowDate, years * 12));
+    }
+
+    for (const month of milestoneMonths) {
+      if (month % 12 === 0) continue;
+      const date = addMonths(birth, month);
+      if (date >= nowDate && date <= maxDate) {
+        items.push(formatMilestone(baby, 'month', date, nowDate, month));
+      }
+    }
+  }
+
+  return items
+    .sort((a, b) => a.days_until - b.days_until || a.name.localeCompare(b.name, 'ru'))
+    .slice(0, 50);
+}
+
+function formatMilestone(baby: any, type: string, eventDate: Date, nowDate: Date, ageMonths: number) {
+  return {
+    baby_id: baby.id || '',
+    user_id: baby.user_id || null,
+    client_id: baby.client_id || null,
+    name: baby.name || 'Без имени',
+    birthdate: baby.birthdate || null,
+    type,
+    event_date: formatDateOnly(eventDate),
+    days_until: diffDays(nowDate, eventDate),
+    age_months: ageMonths,
+    age_label: formatAgeLabel(ageMonths)
   };
 }
 
@@ -170,6 +221,20 @@ function formatAge(ageMonths: number | null | undefined) {
   return rest ? `${years} г. ${rest} мес.` : `${years} г.`;
 }
 
+function formatAgeLabel(ageMonths: number | null | undefined) {
+  if (ageMonths === null || ageMonths === undefined) return 'Возраст не указан';
+  if (ageMonths === 12) return '1 год';
+  if (ageMonths > 12 && ageMonths % 12 === 0) return `${ageMonths / 12} года`;
+  if (ageMonths > 12) {
+    const years = Math.floor(ageMonths / 12);
+    const months = ageMonths % 12;
+    return `${years} г. ${months} мес.`;
+  }
+  if (ageMonths === 1) return '1 месяц';
+  if ([2, 3, 4].includes(ageMonths)) return `${ageMonths} месяца`;
+  return `${ageMonths} месяцев`;
+}
+
 function formatEvent(event: any) {
   return {
     id: event.id || '',
@@ -200,6 +265,42 @@ function byProfileCompleteness(a: any, b: any) {
 function clampNumber(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
   return Math.max(min, Math.min(max, Math.round(value)));
+}
+
+function parseDateOnly(value: string) {
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return null;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function toUtcDateOnly(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function nextBirthday(birth: Date, nowDate: Date) {
+  let date = new Date(Date.UTC(nowDate.getUTCFullYear(), birth.getUTCMonth(), birth.getUTCDate()));
+  if (date < nowDate) {
+    date = new Date(Date.UTC(nowDate.getUTCFullYear() + 1, birth.getUTCMonth(), birth.getUTCDate()));
+  }
+  return date;
+}
+
+function addMonths(date: Date, months: number) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, date.getUTCDate()));
+}
+
+function addDays(date: Date, days: number) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days));
+}
+
+function diffDays(from: Date, to: Date) {
+  return Math.round((to.getTime() - from.getTime()) / 86400000);
+}
+
+function formatDateOnly(date: Date) {
+  return date.toISOString().slice(0, 10);
 }
 
 function json(data: unknown, status = 200) {

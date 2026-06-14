@@ -63,6 +63,25 @@ Deno.serve(async (req) => {
         }, { onConflict: userId ? 'user_id' : 'client_id' });
     }
 
+    if ((event.event === 'notifications_enabled' || event.event === 'notifications_disabled') && (userId || event.client_id || telegramUser?.id)) {
+      const enabled = event.event === 'notifications_enabled';
+      const setting = {
+        user_id: userId,
+        telegram_id: telegramUser?.id || event.payload?.telegram_user_id || null,
+        client_id: event.client_id || null,
+        chat_id: telegramUser?.id || event.payload?.telegram_user_id || null,
+        enabled,
+        timezone: event.payload?.timezone || 'Europe/Moscow',
+        birthday_reminders: Boolean(event.payload?.birthday_reminders ?? enabled),
+        age_milestones: Boolean(event.payload?.age_milestones ?? enabled),
+        schedule_reminders: Boolean(event.payload?.schedule_reminders ?? false),
+        updated_at: new Date().toISOString()
+      };
+      await supabase
+        .from('notification_settings')
+        .upsert(setting, { onConflict: userId ? 'user_id' : (setting.telegram_id ? 'telegram_id' : 'client_id') });
+    }
+
     const { error: eventError } = await supabase.from('events').insert({
       event_name: event.event,
       user_id: userId,
