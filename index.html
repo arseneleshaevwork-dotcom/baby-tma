@@ -33,7 +33,7 @@
 })();
 </script>
 
-<link rel="stylesheet" href="style.css?v=adready1">
+<link rel="stylesheet" href="style.css?v=simplify1">
 </head>
 <body>
 
@@ -57,7 +57,27 @@
      PAGE: HOME
 ═══════════════════════════════════════════════════════ -->
 <div id="page-home" class="page active">
-  <div class="card">
+  <div class="today-hero-card">
+    <div class="today-kicker">Сегодня</div>
+    <div class="today-title" id="todayMainTitle">Соберите спокойный режим дня</div>
+    <div class="today-sub" id="todayMainSub">Возраст, подъем и тип дня уже достаточно, чтобы получить первый план.</div>
+    <button class="gen-btn today-primary" id="btn-generate" onclick="generateAndSwitch()">✨ Собрать режим на сегодня</button>
+    <div class="today-actions">
+      <button onclick="goPage('tracker',document.getElementById('bn-tracker'));hapticLight()">😴 Записать сон</button>
+      <button onclick="goPage('chat',document.getElementById('bn-chat'));hapticLight()">💬 Спросить ИИ</button>
+    </div>
+  </div>
+
+  <div class="card today-plan-card" id="todayPlanCard" style="display:none">
+    <div class="diary-header">
+      <div class="section-title" style="margin-bottom:0">Ближайшие шаги</div>
+      <button class="export-btn" onclick="goPage('schedule',null);hapticLight()">Весь режим</button>
+    </div>
+    <div id="todayPlanList"></div>
+  </div>
+
+  <details class="card setup-card">
+    <summary>Настроить режим</summary>
     <div class="form-grid">
       <div class="field">
         <label for="ageMonths">Возраст малыша</label>
@@ -117,8 +137,8 @@
       </div>
     </div>
 
-    <button class="gen-btn" id="btn-generate" onclick="generateAndSwitch()">✨ Сгенерировать режим дня</button>
-  </div>
+    <button class="gen-btn secondary-generate" onclick="generateAndSwitch()">Обновить режим</button>
+  </details>
 
   <!-- ─── SMART HOME CARD: Что сейчас с малышом ──────────── -->
   <div class="card home-insight-card" id="homeInsightCard" style="display:none">
@@ -136,8 +156,8 @@
     <div class="hic-stats" id="hicStats" style="display:none"></div>
   </div>
 
-  <div class="card">
-    <div class="section-title">Как это работает</div>
+  <details class="card more-card">
+    <summary>Еще полезное</summary>
     <div class="how-item">
       <div class="how-icon sleep-bg">🔬</div>
       <div><div class="how-title">Научная основа</div><div class="how-sub">Wake windows из рекомендаций AAP, ВОЗ, NHS</div></div>
@@ -154,8 +174,11 @@
       <div class="how-icon chat-bg">💬</div>
       <div><div class="how-title">Консультант</div><div class="how-sub">Ответы на 40+ частых вопросов мам</div></div>
     </div>
-    <button class="ai-home-btn" onclick="goPage('chat',document.getElementById('bn-chat'));hapticLight()">💬 Задать вопрос ИИ</button>
-  </div>
+    <div class="more-actions">
+      <button onclick="goPage('articles',null);hapticLight()">📚 База знаний</button>
+      <button onclick="goPage('ritual',null);hapticLight()">🌙 Ритуал сна</button>
+    </div>
+  </details>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
@@ -452,19 +475,13 @@
 ═══════════════════════════════════════════════════════ -->
 <nav class="bottom-nav" role="navigation" aria-label="Основная навигация">
   <button class="bnav-item active" id="bn-home" onclick="goPage('home',this)" aria-label="Главная">
-    <span class="icon">🏠</span><span>Главная</span>
+    <span class="icon">🏠</span><span>Сегодня</span>
   </button>
-  <button class="bnav-item" id="bn-schedule" onclick="goPage('schedule',this)" aria-label="Режим дня">
-    <span class="icon">📅</span><span>Режим</span>
+  <button class="bnav-item" id="bn-tracker" onclick="goPage('tracker',this)" aria-label="Дневник">
+    <span class="icon">😴</span><span>Дневник</span>
   </button>
   <button class="bnav-item" id="bn-chat" onclick="goPage('chat',this)" aria-label="ИИ консультант">
     <span class="icon">💬</span><span>ИИ</span>
-  </button>
-  <button class="bnav-item" id="bn-ritual" onclick="goPage('ritual',this)" aria-label="Ритуал сна">
-    <span class="icon">🌙</span><span>Ритуал</span>
-  </button>
-  <button class="bnav-item" id="bn-tracker" onclick="goPage('tracker',this)" aria-label="Дневник">
-    <span class="icon">📓</span><span>Дневник</span>
   </button>
   <button class="bnav-item" id="bn-premium" onclick="goPage('premium',this);renderPremiumPage()" aria-label="Premium">
     <span class="icon">⭐</span><span>Premium</span>
@@ -527,8 +544,10 @@ if (_isLowEnd) document.documentElement.classList.add('low-end');
 function goPage(id, btn) {
   document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
   document.querySelectorAll('.bnav-item').forEach(function(b) { b.classList.remove('active'); });
-  document.getElementById('page-' + id).classList.add('active');
-  btn.classList.add('active');
+  var page = document.getElementById('page-' + id);
+  if (!page) return;
+  page.classList.add('active');
+  if (btn) btn.classList.add('active');
   if (window.BabyAnalytics) {
     BabyAnalytics.track('page_open', { page: id });
     if (id === 'chat') BabyAnalytics.track('ai_opened');
@@ -552,15 +571,43 @@ function generateAndSwitch() {
     try {
       if (typeof generate !== 'function') { if (typeof showToast === 'function') showToast('Ошибка: generate не загружена'); return; }
       generate();
+      renderTodayPlan();
       if (typeof hapticSuccess === 'function') hapticSuccess();
-      goPage('schedule', document.getElementById('bn-schedule'));
+      goPage('home', document.getElementById('bn-home'));
+      if (typeof showToast === 'function') showToast('✅ Режим на сегодня готов');
     } catch(e) {
       if (typeof showToast === 'function') showToast('Ошибка: ' + e.message);
       console.error('generateAndSwitch error:', e);
     } finally {
-      if (btn) { btn.classList.remove('loading'); btn.textContent = '✨ Сгенерировать режим дня'; }
+      if (btn) { btn.classList.remove('loading'); btn.textContent = '✨ Собрать режим на сегодня'; }
     }
   });
+}
+
+function renderTodayPlan() {
+  var blocks = window._lastBlocks || [];
+  var card = document.getElementById('todayPlanCard');
+  var list = document.getElementById('todayPlanList');
+  if (!card || !list || !blocks.length) return;
+
+  var important = blocks
+    .filter(function(b) { return b.tag === 'sleep' || b.tag === 'feed' || b.tag === 'walk'; })
+    .slice(0, 4);
+  var firstSleep = blocks.find(function(b) { return b.tag === 'sleep' && (b.title || '').includes('Дневной'); });
+  var title = document.getElementById('todayMainTitle');
+  var sub = document.getElementById('todayMainSub');
+
+  if (title && firstSleep) title.textContent = 'Следующий сон около ' + firstSleep.time;
+  if (sub && firstSleep) sub.textContent = firstSleep.note || 'Начните спокойный ритуал заранее.';
+
+  list.innerHTML = important.map(function(b) {
+    return '<div class="today-step">'
+      + '<div class="today-step-time">' + b.time + '</div>'
+      + '<div><strong>' + b.title + '</strong><span>' + b.note + '</span></div>'
+      + '</div>';
+  }).join('');
+  card.style.display = 'block';
+  renderHomeInsights();
 }
 
 // ─── Situation selector ──────────────────────────────────────────────────────

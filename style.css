@@ -253,6 +253,120 @@ body::after {
 }
 
 /* ═══════════════════════════════════════════════════════
+   SIMPLIFIED TODAY SCREEN
+═══════════════════════════════════════════════════════ */
+.today-hero-card {
+  background:linear-gradient(135deg,#FFF0E8 0%,#F5E9FF 100%);
+  border:1.5px solid rgba(201,123,219,.18);
+  border-radius:var(--radius-lg);
+  padding:20px;
+  margin-bottom:14px;
+  box-shadow:var(--shadow-md);
+}
+.today-kicker {
+  color:var(--clr-primary);
+  font-size:.68rem;
+  font-weight:900;
+  text-transform:uppercase;
+  letter-spacing:.1em;
+  margin-bottom:8px;
+}
+.today-title {
+  color:var(--text-dark);
+  font-size:1.35rem;
+  line-height:1.15;
+  font-weight:950;
+  margin-bottom:8px;
+}
+.today-sub {
+  color:var(--text-mid);
+  font-size:.86rem;
+  line-height:1.45;
+  font-weight:650;
+  margin-bottom:14px;
+}
+.today-primary { margin-bottom:10px; }
+.today-actions {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+.today-actions button,
+.more-actions button {
+  min-height:44px;
+  border:1.5px solid rgba(201,123,219,.18);
+  border-radius:var(--radius-sm);
+  background:rgba(255,255,255,.78);
+  color:var(--text-dark);
+  font-family:'Nunito',inherit;
+  font-size:.82rem;
+  font-weight:900;
+  cursor:pointer;
+  box-shadow:var(--shadow-sm);
+}
+.today-actions button:active,
+.more-actions button:active { transform:scale(.98); }
+.today-plan-card { padding-bottom:12px; }
+.today-step {
+  display:grid;
+  grid-template-columns:48px 1fr;
+  gap:10px;
+  padding:11px 0;
+  border-bottom:1px solid var(--border-soft);
+}
+.today-step:last-child { border-bottom:none; }
+.today-step-time {
+  color:var(--clr-primary);
+  font-size:.78rem;
+  font-weight:900;
+}
+.today-step strong {
+  display:block;
+  color:var(--text-dark);
+  font-size:.86rem;
+  line-height:1.2;
+  margin-bottom:2px;
+}
+.today-step span {
+  display:block;
+  color:var(--text-hint);
+  font-size:.76rem;
+  line-height:1.35;
+  font-weight:600;
+}
+.setup-card summary,
+.more-card summary {
+  cursor:pointer;
+  color:var(--text-dark);
+  font-size:.9rem;
+  font-weight:900;
+  list-style:none;
+}
+.setup-card summary::-webkit-details-marker,
+.more-card summary::-webkit-details-marker { display:none; }
+.setup-card summary::after,
+.more-card summary::after {
+  content:'↓';
+  float:right;
+  color:var(--text-hint);
+}
+.setup-card[open] summary,
+.more-card[open] summary { margin-bottom:14px; }
+.setup-card[open] summary::after,
+.more-card[open] summary::after { content:'↑'; }
+.secondary-generate {
+  min-height:46px;
+  font-size:.88rem;
+  box-shadow:var(--shadow-sm);
+}
+.more-actions {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:12px;
+}
+
+/* ═══════════════════════════════════════════════════════
    SECTION TITLE
 ═══════════════════════════════════════════════════════ */
 .section-title {
