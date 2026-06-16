@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { buildBotReply } from './bot-flow.mjs';
 
 const miniAppUrl = Deno.env.get('MINI_APP_URL') || 'https://arseneleshaevwork-dotcom.github.io/baby-tma/';
 
@@ -8,15 +9,17 @@ Deno.serve(async (req) => {
   }
 
   const update = await req.json().catch(() => null);
-  const message = update?.message;
-  const from = message?.from;
+  const callback = update?.callback_query;
+  const message = update?.message || callback?.message;
+  const from = callback?.from || message?.from;
   const chatId = message?.chat?.id;
-  const text = String(message?.text || '');
+  const text = String(callback?.data || message?.text || '');
 
   if (!from?.id || !chatId) {
     return json({ ok: true, skipped: true });
   }
 
+  let botReply: any = null;
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (supabaseUrl && serviceRoleKey) {
@@ -33,48 +36,123 @@ Deno.serve(async (req) => {
       .select('id')
       .single();
 
+    const { data: baby } = user?.id
+      ? await supabase
+        .from('babies')
+        .select('name,birthdate,age_months')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      : { data: null };
+
+    botReply = buildBotReply({
+      text,
+      firstName: from.first_name || '',
+      baby,
+      miniAppUrl,
+      now: new Date()
+    });
+
+    if (botReply?.action === 'save_name' && user?.id) {
+      await supabase.from('babies').upsert({
+        user_id: user.id,
+        name: botReply.profile.name,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+    }
+
+    if (botReply?.action === 'save_birthdate' && user?.id) {
+      await supabase.from('babies').upsert({
+        user_id: user.id,
+        name: botReply.profile.name,
+        birthdate: botReply.profile.birthdate,
+        age_months: botReply.profile.age_months,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+    }
+
+    if ((botReply?.action === 'enable_reminders' || botReply?.action === 'disable_reminders') && user?.id) {
+      const enabled = botReply.action === 'enable_reminders';
+      await supabase.from('notification_settings').upsert({
+        user_id: user.id,
+        telegram_id: from.id,
+        chat_id: chatId,
+        enabled,
+        timezone: 'Europe/Moscow',
+        birthday_reminders: enabled,
+        age_milestones: enabled,
+        schedule_reminders: false,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'telegram_id' });
+    } else if (user?.id) {
+      const { data: setting } = await supabase
+        .from('notification_settings')
+        .select('enabled,birthday_reminders,age_milestones,schedule_reminders')
+        .eq('telegram_id', from.id)
+        .maybeSingle();
+
+      await supabase.from('notification_settings').upsert({
+        user_id: user.id,
+        telegram_id: from.id,
+        chat_id: chatId,
+        enabled: Boolean(setting?.enabled),
+        timezone: 'Europe/Moscow',
+        birthday_reminders: Boolean(setting?.birthday_reminders ?? true),
+        age_milestones: Boolean(setting?.age_milestones ?? true),
+        schedule_reminders: Boolean(setting?.schedule_reminders ?? false),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'telegram_id' });
+    }
+
     await supabase.from('events').insert({
       event_name: text.startsWith('/start') ? 'bot_start' : 'bot_message',
       user_id: user?.id || null,
       telegram_id: from.id,
-      payload: { text },
+      baby_name: botReply?.profile?.name || baby?.name || null,
+      baby_birthdate: botReply?.profile?.birthdate || baby?.birthdate || null,
+      baby_age_months: botReply?.profile?.age_months ?? baby?.age_months ?? null,
+      payload: { text, action: botReply?.action || 'none' },
       language: from.language_code || null
     });
-
-    await supabase.from('notification_settings').upsert({
-      user_id: user?.id || null,
-      telegram_id: from.id,
-      chat_id: chatId,
-      enabled: false,
-      timezone: 'Europe/Moscow',
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'telegram_id' });
+  } else {
+    botReply = buildBotReply({
+      text,
+      firstName: from.first_name || '',
+      baby: null,
+      miniAppUrl,
+      now: new Date()
+    });
   }
 
-  if (text.startsWith('/start')) {
-    await sendWelcome(chatId);
+  if (callback?.id) {
+    await answerCallback(callback.id);
   }
+  await sendBotMessage(chatId, botReply);
 
   return json({ ok: true });
 });
 
-async function sendWelcome(chatId: number) {
+async function sendBotMessage(chatId: number, reply: any) {
   const token = Deno.env.get('TELEGRAM_BOT_TOKEN');
-  if (!token) return;
+  if (!token || !reply?.text) return;
 
   await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       chat_id: chatId,
-      text: 'Привет! Я помогу собрать спокойный режим малыша: сон, кормления, дневник, ИИ-подсказки и напоминания по возрасту. Начните с возраста и времени подъёма — план дня появится за минуту.',
-      reply_markup: {
-        inline_keyboard: [[{
-          text: 'Открыть Режим малыша',
-          web_app: { url: miniAppUrl }
-        }]]
-      }
+      text: reply.text,
+      reply_markup: reply.reply_markup
     })
+  });
+}
+
+async function answerCallback(callbackQueryId: string) {
+  const token = Deno.env.get('TELEGRAM_BOT_TOKEN');
+  if (!token) return;
+  await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ callback_query_id: callbackQueryId })
   });
 }
 
