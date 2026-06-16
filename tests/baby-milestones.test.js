@@ -1,6 +1,7 @@
 const assert = require('assert');
 const {
   buildUpcomingBabyDates,
+  buildNextBabyEvent,
   getBabyAgeMonths
 } = require('../baby-milestones');
 
@@ -53,4 +54,40 @@ test('builds upcoming birthday and month milestones', () => {
       age_label: '6 месяцев'
     }
   ]);
+});
+
+
+test('builds next baby event card for home screen', () => {
+  const event = buildNextBabyEvent({
+    name: 'Артем',
+    birthdate: '2025-12-20',
+    now: '2026-06-14T09:00:00.000Z',
+    horizonDays: 45
+  });
+
+  assert.deepStrictEqual(event, {
+    type: 'month',
+    title: 'Через 6 дней Артем: 6 месяцев',
+    subtitle: 'Это хороший момент пересмотреть окна бодрствования, дневные сны и кормления.',
+    cta: 'Что важно сейчас',
+    days_until: 6,
+    event_date: '2026-06-20',
+    age_months: 6,
+    age_label: '6 месяцев'
+  });
+});
+
+test('builds profile prompt when birthdate is missing', () => {
+  const event = buildNextBabyEvent({ name: 'Малыш', birthdate: '', now: '2026-06-14T09:00:00.000Z' });
+
+  assert.deepStrictEqual(event, {
+    type: 'profile',
+    title: 'Добавьте дату рождения малыша',
+    subtitle: 'Тогда я смогу поздравлять с важными датами и точнее подбирать режим по возрасту.',
+    cta: 'Заполнить профиль',
+    days_until: null,
+    event_date: null,
+    age_months: null,
+    age_label: 'Возраст не указан'
+  });
 });

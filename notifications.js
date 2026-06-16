@@ -30,18 +30,18 @@ function _showNotifPrompt() {
     try {
       tg.showPopup({
         title: '🔔 Напоминания',
-        message: 'Хотите получать напоминания о кормлении и сне малыша прямо в Telegram?',
+        message: 'Включить мягкие напоминания о важных датах малыша, скачках возраста и ближайших событиях режима?',
         buttons: [
           { id: 'yes', type: 'default', text: 'Да, включить' },
           { id: 'no',  type: 'destructive', text: 'Не сейчас' }
         ]
       }, function(btnId) {
         if (btnId === 'yes') {
-          _setNotificationPreference('tg');
+          setNotificationPreference('tg');
           if (typeof showToast === 'function') showToast('✅ Напоминания включены!');
           if (typeof hapticSuccess === 'function') hapticSuccess();
         } else {
-          _setNotificationPreference('no');
+          setNotificationPreference('no');
         }
       });
     } catch(e) {
@@ -57,7 +57,7 @@ function _showInAppPrompt() {
   if (typeof showToast === 'function') {
     showToast('💡 Напоминания: нажмите кнопку 🔔 после генерации расписания');
   }
-  _setNotificationPreference('pending');
+  setNotificationPreference('pending');
 }
 
 // Called after schedule is generated — schedules in-session reminders
@@ -119,7 +119,7 @@ function _sendBotMessage(chatId, text) {
 function toggleNotifications() {
   const cur = localStorage.getItem(NOTIF_KEY);
   if (cur === 'tg' || cur === 'pending') {
-    _setNotificationPreference('no');
+    setNotificationPreference('no');
     _notifTimers.forEach(t => clearTimeout(t));
     _notifTimers = [];
     if (typeof showToast === 'function') showToast('🔕 Напоминания отключены');
@@ -132,7 +132,7 @@ function isNotificationsEnabled() {
   return localStorage.getItem(NOTIF_KEY) === 'tg' || localStorage.getItem(NOTIF_KEY) === 'pending';
 }
 
-function _setNotificationPreference(value) {
+function setNotificationPreference(value) {
   localStorage.setItem(NOTIF_KEY, value);
   if (!window.BabyAnalytics) return;
 
@@ -147,3 +147,6 @@ function _setNotificationPreference(value) {
   });
   BabyAnalytics.flush();
 }
+
+
+const _setNotificationPreference = setNotificationPreference;

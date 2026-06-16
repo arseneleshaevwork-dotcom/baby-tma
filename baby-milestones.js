@@ -30,6 +30,65 @@ function buildUpcomingBabyDates({ babies = [], now = new Date(), horizonDays = 3
     .slice(0, 50);
 }
 
+function buildNextBabyEvent({ name = '', birthdate = '', now = new Date(), horizonDays = 45 } = {}) {
+  const cleanName = String(name || '').trim() || 'малыш';
+  if (!birthdate) {
+    return {
+      type: 'profile',
+      title: 'Добавьте дату рождения малыша',
+      subtitle: 'Тогда я смогу поздравлять с важными датами и точнее подбирать режим по возрасту.',
+      cta: 'Заполнить профиль',
+      days_until: null,
+      event_date: null,
+      age_months: null,
+      age_label: 'Возраст не указан'
+    };
+  }
+
+  const items = buildUpcomingBabyDates({
+    babies: [{ id: 'local', name: cleanName, birthdate }],
+    now,
+    horizonDays
+  });
+  const next = items[0];
+  if (!next) {
+    const ageMonths = getBabyAgeMonths(birthdate, now);
+    return {
+      type: 'steady',
+      title: `${cleanName}: ${formatAgeLabel(ageMonths)}`,
+      subtitle: 'Ведите дневник сна несколько дней — я подскажу, где режим можно сделать спокойнее.',
+      cta: 'Открыть дневник',
+      days_until: null,
+      event_date: null,
+      age_months: ageMonths,
+      age_label: formatAgeLabel(ageMonths)
+    };
+  }
+
+  const prefix = next.days_until === 0 ? 'Сегодня' : `Через ${next.days_until} ${pluralDays(next.days_until)}`;
+  return {
+    type: next.type,
+    title: `${prefix} ${cleanName}: ${next.age_label}`,
+    subtitle: next.type === 'birthday'
+      ? 'Подготовьте поздравление и проверьте, как меняются сон, питание и ритуалы в новом возрасте.'
+      : 'Это хороший момент пересмотреть окна бодрствования, дневные сны и кормления.',
+    cta: 'Что важно сейчас',
+    days_until: next.days_until,
+    event_date: next.event_date,
+    age_months: next.age_months,
+    age_label: next.age_label
+  };
+}
+
+function pluralDays(value) {
+  const n = Math.abs(Number(value));
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'день';
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'дня';
+  return 'дней';
+}
+
 function getBabyAgeMonths(birthdate, now = new Date()) {
   const birth = parseDateOnly(birthdate);
   if (!birth) return null;
@@ -110,6 +169,18 @@ if (typeof module !== 'undefined') {
   module.exports = {
     MILESTONE_MONTHS,
     buildUpcomingBabyDates,
+    buildNextBabyEvent,
+    getBabyAgeMonths,
+    formatAgeLabel
+  };
+}
+
+
+if (typeof window !== 'undefined') {
+  window.BabyMilestones = {
+    MILESTONE_MONTHS,
+    buildUpcomingBabyDates,
+    buildNextBabyEvent,
     getBabyAgeMonths,
     formatAgeLabel
   };

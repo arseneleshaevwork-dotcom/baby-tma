@@ -5,34 +5,23 @@ const ONBOARD_KEY = 'babymode_onboarded_v2';
 
 const SLIDES = [
   {
-    img: 'img_sleep.png',
-    emoji: '🌙',
-    title: 'Спокойный режим малыша',
-    text: 'Соберу понятный план сна, кормления и бодрствования по возрасту, помогу заметить закономерности и подскажу, что делать сегодня'
+    type: 'welcome',
+    emoji: '🌸',
+    title: 'Добро пожаловать в спокойный режим',
+    text: 'Я помогу собрать день малыша, вести дневник сна и мягко напоминать о важных событиях.',
+    chips: ['режим на сегодня', 'дневник сна', 'важные даты']
   },
   {
-    img: 'img_play.png',
-    emoji: '🍼',
-    title: 'План дня за минуту',
-    text: 'Укажите возраст и время подъёма — приложение рассчитает окна бодрствования, дневные сны, кормления и вечерний ритуал'
-  },
-  {
-    img: 'img_feed.png',
-    emoji: '💬',
-    title: 'ИИ-помощник рядом',
-    text: 'Задавайте вопросы о сне, плаче, кормлении и скачках развития. Если вести дневник 3+ дня, ответы будут учитывать данные малыша'
-  },
-  {
-    type: 'name', // special slide — input baby name
+    type: 'profile',
     emoji: '👶',
-    title: 'Как зовут малыша?',
-    text: 'Персонализируем приложение под вашего ребёнка ♡'
+    title: 'Расскажите о малыше',
+    text: 'Эти данные нужны для точного возраста, поздравлений и персональных подсказок.'
   },
   {
-    type: 'photo', // special slide — upload baby photo
-    emoji: '📸',
-    title: 'Добавьте фото малыша',
-    text: 'Оно будет отображаться в приложении (хранится только на вашем устройстве)'
+    type: 'reminders',
+    emoji: '🔔',
+    title: 'Напоминать о важном?',
+    text: 'Я могу напоминать о днях рождения, месячных этапах и ближайших событиях режима после генерации дня.'
   }
 ];
 
@@ -41,6 +30,7 @@ let _onboardEl = null;
 
 function initOnboarding() {
   if (localStorage.getItem(ONBOARD_KEY)) return;
+  _currentSlide = 0;
   if (window.BabyAnalytics) BabyAnalytics.track('onboarding_start');
   _renderOnboarding();
 }
@@ -80,53 +70,64 @@ function _renderSlide(idx) {
   const btnEl    = document.getElementById('obNextBtn');
   const isLast   = idx === SLIDES.length - 1;
 
-  if (s.type === 'name') {
+  if (s.type === 'profile') {
     slidesEl.innerHTML = `
-      <div class="ob-slide">
-        <div style="font-size:3.5rem;margin-bottom:12px;animation:float 4s ease-in-out infinite">${s.emoji}</div>
+      <div class="ob-slide ob-profile-slide">
+        <div class="ob-bubble">${s.emoji}</div>
         <h2 class="ob-title">${s.title}</h2>
-        <p class="ob-text" style="margin-bottom:16px">${s.text}</p>
-        <div class="ob-name-wrap">
-          <input class="ob-name-input" id="obBabyName" type="text"
-            placeholder="Имя малыша..." maxlength="20"
-            value="${localStorage.getItem('babymode_baby_name') || ''}"
-            oninput="this.value=this.value.replace(/[^а-яёА-ЯЁa-zA-Z\\s-]/g,'')">
-          <input class="ob-name-input ob-birth-input" id="obBabyBirthdate" type="date"
-            max="${new Date().toISOString().slice(0, 10)}"
-            value="${localStorage.getItem('babymode_baby_birthdate') || ''}">
+        <p class="ob-text" style="margin-bottom:14px">${s.text}</p>
+        <div class="ob-profile-grid">
+          <label class="ob-field-label">Имя малыша
+            <input class="ob-name-input" id="obBabyName" type="text" placeholder="Например, Артем" maxlength="20"
+              value="${localStorage.getItem('babymode_baby_name') || ''}"
+              oninput="this.value=this.value.replace(/[^а-яёА-ЯЁa-zA-Z\\s-]/g,'')">
+          </label>
+          <label class="ob-field-label">Дата рождения
+            <input class="ob-name-input ob-birth-input" id="obBabyBirthdate" type="date"
+              max="${new Date().toISOString().slice(0, 10)}"
+              value="${localStorage.getItem('babymode_baby_birthdate') || ''}">
+          </label>
+          <label class="ob-field-label">Обычный подъем
+            <input class="ob-name-input" id="obWakeTime" type="time" value="${localStorage.getItem('babymode_wake_time') || document.getElementById('wakeTime')?.value || '07:00'}">
+          </label>
+          <label class="ob-field-label">Кормление
+            <select class="ob-name-input" id="obFeedType">
+              ${_feedOptions(localStorage.getItem('babymode_feed_type') || document.getElementById('feedType')?.value || 'breast')}
+            </select>
+          </label>
         </div>
-        <p style="font-size:.72rem;color:var(--text-hint);font-weight:500;text-align:center">Дата нужна, чтобы поздравлять и давать подсказки по возрасту. Можно пропустить</p>
       </div>
     `;
-    setTimeout(() => {
-      const inp = document.getElementById('obBabyName');
-      if (inp) inp.focus();
-    }, 300);
-  } else if (s.type === 'photo') {
-    const savedPhoto = localStorage.getItem('babymode_photo');
+    setTimeout(() => document.getElementById('obBabyName')?.focus(), 250);
+  } else if (s.type === 'reminders') {
+    const pref = localStorage.getItem('babymode_notif_enabled');
+    const checked = pref === 'tg' || pref === 'pending' || !pref;
     slidesEl.innerHTML = `
-      <div class="ob-slide">
-        <div style="font-size:2.5rem;margin-bottom:8px;animation:float 4s ease-in-out infinite">${s.emoji}</div>
+      <div class="ob-slide ob-reminder-slide">
+        <div class="ob-bubble ob-bubble-ring">${s.emoji}</div>
         <h2 class="ob-title">${s.title}</h2>
         <p class="ob-text">${s.text}</p>
-        <div class="ob-photo-area" id="obPhotoArea" onclick="obPickPhoto()">
-          ${savedPhoto ? `<img src="${savedPhoto}" alt="Фото малыша" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%">` : `
-          <div class="ob-photo-icon">📷</div>
-          <div class="ob-photo-label">Добавить фото</div>
-          `}
+        <div class="ob-reminder-list">
+          <div><strong>🎂 Дни рождения</strong><span>поздравление и подсказки по возрасту</span></div>
+          <div><strong>📆 Месячные этапы</strong><span>1, 3, 6, 9, 12, 18, 24 месяца</span></div>
+          <div><strong>🌙 Режим дня</strong><span>ближайший сон, кормление и прогулка после генерации</span></div>
         </div>
-        <p style="font-size:.72rem;color:var(--text-hint);font-weight:500;text-align:center;margin-top:8px">Можно пропустить</p>
+        <label class="ob-toggle-row">
+          <input type="checkbox" id="obReminderConsent" ${checked ? 'checked' : ''}>
+          <span>Включить мягкие напоминания</span>
+        </label>
       </div>
     `;
   } else {
     slidesEl.innerHTML = `
-      <div class="ob-slide">
-        <div class="ob-img-wrap">
-          <img src="${s.img}" alt="${s.title}" class="ob-img" loading="lazy">
-          <div class="ob-img-glow"></div>
+      <div class="ob-slide ob-welcome-slide">
+        <div class="ob-hero-orbit">
+          <div class="ob-hero-emoji">${s.emoji}</div>
+          <span>🌙</span><span>🍼</span><span>📊</span>
         </div>
         <h2 class="ob-title ob-title-grad">${s.title}</h2>
         <p class="ob-text">${s.text}</p>
+        <div class="ob-chip-row">${s.chips.map(chip => `<span>${chip}</span>`).join('')}</div>
       </div>
     `;
   }
@@ -136,12 +137,22 @@ function _renderSlide(idx) {
   ).join('');
 
   if (isLast) {
-    btnEl.textContent = '🌸 Начать!';
+    btnEl.textContent = '🌸 Сохранить и начать';
     btnEl.style.background = 'linear-gradient(135deg,#FF9A7B,#C97BDB)';
   } else {
     btnEl.textContent = 'Далее →';
     btnEl.style.background = '';
   }
+}
+
+function _feedOptions(selected) {
+  const options = [
+    ['breast', 'Грудное'],
+    ['formula', 'Смесь'],
+    ['mixed', 'Смешанное'],
+    ['solids', 'Прикорм + ГВ']
+  ];
+  return options.map(([value, label]) => `<option value="${value}" ${value === selected ? 'selected' : ''}>${label}</option>`).join('');
 }
 
 function obPickPhoto() {
@@ -186,24 +197,58 @@ function nextSlide() {
 
 function _saveCurrent() {
   const s = SLIDES[_currentSlide];
-  if (s.type === 'name') {
-    const inp = document.getElementById('obBabyName');
-    const birth = document.getElementById('obBabyBirthdate');
-    const name = inp && inp.value.trim() ? inp.value.trim() : '';
-    const birthdate = birth && birth.value ? birth.value : '';
-    if (name || birthdate) {
-      if (name) localStorage.setItem('babymode_baby_name', name);
-      if (birthdate) localStorage.setItem('babymode_baby_birthdate', birthdate);
-      if (window.BabyAnalytics) {
-        BabyAnalytics.saveBabyProfile({
-          name,
-          birthdate,
-          ageMonths: localStorage.getItem('babymode_last_age') || ''
-        });
-      }
-      if (name && typeof _applyBabyName === 'function') _applyBabyName(name);
-    }
+  if (s.type === 'profile') saveOnboardingProfile();
+  if (s.type === 'reminders') saveOnboardingReminderConsent();
+}
+
+function saveOnboardingProfile() {
+  const inp = document.getElementById('obBabyName');
+  const birth = document.getElementById('obBabyBirthdate');
+  const wake = document.getElementById('obWakeTime');
+  const feed = document.getElementById('obFeedType');
+  const name = inp && inp.value.trim() ? inp.value.trim() : '';
+  const birthdate = birth && birth.value ? birth.value : '';
+  const wakeTime = wake && wake.value ? wake.value : '';
+  const feedType = feed && feed.value ? feed.value : '';
+  const ageMonths = birthdate && window.BabyMilestones
+    ? BabyMilestones.getBabyAgeMonths(birthdate, new Date())
+    : (localStorage.getItem('babymode_last_age') || '');
+
+  if (name) localStorage.setItem('babymode_baby_name', name);
+  if (birthdate) localStorage.setItem('babymode_baby_birthdate', birthdate);
+  if (wakeTime) localStorage.setItem('babymode_wake_time', wakeTime);
+  if (feedType) localStorage.setItem('babymode_feed_type', feedType);
+  if (ageMonths !== '' && ageMonths !== null && ageMonths !== undefined) localStorage.setItem('babymode_last_age', String(ageMonths));
+
+  const wakeEl = document.getElementById('wakeTime');
+  const feedEl = document.getElementById('feedType');
+  const ageEl = document.getElementById('ageMonths');
+  if (wakeEl && wakeTime) wakeEl.value = wakeTime;
+  if (feedEl && feedType) feedEl.value = feedType;
+  if (ageEl && ageMonths !== '' && ageMonths !== null && ageMonths !== undefined) ageEl.value = String(_nearestAgeOption(ageMonths));
+
+  if (window.BabyAnalytics && (name || birthdate || ageMonths !== '')) {
+    BabyAnalytics.saveBabyProfile({ name, birthdate, ageMonths });
+    BabyAnalytics.flush();
   }
+  if (name && typeof _applyBabyName === 'function') _applyBabyName(name);
+  if (typeof renderBabyEventCard === 'function') renderBabyEventCard();
+}
+
+function saveOnboardingReminderConsent() {
+  const consent = document.getElementById('obReminderConsent');
+  const enabled = !consent || consent.checked;
+  if (typeof setNotificationPreference === 'function') {
+    setNotificationPreference(enabled ? 'tg' : 'no');
+  } else {
+    localStorage.setItem('babymode_notif_enabled', enabled ? 'pending' : 'no');
+  }
+}
+
+function _nearestAgeOption(ageMonths) {
+  const values = [1,2,3,4,5,6,7,8,9,10,11,12,15,18,21,24,30,36];
+  const age = Math.max(1, parseInt(ageMonths, 10) || 1);
+  return values.reduce((best, cur) => Math.abs(cur - age) < Math.abs(best - age) ? cur : best, values[0]);
 }
 
 function skipOnboarding() {

@@ -1481,3 +1481,181 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   color: var(--text-hint);
 }
 .cpb-stats b { color: var(--text-dark); }
+
+/* ═══════════════════════════════════════════════════════
+   WELCOME, PROFILE AND EVENTS
+═══════════════════════════════════════════════════════ */
+.baby-event-card {
+  display:grid;
+  grid-template-columns:46px 1fr auto;
+  align-items:center;
+  gap:10px;
+  padding:14px;
+  border-color:rgba(93,201,160,.22);
+  background:linear-gradient(135deg,#F3FFF9 0%,#FFF8ED 100%);
+}
+.baby-event-icon {
+  width:46px;
+  height:46px;
+  border-radius:16px;
+  display:grid;
+  place-items:center;
+  background:#fff;
+  box-shadow:var(--shadow-sm);
+  font-size:1.4rem;
+}
+.baby-event-kicker {
+  color:var(--clr-mint-dark);
+  font-size:.64rem;
+  font-weight:950;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  margin-bottom:3px;
+}
+.baby-event-title {
+  color:var(--text-dark);
+  font-size:.9rem;
+  font-weight:950;
+  line-height:1.2;
+}
+.baby-event-sub {
+  color:var(--text-hint);
+  font-size:.74rem;
+  font-weight:650;
+  line-height:1.35;
+  margin-top:3px;
+}
+.baby-event-btn {
+  min-height:38px;
+  max-width:92px;
+  border:0;
+  border-radius:var(--radius-sm);
+  background:var(--clr-mint);
+  color:#fff;
+  font-family:'Nunito',inherit;
+  font-size:.72rem;
+  font-weight:950;
+  padding:8px 10px;
+  cursor:pointer;
+  box-shadow:var(--shadow-sm);
+}
+.ob-welcome-slide,
+.ob-profile-slide,
+.ob-reminder-slide { min-height:340px; }
+.ob-hero-orbit {
+  position:relative;
+  width:156px;
+  height:156px;
+  margin:0 auto 16px;
+  border-radius:50%;
+  background:linear-gradient(135deg,#FFE8DD,#F1DFFF);
+  display:grid;
+  place-items:center;
+  box-shadow:0 18px 42px rgba(201,123,219,.22);
+}
+.ob-hero-emoji { font-size:3.8rem; animation:float 4s ease-in-out infinite; }
+.ob-hero-orbit span {
+  position:absolute;
+  width:36px;
+  height:36px;
+  display:grid;
+  place-items:center;
+  border-radius:14px;
+  background:#fff;
+  box-shadow:var(--shadow-sm);
+}
+.ob-hero-orbit span:nth-child(2) { top:10px; right:4px; }
+.ob-hero-orbit span:nth-child(3) { bottom:12px; right:16px; }
+.ob-hero-orbit span:nth-child(4) { bottom:26px; left:2px; }
+.ob-chip-row {
+  display:flex;
+  justify-content:center;
+  flex-wrap:wrap;
+  gap:7px;
+  margin-top:16px;
+}
+.ob-chip-row span {
+  background:rgba(255,255,255,.86);
+  border:1px solid rgba(201,123,219,.16);
+  color:var(--text-mid);
+  border-radius:999px;
+  padding:7px 10px;
+  font-size:.7rem;
+  font-weight:900;
+}
+.ob-bubble {
+  width:78px;
+  height:78px;
+  margin:0 auto 12px;
+  display:grid;
+  place-items:center;
+  border-radius:26px;
+  background:linear-gradient(135deg,#FFF0E8,#F5E9FF);
+  font-size:2.6rem;
+  box-shadow:var(--shadow-md);
+}
+.ob-bubble-ring { background:linear-gradient(135deg,#E9FFF4,#FFF3DF); }
+.ob-profile-grid {
+  display:grid;
+  gap:9px;
+  margin-top:8px;
+}
+.ob-field-label {
+  text-align:left;
+  color:var(--text-mid);
+  font-size:.68rem;
+  font-weight:900;
+}
+.ob-field-label .ob-name-input { margin-top:4px; }
+.ob-reminder-list {
+  display:grid;
+  gap:8px;
+  margin:16px 0 12px;
+  text-align:left;
+}
+.ob-reminder-list div {
+  background:rgba(255,255,255,.82);
+  border:1px solid rgba(93,201,160,.16);
+  border-radius:var(--radius-sm);
+  padding:10px;
+}
+.ob-reminder-list strong {
+  display:block;
+  color:var(--text-dark);
+  font-size:.82rem;
+  line-height:1.2;
+}
+.ob-reminder-list span {
+  display:block;
+  color:var(--text-hint);
+  font-size:.72rem;
+  font-weight:650;
+  line-height:1.35;
+  margin-top:2px;
+}
+.ob-toggle-row {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  color:var(--text-dark);
+  font-size:.82rem;
+  font-weight:900;
+}
+.ob-toggle-row input { width:18px; height:18px; accent-color:var(--clr-primary); }
+@media(max-width:380px) {
+  .baby-event-card { grid-template-columns:42px 1fr; }
+  .baby-event-btn { grid-column:2; max-width:none; width:100%; }
+}
+
+.baby-event-card {
+  grid-template-columns:46px 1fr;
+}
+.baby-event-btn {
+  grid-column:1 / -1;
+  width:100%;
+  max-width:none;
+  min-height:42px;
+  background:linear-gradient(135deg,#5DC9A0,#C97BDB);
+  color:#fff;
+}

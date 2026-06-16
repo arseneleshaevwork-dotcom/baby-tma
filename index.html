@@ -33,7 +33,7 @@
 })();
 </script>
 
-<link rel="stylesheet" href="style.css?v=simplify1">
+<link rel="stylesheet" href="style.css?v=welcome1">
 </head>
 <body>
 
@@ -66,6 +66,16 @@
       <button onclick="goPage('tracker',document.getElementById('bn-tracker'));hapticLight()">😴 Записать сон</button>
       <button onclick="goPage('chat',document.getElementById('bn-chat'));hapticLight()">💬 Спросить ИИ</button>
     </div>
+  </div>
+
+  <div class="card baby-event-card" id="babyEventCard" style="display:none">
+    <div class="baby-event-icon" id="babyEventIcon">📆</div>
+    <div class="baby-event-body">
+      <div class="baby-event-kicker">Следующее событие</div>
+      <div class="baby-event-title" id="babyEventTitle"></div>
+      <div class="baby-event-sub" id="babyEventSub"></div>
+    </div>
+    <button class="baby-event-btn" id="babyEventBtn" onclick="handleBabyEventAction();hapticLight()">Открыть</button>
   </div>
 
   <div class="card today-plan-card" id="todayPlanCard" style="display:none">
@@ -524,11 +534,12 @@
 <script src="tma.js"></script>
 <script src="chat.js?v=adready1"></script>
 <script src="sleep-intelligence.js"></script>
+<script src="baby-milestones.js?v=welcome1"></script>
 <script src="tracker.js?v=d55c9a8"></script>
 <script src="articles.js"></script>
 <script src="subscription.js"></script>
-<script src="onboarding.js"></script>
-<script src="notifications.js"></script>
+<script src="onboarding.js?v=welcome1"></script>
+<script src="notifications.js?v=welcome1"></script>
 <script src="app.js"></script>
 
 <script>
@@ -890,6 +901,42 @@ function doShareSchedule() {
 function _onAgeChange(val) {
   localStorage.setItem('babymode_last_age', String(val));
   renderHomeInsights();
+  renderBabyEventCard();
+}
+
+function renderBabyEventCard() {
+  var card = document.getElementById('babyEventCard');
+  if (!card || !window.BabyMilestones) return;
+  var name = localStorage.getItem('babymode_baby_name') || '';
+  var birthdate = localStorage.getItem('babymode_baby_birthdate') || '';
+  var event = BabyMilestones.buildNextBabyEvent({ name: name, birthdate: birthdate, now: new Date(), horizonDays: 45 });
+  if (!event) return;
+
+  var icon = document.getElementById('babyEventIcon');
+  var title = document.getElementById('babyEventTitle');
+  var sub = document.getElementById('babyEventSub');
+  var btn = document.getElementById('babyEventBtn');
+  if (icon) icon.textContent = event.type === 'birthday' ? '🎂' : (event.type === 'profile' ? '👶' : '📆');
+  if (title) title.textContent = event.title;
+  if (sub) sub.textContent = event.subtitle;
+  if (btn) btn.textContent = event.cta;
+  card.dataset.eventType = event.type;
+  card.style.display = 'grid';
+}
+
+function handleBabyEventAction() {
+  var card = document.getElementById('babyEventCard');
+  var type = card ? card.dataset.eventType : '';
+  if (type === 'profile') {
+    if (typeof initOnboarding === 'function') {
+      localStorage.removeItem('babymode_onboarded_v2');
+      initOnboarding();
+    }
+    return;
+  }
+  goPage('articles', null);
+  if (typeof setArticleFilter === 'function') setArticleFilter('development');
+  if (window.BabyAnalytics) BabyAnalytics.track('baby_event_opened', { type: type || 'unknown' });
 }
 
 function renderHomeInsights() {
@@ -1049,6 +1096,15 @@ function showToast(msg, dur) {
   setTimeout(function() { t.classList.remove('show'); }, dur || 3000);
 }
 
+
+function _nearestAgeOptionInline(ageMonths) {
+  var values = [1,2,3,4,5,6,7,8,9,10,11,12,15,18,21,24,30,36];
+  var age = Math.max(1, parseInt(ageMonths, 10) || 1);
+  return values.reduce(function(best, cur) {
+    return Math.abs(cur - age) < Math.abs(best - age) ? cur : best;
+  }, values[0]);
+}
+
 // ─── DOMContentLoaded init ───────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', function() {
   if (window.BabyAnalytics) BabyAnalytics.track('app_open');
@@ -1058,11 +1114,24 @@ window.addEventListener('DOMContentLoaded', function() {
   // Init subscription first
   if (typeof SUB !== 'undefined') SUB.init();
 
-  // Restore baby photo & name
+  // Restore baby photo, name and profile fields
   var savedPhoto = localStorage.getItem('babymode_photo');
   var savedName  = localStorage.getItem('babymode_baby_name');
+  var savedBirth = localStorage.getItem('babymode_baby_birthdate');
+  var savedWake  = localStorage.getItem('babymode_wake_time');
+  var savedFeed  = localStorage.getItem('babymode_feed_type');
   if (savedPhoto) _applyBabyPhoto(savedPhoto);
   if (savedName)  _applyBabyName(savedName);
+  if (savedBirth && window.BabyMilestones) {
+    var age = BabyMilestones.getBabyAgeMonths(savedBirth, new Date());
+    if (age !== null) localStorage.setItem('babymode_last_age', String(age));
+  }
+  var ageEl = document.getElementById('ageMonths');
+  var wakeEl = document.getElementById('wakeTime');
+  var feedEl = document.getElementById('feedType');
+  if (ageEl && localStorage.getItem('babymode_last_age')) ageEl.value = String(_nearestAgeOptionInline(localStorage.getItem('babymode_last_age')));
+  if (wakeEl && savedWake) wakeEl.value = savedWake;
+  if (feedEl && savedFeed) feedEl.value = savedFeed;
 
   var topicsEl = document.getElementById('chatTopics');
   if (topicsEl && typeof initTopics === 'function') initTopics(topicsEl);
@@ -1073,8 +1142,8 @@ window.addEventListener('DOMContentLoaded', function() {
   // Sync FAB state on load
   _updateFab();
 
-  // Render home insights card
-  setTimeout(renderHomeInsights, 200);
+  // Render home cards
+  setTimeout(function(){ renderHomeInsights(); renderBabyEventCard(); }, 200);
 
   // Show trial offer on first launch (after 3s)
   var hasLaunched = localStorage.getItem('babymode_launched');
