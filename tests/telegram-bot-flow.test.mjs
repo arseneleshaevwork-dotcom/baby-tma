@@ -72,6 +72,19 @@ test('parses reminder consent commands', () => {
   assert.equal(parseReminderConsent('что умеешь?'), null);
 });
 
+test('handles skip birthdate callback and asks for reminder consent', () => {
+  const reply = buildBotReply({
+    text: 'skip_birthdate',
+    firstName: 'Анна',
+    baby: { name: 'Миша', birthdate: null },
+    miniAppUrl: 'https://example.test/app'
+  });
+
+  assert.equal(reply.action, 'skip_birthdate');
+  assert.match(reply.text, /дату рождения можно добавить позже/);
+  assert.match(reply.text, /Включить напоминания/);
+});
+
 test('normalizes supported birthdate formats and calculates full months', () => {
   assert.equal(normalizeBirthdate('20.12.2025'), '2025-12-20');
   assert.equal(normalizeBirthdate('2025-12-20'), '2025-12-20');

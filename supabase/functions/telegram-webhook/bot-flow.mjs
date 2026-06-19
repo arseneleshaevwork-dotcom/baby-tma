@@ -35,6 +35,14 @@ export function buildBotReply({ text = '', firstName = '', baby = null, miniAppU
     };
   }
 
+  if (cleanText === 'skip_birthdate' && baby?.name && !baby?.birthdate) {
+    return {
+      action: 'skip_birthdate',
+      text: `Хорошо, дату рождения можно добавить позже.\n\nЯ все равно помогу с режимом и дневником. Включить напоминания о важных событиях и подсказках?`,
+      reply_markup: remindersKeyboard(miniAppUrl)
+    };
+  }
+
   if (baby?.name && !baby?.birthdate) {
     const birthdate = normalizeBirthdate(cleanText);
     if (birthdate) {
