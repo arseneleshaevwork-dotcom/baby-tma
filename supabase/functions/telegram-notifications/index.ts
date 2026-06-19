@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
 
-const milestoneMonths = [1, 3, 6, 9, 18];
+const milestoneMonths = [1, 3, 6, 9, 12, 18, 24, 36];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -179,6 +179,9 @@ function fullMonthsBetween(from: Date, to: Date) {
 function formatMonthLabel(months: number) {
   if (months === 1) return '1 месяц';
   if ([2, 3, 4].includes(months)) return `${months} месяца`;
+  if (months === 12) return '1 год';
+  if (months > 12 && months % 12 === 0) return `${months / 12} года`;
+  if (months > 12) return `${Math.floor(months / 12)} г. ${months % 12} мес.`;
   return `${months} месяцев`;
 }
 
