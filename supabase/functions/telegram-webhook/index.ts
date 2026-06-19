@@ -70,6 +70,13 @@ Deno.serve(async (req) => {
       }, { onConflict: 'user_id' });
     }
 
+    if (botReply?.action === 'reset_profile' && user?.id) {
+      await supabase
+        .from('babies')
+        .delete()
+        .eq('user_id', user.id);
+    }
+
     if ((botReply?.action === 'enable_reminders' || botReply?.action === 'disable_reminders') && user?.id) {
       const enabled = botReply.action === 'enable_reminders';
       await supabase.from('notification_settings').upsert({

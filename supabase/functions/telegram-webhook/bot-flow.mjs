@@ -15,6 +15,37 @@ export function buildBotReply({ text = '', firstName = '', baby = null, miniAppU
     };
   }
 
+  if (cleanText === '/help') {
+    return {
+      action: 'help',
+      text: buildHelpText(),
+      reply_markup: openAppKeyboard(miniAppUrl)
+    };
+  }
+
+  if (cleanText === '/profile') {
+    if (!baby?.name && !baby?.birthdate) {
+      return {
+        action: 'ask_name',
+        text: 'Профиль малыша пока не заполнен.\n\nКак зовут малыша? Напишите имя одним сообщением.',
+        reply_markup: openAppKeyboard(miniAppUrl)
+      };
+    }
+    return {
+      action: 'show_profile',
+      text: buildProfileText(baby),
+      reply_markup: profileKeyboard(miniAppUrl)
+    };
+  }
+
+  if (cleanText === '/reset') {
+    return {
+      action: 'reset_profile',
+      text: 'Профиль малыша сброшен.\n\nНачнем заново. Как зовут малыша? Напишите имя одним сообщением.',
+      reply_markup: openAppKeyboard(miniAppUrl)
+    };
+  }
+
   if (cleanText.startsWith('/start')) {
     return {
       action: baby?.name ? 'welcome_back' : 'ask_name',
@@ -69,7 +100,7 @@ export function buildBotReply({ text = '', firstName = '', baby = null, miniAppU
 
   return {
     action: 'help',
-    text: 'Я уже рядом. Откройте мини-приложение, чтобы собрать режим на сегодня, или напишите /start, чтобы заново пройти приветствие.',
+    text: buildHelpText(),
     reply_markup: openAppKeyboard(miniAppUrl)
   };
 }
@@ -131,6 +162,19 @@ function formatAge(months) {
   return `${months} месяцев`;
 }
 
+function buildProfileText(baby = {}) {
+  const name = baby.name || 'не указано';
+  const birthdate = baby.birthdate || 'не указана';
+  const age = baby.age_months === null || baby.age_months === undefined
+    ? 'возраст не указан'
+    : formatAge(Number(baby.age_months));
+  return `👶 Профиль малыша\n\nИмя: ${name}\nДата рождения: ${birthdate}\nВозраст: ${age}\n\nОткройте мини-приложение, чтобы собрать режим на сегодня или вести дневник.`;
+}
+
+function buildHelpText() {
+  return `Я помогу с режимом малыша: сон, кормления, дневник, ИИ-подсказки и напоминания.\n\nКоманды:\n/start — начать заново\n/profile — профиль малыша\n/reminders_on — включить напоминания\n/reminders_off — отключить напоминания\n/reset — сбросить профиль малыша\n/help — помощь\n\nМожно просто открыть мини-приложение и собрать режим на сегодня.`;
+}
+
 function parseDateOnly(value) {
   const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
@@ -162,6 +206,15 @@ function remindersKeyboard(miniAppUrl) {
       [{ text: 'Да, включить', callback_data: 'reminders_on' }],
       [{ text: 'Не сейчас', callback_data: 'reminders_off' }],
       [{ text: 'Открыть мини-приложение', web_app: { url: miniAppUrl } }]
+    ]
+  };
+}
+
+function profileKeyboard(miniAppUrl) {
+  return {
+    inline_keyboard: [
+      [{ text: 'Открыть мини-приложение', web_app: { url: miniAppUrl } }],
+      [{ text: 'Сбросить профиль', callback_data: '/reset' }]
     ]
   };
 }

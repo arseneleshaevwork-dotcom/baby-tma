@@ -85,6 +85,47 @@ test('handles skip birthdate callback and asks for reminder consent', () => {
   assert.match(reply.text, /Включить напоминания/);
 });
 
+test('shows profile summary when baby profile exists', () => {
+  const reply = buildBotReply({
+    text: '/profile',
+    firstName: 'Анна',
+    baby: { name: 'Миша', birthdate: '2025-12-20', age_months: 6 },
+    miniAppUrl: 'https://example.test/app'
+  });
+
+  assert.equal(reply.action, 'show_profile');
+  assert.match(reply.text, /Миша/);
+  assert.match(reply.text, /2025-12-20/);
+  assert.match(reply.text, /6 месяцев/);
+});
+
+test('resets profile with command', () => {
+  const reply = buildBotReply({
+    text: '/reset',
+    firstName: 'Анна',
+    baby: { name: 'Миша', birthdate: '2025-12-20', age_months: 6 },
+    miniAppUrl: 'https://example.test/app'
+  });
+
+  assert.equal(reply.action, 'reset_profile');
+  assert.match(reply.text, /Профиль малыша сброшен/);
+  assert.match(reply.text, /Как зовут малыша/);
+});
+
+test('shows bot help with commands', () => {
+  const reply = buildBotReply({
+    text: '/help',
+    firstName: 'Анна',
+    baby: null,
+    miniAppUrl: 'https://example.test/app'
+  });
+
+  assert.equal(reply.action, 'help');
+  assert.match(reply.text, /\/profile/);
+  assert.match(reply.text, /\/reminders_on/);
+  assert.match(reply.text, /\/reset/);
+});
+
 test('normalizes supported birthdate formats and calculates full months', () => {
   assert.equal(normalizeBirthdate('20.12.2025'), '2025-12-20');
   assert.equal(normalizeBirthdate('2025-12-20'), '2025-12-20');
