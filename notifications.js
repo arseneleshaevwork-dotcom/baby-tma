@@ -21,6 +21,10 @@ function initNotifications() {
   if (!localStorage.getItem(NOTIF_KEY)) {
     _showNotifPrompt();
   }
+
+  const savedPlan = getTodayReminderPlan();
+  _renderReminderBadge(savedPlan.length);
+  _renderReminderList(savedPlan);
 }
 
 function _showNotifPrompt() {
@@ -66,43 +70,35 @@ function scheduleReminders(blocks) {
   _notifTimers.forEach(t => clearTimeout(t));
   _notifTimers = [];
 
-  if (!blocks || !blocks.length) return;
+  if (!blocks || !blocks.length) {
+    _storeReminderPlan([]);
+    _renderReminderBadge(0);
+    _renderReminderList([]);
+    return;
+  }
 
   const now = new Date();
-  const nowMin = now.getHours() * 60 + now.getMinutes();
 
-  // Find next blocks from now
-  const upcoming = blocks.filter(b => {
-    const [h, m] = (b.time || '').split(':').map(Number);
-    if (isNaN(h)) return false;
-    const blockMin = h * 60 + m;
-    return blockMin > nowMin && blockMin - nowMin <= 60 * 8; // within 8h
-  }).slice(0, 5);
+  const reminderPlan = window.ReminderPlanner
+    ? ReminderPlanner.buildReminderPlan(blocks, now)
+    : [];
 
-  upcoming.forEach(block => {
-    const [h, m] = block.time.split(':').map(Number);
-    const blockMin = h * 60 + m;
-    const delayMs = (blockMin - nowMin) * 60 * 1000;
-
-    const emoji = { sleep:'🌙', feed:'🍼', active:'🎮', hygiene:'🛁', walk:'🌿' }[block.tag] || '⏰';
-    const msg = `${emoji} ${block.time} — ${block.title}`;
-
+  reminderPlan.forEach(reminder => {
+    const delayMs = Math.max(0, reminder.atMs - now.getTime());
     const t = setTimeout(() => {
-      // In-app toast notification
-      if (typeof showToast === 'function') showToast(msg);
+      if (typeof showToast === 'function') showToast(reminder.message);
       if (typeof hapticLight === 'function') hapticLight();
-
-      // Telegram bot message if user ID known and enabled
-      if (_tgUserId && localStorage.getItem(NOTIF_KEY) === 'tg') {
-        _sendBotMessage(_tgUserId, `${emoji} *${block.time}* — ${block.title}\n${block.note || ''}`);
-      }
     }, delayMs);
 
     _notifTimers.push(t);
   });
 
-  if (upcoming.length > 0 && typeof showToast === 'function') {
-    showToast(`🔔 Напоминания установлены на ${upcoming.length} событий`);
+  _storeReminderPlan(reminderPlan);
+  _renderReminderBadge(reminderPlan.length);
+  _renderReminderList(reminderPlan);
+
+  if (reminderPlan.length > 0 && typeof showToast === 'function') {
+    showToast(`🔔 Напоминания установлены: ${reminderPlan.length}`);
   }
 }
 
@@ -122,6 +118,9 @@ function toggleNotifications() {
     setNotificationPreference('no');
     _notifTimers.forEach(t => clearTimeout(t));
     _notifTimers = [];
+    _storeReminderPlan([]);
+    _renderReminderBadge(0);
+    _renderReminderList([]);
     if (typeof showToast === 'function') showToast('🔕 Напоминания отключены');
   } else {
     _showNotifPrompt();
@@ -130,6 +129,71 @@ function toggleNotifications() {
 
 function isNotificationsEnabled() {
   return localStorage.getItem(NOTIF_KEY) === 'tg' || localStorage.getItem(NOTIF_KEY) === 'pending';
+}
+
+function getTodayReminderPlan() {
+  try { return JSON.parse(localStorage.getItem('babymode_today_reminders') || '[]'); }
+  catch(e) { return []; }
+}
+
+function _storeReminderPlan(plan) {
+  localStorage.setItem('babymode_today_reminders', JSON.stringify((plan || []).map(item => ({
+    kind: item.kind,
+    type: item.type,
+    title: item.title,
+    time: item.time,
+    at: item.at,
+    message: item.message,
+    label: item.label
+  }))));
+}
+
+function _renderReminderBadge(count) {
+  const badge = document.getElementById('reminderBadge');
+  if (!badge) return;
+  if (!isNotificationsEnabled()) {
+    badge.textContent = 'Выкл';
+  } else {
+    badge.textContent = count ? `${count} акт.` : 'Вкл';
+  }
+}
+
+function _renderReminderList(plan) {
+  const card = document.getElementById('reminderListCard');
+  if (!card) return;
+  const items = (plan || []).slice(0, 6);
+  if (!items.length || !isNotificationsEnabled()) {
+    card.style.display = 'none';
+    card.innerHTML = '';
+    return;
+  }
+  card.style.display = 'block';
+  card.innerHTML = `
+    <div class="rl-title">Ближайшие напоминания</div>
+    <div class="rl-list">
+      ${items.map(item => `
+        <div class="rl-item">
+          <span class="rl-time">${_formatReminderTime(item.at)}</span>
+          <span class="rl-text">${_escapeHtml(item.label)}</span>
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+function _formatReminderTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function _escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  }[ch]));
 }
 
 function setNotificationPreference(value) {
