@@ -3,6 +3,7 @@
 
 const SUB = (() => {
   const KEY_PREMIUM    = 'babymode_premium';
+  const KEY_PREMIUM_UNTIL = 'babymode_premium_until';
   const KEY_TRIAL_DATE = 'babymode_trial_start';
   const TRIAL_DAYS     = 7;
 
@@ -20,9 +21,10 @@ const SUB = (() => {
   let _isPremium = false;
   let _trialActive = false;
   let _trialDaysLeft = 0;
+  let _premiumUntil = null;
 
   function init() {
-    _isPremium = localStorage.getItem(KEY_PREMIUM) === '1';
+    _loadCachedPremium();
 
     const trialStart = localStorage.getItem(KEY_TRIAL_DATE);
     if (trialStart) {
@@ -32,6 +34,7 @@ const SUB = (() => {
     }
 
     _renderHeaderBadge();
+    refreshPremiumStatus();
   }
 
   function startTrial() {
@@ -45,13 +48,15 @@ const SUB = (() => {
     showToast('🎉 7 дней Premium бесплатно активированы!');
   }
 
-  function activatePremium() {
-    _isPremium = true;
-    localStorage.setItem(KEY_PREMIUM, '1');
+  function _applyServerPremium(subscription) {
+    const active = Boolean(subscription && subscription.active && subscription.current_period_end);
+    _isPremium = active;
+    _premiumUntil = active ? subscription.current_period_end : null;
+    localStorage.setItem(KEY_PREMIUM, active ? '1' : '0');
+    if (_premiumUntil) localStorage.setItem(KEY_PREMIUM_UNTIL, _premiumUntil);
+    else localStorage.removeItem(KEY_PREMIUM_UNTIL);
     _trialActive = false;
     _renderHeaderBadge();
-    _showConfetti();
-    if (window.BabyAnalytics) BabyAnalytics.track('premium_activated');
   }
 
   // Check if user has access to a feature
@@ -69,6 +74,7 @@ const SUB = (() => {
   }
 
   function getDaysLeft() { return _trialDaysLeft; }
+  function getPremiumUntil() { return _premiumUntil; }
   function isPremium()   { return _isPremium; }
   function isTrialActive() { return _trialActive; }
 
@@ -117,6 +123,34 @@ const SUB = (() => {
     }
   }
 
+  function _loadCachedPremium() {
+    const until = localStorage.getItem(KEY_PREMIUM_UNTIL);
+    const active = until && new Date(until).getTime() > Date.now();
+    _isPremium = Boolean(active);
+    _premiumUntil = active ? until : null;
+    if (!active) localStorage.setItem(KEY_PREMIUM, '0');
+  }
+
+  async function refreshPremiumStatus() {
+    const initData = _getTelegramInitData();
+    const endpoint = window.BABY_SUBSCRIPTION_STATUS_ENDPOINT;
+    if (!initData || !endpoint) return false;
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData })
+      });
+      if (!response.ok) return false;
+      const data = await response.json();
+      _applyServerPremium(data);
+      if (typeof renderPremiumPage === 'function') renderPremiumPage();
+      return Boolean(data.active);
+    } catch(e) {
+      return false;
+    }
+  }
+
   function _showConfetti() {
     const colors = ['#FF9A7B','#C97BDB','#FFB347','#5DC9A0','#F48FB1','#7C83E8'];
     for (let i = 0; i < 30; i++) {
@@ -139,7 +173,7 @@ const SUB = (() => {
     }
   }
 
-  return { init, startTrial, activatePremium, can, getStatus, getDaysLeft, isPremium, isTrialActive, requirePremium };
+  return { init, startTrial, refreshPremiumStatus, can, getStatus, getDaysLeft, getPremiumUntil, isPremium, isTrialActive, requirePremium };
 })();
 
 // ─── Premium Page Renderer ───────────────────────────────────────────────────
@@ -164,11 +198,13 @@ function renderPremiumPage() {
 }
 
 function _renderPremiumActive() {
+  const until = SUB.getPremiumUntil();
+  const untilText = until ? `Доступ открыт до ${new Date(until).toLocaleDateString('ru-RU')}` : 'Все функции разблокированы';
   return `
     <div class="premium-active-card">
       <div class="premium-crown">👑</div>
       <div class="premium-active-title">Premium активен</div>
-      <div class="premium-active-sub">Все функции разблокированы ♡</div>
+      <div class="premium-active-sub">${untilText}</div>
     </div>
     <div class="card">
       <div class="section-title">Ваши преимущества</div>
@@ -197,10 +233,10 @@ function _renderTrialActive(days) {
     </div>
     <div style="padding:0 0 8px">
       <button class="cta-sub-btn" onclick="handleSubscribe('month');hapticMedium()">
-        💳 Подписка 299 руб/мес
+        ⭐ Premium за 299 ⭐ / 30 дней
       </button>
       <button class="cta-outline-btn" onclick="handleSubscribe('year');hapticLight()">
-        💫 1490 руб/год — экономия 50%
+        💫 1490 ⭐ / год — экономия 50%
       </button>
     </div>
     <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
@@ -231,13 +267,13 @@ function _renderFreePage() {
 
     <div class="plans-row">
       <div class="plan-card" onclick="handleSubscribe('month');hapticLight()">
-        <div class="plan-price">299<span> руб</span></div>
-        <div class="plan-label">в месяц</div>
+        <div class="plan-price">299<span> ⭐</span></div>
+        <div class="plan-label">на 30 дней</div>
       </div>
       <div class="plan-card recommended" onclick="handleSubscribe('year');hapticLight()">
         <div class="plan-badge">Выгоднее</div>
-        <div class="plan-price">1490<span> руб</span></div>
-        <div class="plan-label">в год</div>
+        <div class="plan-price">1490<span> ⭐</span></div>
+        <div class="plan-label">на 1 год</div>
         <div class="plan-save">Экономия 50%</div>
       </div>
     </div>
@@ -249,10 +285,10 @@ function _renderFreePage() {
 
     <div style="padding:0 0 8px">
       <button class="cta-sub-btn" onclick="handleSubscribe('year');hapticMedium()">
-        💫 Подписаться за 1490 руб/год
+        💫 Подписаться за 1490 ⭐/год
       </button>
       <button class="cta-outline-btn" style="margin-top:8px" onclick="handleSubscribe('month');hapticLight()">
-        или 299 руб/месяц
+        или 299 ⭐ на 30 дней
       </button>
     </div>
     <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
@@ -300,16 +336,56 @@ function handleStartTrial() {
   setTimeout(() => renderPremiumPage(), 300);
 }
 
-function handleSubscribe(plan) {
-  // Placeholder for actual payment integration (Telegram Stars / ЮКасса)
+async function handleSubscribe(plan) {
   if (window.BabyAnalytics) BabyAnalytics.track('subscribe_clicked', { plan });
-  showToast('🚀 Оплата скоро будет доступна!');
-  // For demo: activate premium after 1.5s
-  setTimeout(() => {
-    SUB.activatePremium();
-    renderPremiumPage();
-  }, 1500);
+
+  const initData = _getTelegramInitData();
+  const endpoint = window.BABY_CREATE_STARS_INVOICE_ENDPOINT;
+  if (!initData || !endpoint) {
+    showToast('Оформление Premium доступно внутри Telegram.');
+    return;
+  }
+
+  try {
+    showToast('Готовлю оплату через Telegram Stars...');
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan, initData })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.invoice_link) {
+      showToast('Не удалось создать оплату. Попробуйте еще раз.');
+      return;
+    }
+
+    const tg = window.Telegram && window.Telegram.WebApp;
+    if (tg && typeof tg.openInvoice === 'function') {
+      tg.openInvoice(data.invoice_link, async function(status) {
+        if (status === 'paid') {
+          await SUB.refreshPremiumStatus();
+          renderPremiumPage();
+          showToast('Premium активирован!');
+          if (window.BabyAnalytics) BabyAnalytics.track('premium_paid', { plan });
+        }
+      });
+    } else {
+      window.open(data.invoice_link, '_blank', 'noopener');
+    }
+  } catch(e) {
+    showToast('Оплата временно недоступна. Попробуйте позже.');
+  }
 }
 
 // Legacy compat
 function buyPremium() { handleSubscribe('month'); }
+
+function _getTelegramInitData() {
+  try {
+    return window.Telegram && window.Telegram.WebApp
+      ? window.Telegram.WebApp.initData || ''
+      : '';
+  } catch(e) {
+    return '';
+  }
+}

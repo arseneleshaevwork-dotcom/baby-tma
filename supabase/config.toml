@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.telegram-notifications]
 verify_jwt = false
+
+[functions.create-stars-invoice]
+verify_jwt = false
+
+[functions.subscription-status]
+verify_jwt = false

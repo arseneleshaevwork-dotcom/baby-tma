@@ -16,6 +16,8 @@ Deployed endpoints:
 https://jfyprwisnrubhhowipdm.functions.supabase.co/analytics-events
 https://jfyprwisnrubhhowipdm.functions.supabase.co/telegram-webhook
 https://jfyprwisnrubhhowipdm.functions.supabase.co/analytics-dashboard
+https://jfyprwisnrubhhowipdm.functions.supabase.co/create-stars-invoice
+https://jfyprwisnrubhhowipdm.functions.supabase.co/subscription-status
 ```
 
 1. Create a Supabase project.
@@ -23,10 +25,14 @@ https://jfyprwisnrubhhowipdm.functions.supabase.co/analytics-dashboard
 3. Deploy `supabase/functions/analytics-events`.
 4. Deploy `supabase/functions/telegram-webhook`.
 5. Deploy `supabase/functions/analytics-dashboard`.
-6. Copy the analytics function URL into `analytics-config.js`:
+6. Deploy `supabase/functions/create-stars-invoice`.
+7. Deploy `supabase/functions/subscription-status`.
+8. Copy function URLs into `analytics-config.js`:
 
 ```js
 window.BABY_ANALYTICS_ENDPOINT = 'https://<project-ref>.functions.supabase.co/analytics-events';
+window.BABY_CREATE_STARS_INVOICE_ENDPOINT = 'https://<project-ref>.functions.supabase.co/create-stars-invoice';
+window.BABY_SUBSCRIPTION_STATUS_ENDPOINT = 'https://<project-ref>.functions.supabase.co/subscription-status';
 ```
 
 ## Admin dashboard
@@ -54,10 +60,24 @@ To see users who press `/start` but never open the Mini App, set the bot token a
 
 ```bash
 supabase secrets set TELEGRAM_BOT_TOKEN='<telegram_bot_token>' --project-ref jfyprwisnrubhhowipdm
-curl "https://api.telegram.org/bot<telegram_bot_token>/setWebhook?url=https://jfyprwisnrubhhowipdm.functions.supabase.co/telegram-webhook"
+supabase secrets set TELEGRAM_WEBHOOK_SECRET='<strong_random_webhook_secret>' --project-ref jfyprwisnrubhhowipdm
+curl "https://api.telegram.org/bot<telegram_bot_token>/setWebhook?url=https://jfyprwisnrubhhowipdm.functions.supabase.co/telegram-webhook&secret_token=<strong_random_webhook_secret>"
 ```
 
 Do not commit Telegram bot tokens to the repository.
+
+## Telegram Stars subscriptions
+
+Premium payments use Telegram Stars:
+
+1. The Mini App sends Telegram `initData` and the selected plan to `create-stars-invoice`.
+2. The function verifies `initData` with `TELEGRAM_BOT_TOKEN`.
+3. The function creates a Telegram Stars invoice link and stores a pending row in `payments`.
+4. Telegram sends `successful_payment` to `telegram-webhook`.
+5. The webhook updates `payments` and upserts the active row in `subscriptions`.
+6. The Mini App calls `subscription-status` to refresh access.
+
+Client-side `localStorage` is treated only as a cache. Paid access must be verified through `subscription-status`.
 
 ## Core events
 
