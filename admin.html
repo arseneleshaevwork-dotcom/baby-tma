@@ -184,6 +184,22 @@
       font-size: 12px;
     }
 
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #eef2ff;
+      color: #3730a3;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .badge.ok { background: #dcfce7; color: #166534; }
+    .badge.warn { background: #fef3c7; color: #92400e; }
+    .badge.bad { background: #fee2e2; color: #991b1b; }
+
     .wide {
       grid-column: 1 / -1;
     }
@@ -259,6 +275,30 @@
 
       <div class="card wide">
         <div class="section-title">
+          <h2>Деньги и подписки</h2>
+          <span class="muted">Telegram Stars</span>
+        </div>
+        <div id="billing"></div>
+      </div>
+
+      <div class="card wide">
+        <div class="section-title">
+          <h2>Подписки</h2>
+          <span class="muted">до 100 строк</span>
+        </div>
+        <div id="subscriptions"></div>
+      </div>
+
+      <div class="card wide">
+        <div class="section-title">
+          <h2>Платежи</h2>
+          <span class="muted">за выбранный период</span>
+        </div>
+        <div id="payments"></div>
+      </div>
+
+      <div class="card wide">
+        <div class="section-title">
           <h2>Ближайшие даты</h2>
           <span class="muted">45 дней</span>
         </div>
@@ -317,6 +357,8 @@
       ['premium_opened', 'Открыли Premium'],
       ['trial_started', 'Старт trial'],
       ['subscribe_clicked', 'Клик подписки'],
+      ['premium_paid', 'Оплата во frontend'],
+      ['payment_success', 'Оплата подтверждена'],
       ['notifications_enabled', 'Включили напоминания'],
       ['notifications_disabled', 'Отключили напоминания'],
       ['notification_sent', 'Отправлено уведомлений']
@@ -333,6 +375,9 @@
       metrics: document.getElementById('metrics'),
       funnel: document.getElementById('funnel'),
       dropoffs: document.getElementById('dropoffs'),
+      billing: document.getElementById('billing'),
+      subscriptions: document.getElementById('subscriptions'),
+      payments: document.getElementById('payments'),
       upcomingDates: document.getElementById('upcomingDates'),
       sources: document.getElementById('sources'),
       aiQuestions: document.getElementById('aiQuestions'),
@@ -399,6 +444,9 @@
       renderMetrics(data);
       renderFunnel(data.funnel || []);
       renderDropoffs(data);
+      renderBilling(data.billing || {});
+      renderSubscriptions(data.subscriptions || []);
+      renderPayments(data.payments || []);
       renderUpcomingDates(data.upcoming_dates || []);
       renderSources(data.sources || []);
       renderAiQuestions(data.ai_questions || []);
@@ -444,6 +492,74 @@
       els.dropoffs.innerHTML = `
         <tr><th>Запустили бот, но не открыли app</th><td>${number(data.bot_started_not_opened)}</td></tr>
         <tr><th>Открыли app и ничего не сделали</th><td>${number(data.opened_and_left)}</td></tr>
+      `;
+    }
+
+    function renderBilling(billing) {
+      const cards = [
+        ['Активные подписки', number(billing.active_subscriptions), `${number(billing.month_subscriptions)} мес. · ${number(billing.year_subscriptions)} год`],
+        ['Оплачено Stars', `${number(billing.paid_stars)} ⭐`, `${number(billing.paid_payments)} успешных платежей`],
+        ['Ожидают оплаты', number(billing.pending_payments), 'созданные invoice'],
+        ['Ошибки оплаты', number(billing.failed_payments), 'invoice_failed / failed / cancelled']
+      ];
+      els.billing.innerHTML = `
+        <div class="grid metrics" style="margin-bottom:0">
+          ${cards.map(([label, value, hint]) => `
+            <article class="card">
+              <div class="metric-label">${escapeHtml(label)}</div>
+              <div class="metric-value">${escapeHtml(value)}</div>
+              <div class="muted">${escapeHtml(hint)}</div>
+            </article>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderSubscriptions(items) {
+      if (!items.length) {
+        els.subscriptions.innerHTML = '<div class="empty">Подписок пока нет</div>';
+        return;
+      }
+      els.subscriptions.innerHTML = `
+        <table>
+          <thead><tr><th>Статус</th><th>План</th><th>Telegram</th><th>Доступ до</th><th>Источник</th><th>Обновлено</th></tr></thead>
+          <tbody>
+            ${items.map(item => `
+              <tr>
+                <td>${statusBadge(item.status, isFuture(item.current_period_end) ? 'ok' : 'warn')}</td>
+                <td>${escapeHtml(planLabel(item.plan))}</td>
+                <td class="mono">${escapeHtml(shortId(item.telegram_id || item.user_id || ''))}</td>
+                <td>${formatDateTime(item.current_period_end)}</td>
+                <td>${escapeHtml(item.source || '—')}</td>
+                <td>${formatDateTime(item.updated_at)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function renderPayments(items) {
+      if (!items.length) {
+        els.payments.innerHTML = '<div class="empty">Платежей за период нет</div>';
+        return;
+      }
+      els.payments.innerHTML = `
+        <table>
+          <thead><tr><th>Статус</th><th>План</th><th>Сумма</th><th>Telegram</th><th>Создан</th><th>Оплачен</th></tr></thead>
+          <tbody>
+            ${items.map(item => `
+              <tr>
+                <td>${statusBadge(item.status, paymentTone(item.status))}</td>
+                <td>${escapeHtml(planLabel(item.plan))}</td>
+                <td>${number(item.total_amount)} ${escapeHtml(item.currency || '')}</td>
+                <td class="mono">${escapeHtml(shortId(item.telegram_id || item.user_id || ''))}</td>
+                <td>${formatDateTime(item.created_at)}</td>
+                <td>${formatDateTime(item.paid_at)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
       `;
     }
 
@@ -585,6 +701,29 @@
     function shortId(value) {
       const text = String(value || '');
       return text.length > 18 ? `${text.slice(0, 9)}...${text.slice(-6)}` : text || '—';
+    }
+
+    function statusBadge(label, tone = '') {
+      const safeTone = ['ok', 'warn', 'bad'].includes(tone) ? tone : '';
+      return `<span class="badge ${safeTone}">${escapeHtml(label || '—')}</span>`;
+    }
+
+    function paymentTone(status) {
+      if (status === 'paid') return 'ok';
+      if (status === 'created') return 'warn';
+      if (['invoice_failed', 'failed', 'cancelled'].includes(status)) return 'bad';
+      return '';
+    }
+
+    function planLabel(plan) {
+      if (plan === 'month') return '30 дней';
+      if (plan === 'year') return '1 год';
+      return plan || '—';
+    }
+
+    function isFuture(value) {
+      const date = new Date(value);
+      return !Number.isNaN(date.getTime()) && date.getTime() > Date.now();
     }
 
     function escapeHtml(value) {

@@ -21,6 +21,8 @@ const trackedEvents = [
   'premium_opened',
   'trial_started',
   'subscribe_clicked',
+  'premium_paid',
+  'payment_success',
   'notifications_enabled',
   'notifications_disabled',
   'notification_sent'
@@ -57,7 +59,7 @@ Deno.serve(async (req) => {
   const since = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  const [eventsResult, babiesResult] = await Promise.all([
+  const [eventsResult, babiesResult, subscriptionsResult, paymentsResult] = await Promise.all([
     supabase
       .from('events')
       .select('id,event_name,user_id,client_id,telegram_id,attribution,payload,created_at')
@@ -68,23 +70,40 @@ Deno.serve(async (req) => {
       .from('babies')
       .select('id,user_id,client_id,name,birthdate,age_months,updated_at')
       .order('updated_at', { ascending: false })
+      .limit(1000),
+    supabase
+      .from('subscriptions')
+      .select('id,user_id,telegram_id,plan,status,source,current_period_end,created_at,updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(1000),
+    supabase
+      .from('payments')
+      .select('id,user_id,telegram_id,plan,currency,total_amount,status,created_at,paid_at')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
       .limit(1000)
   ]);
 
   if (eventsResult.error) return json({ error: 'events_query_failed', details: eventsResult.error.message }, 500);
   if (babiesResult.error) return json({ error: 'babies_query_failed', details: babiesResult.error.message }, 500);
+  if (subscriptionsResult.error) return json({ error: 'subscriptions_query_failed', details: subscriptionsResult.error.message }, 500);
+  if (paymentsResult.error) return json({ error: 'payments_query_failed', details: paymentsResult.error.message }, 500);
 
   return json(buildDashboard({
     events: eventsResult.data || [],
     babies: babiesResult.data || [],
+    subscriptions: subscriptionsResult.data || [],
+    payments: paymentsResult.data || [],
     rangeDays,
     generatedAt: new Date().toISOString()
   }));
 });
 
-function buildDashboard({ events, babies, rangeDays, generatedAt }: {
+function buildDashboard({ events, babies, subscriptions = [], payments = [], rangeDays, generatedAt }: {
   events: any[];
   babies: any[];
+  subscriptions?: any[];
+  payments?: any[];
   rangeDays: number;
   generatedAt: string;
 }) {
@@ -138,9 +157,33 @@ function buildDashboard({ events, babies, rangeDays, generatedAt }: {
     bot_started_not_opened: botStartedNotOpened,
     sources: buildSources(events),
     ai_questions: buildAiQuestions(events),
+    billing: buildBilling({ subscriptions, payments }),
+    subscriptions: (subscriptions || []).map(formatSubscription).sort(byPeriodEndDesc).slice(0, 100),
+    payments: (payments || []).map(formatPayment).sort(byPaymentCreatedDesc).slice(0, 100),
     babies: babies.map(formatBaby).sort(byProfileCompleteness),
     upcoming_dates: buildUpcomingBabyDates({ babies, now: generatedAt, horizonDays: 45 }),
     recent_events: [...events].sort(byCreatedDesc).slice(0, 100).map(formatEvent)
+  };
+}
+
+function buildBilling({ subscriptions = [], payments = [] }: { subscriptions?: any[]; payments?: any[] } = {}) {
+  const now = Date.now();
+  const activeSubscriptions = subscriptions.filter(item =>
+    item.status === 'active' && item.current_period_end && new Date(item.current_period_end).getTime() > now
+  );
+  const paidPayments = payments.filter(item => item.status === 'paid');
+  const failedPayments = payments.filter(item => ['invoice_failed', 'failed', 'cancelled'].includes(item.status));
+  const pendingPayments = payments.filter(item => item.status === 'created');
+  const paidStars = paidPayments.reduce((sum, item) => sum + Number(item.total_amount || 0), 0);
+
+  return {
+    active_subscriptions: activeSubscriptions.length,
+    paid_payments: paidPayments.length,
+    paid_stars: paidStars,
+    failed_payments: failedPayments.length,
+    pending_payments: pendingPayments.length,
+    month_subscriptions: activeSubscriptions.filter(item => item.plan === 'month').length,
+    year_subscriptions: activeSubscriptions.filter(item => item.plan === 'year').length
   };
 }
 
@@ -286,12 +329,47 @@ function formatEvent(event: any) {
   };
 }
 
+function formatSubscription(subscription: any) {
+  return {
+    id: subscription.id || '',
+    user_id: subscription.user_id || null,
+    telegram_id: subscription.telegram_id || null,
+    plan: subscription.plan || '',
+    status: subscription.status || '',
+    source: subscription.source || '',
+    current_period_end: subscription.current_period_end || null,
+    updated_at: subscription.updated_at || subscription.created_at || null
+  };
+}
+
+function formatPayment(payment: any) {
+  return {
+    id: payment.id || '',
+    user_id: payment.user_id || null,
+    telegram_id: payment.telegram_id || null,
+    plan: payment.plan || '',
+    currency: payment.currency || '',
+    total_amount: Number(payment.total_amount || 0),
+    status: payment.status || '',
+    created_at: payment.created_at || null,
+    paid_at: payment.paid_at || null
+  };
+}
+
 function byCreatedDesc(a: any, b: any) {
   return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
 }
 
 function byUpdatedDesc(a: any, b: any) {
   return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
+}
+
+function byPeriodEndDesc(a: any, b: any) {
+  return new Date(b.current_period_end || 0).getTime() - new Date(a.current_period_end || 0).getTime();
+}
+
+function byPaymentCreatedDesc(a: any, b: any) {
+  return new Date(b.created_at || b.paid_at || 0).getTime() - new Date(a.created_at || a.paid_at || 0).getTime();
 }
 
 function byProfileCompleteness(a: any, b: any) {

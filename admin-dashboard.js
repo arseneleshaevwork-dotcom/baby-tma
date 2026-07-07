@@ -13,6 +13,8 @@ const TRACKED_EVENTS = [
   'premium_opened',
   'trial_started',
   'subscribe_clicked',
+  'premium_paid',
+  'payment_success',
   'notifications_enabled',
   'notifications_disabled',
   'notification_sent'
@@ -30,7 +32,7 @@ const { buildUpcomingBabyDates } = typeof require === 'function'
   ? require('./baby-milestones')
   : { buildUpcomingBabyDates: () => [] };
 
-function buildAdminDashboard({ events = [], babies = [], generatedAt, rangeDays = 30, now = new Date() } = {}) {
+function buildAdminDashboard({ events = [], babies = [], subscriptions = [], payments = [], generatedAt, rangeDays = 30, now = new Date() } = {}) {
   const totals = Object.fromEntries(TRACKED_EVENTS.map(event => [event, 0]));
   const usersByEvent = Object.fromEntries(TRACKED_EVENTS.map(event => [event, new Set()]));
   const userEvents = new Map();
@@ -83,9 +85,33 @@ function buildAdminDashboard({ events = [], babies = [], generatedAt, rangeDays 
     bot_started_not_opened: botStartedNotOpened,
     sources: buildSources(events),
     ai_questions: buildAiQuestions(events),
+    billing: buildBilling({ subscriptions, payments }),
+    subscriptions: subscriptions.map(formatSubscription).sort(byPeriodEndDesc).slice(0, 100),
+    payments: payments.map(formatPayment).sort(byPaymentCreatedDesc).slice(0, 100),
     babies: babies.map(formatBaby).sort(byProfileCompleteness),
     upcoming_dates: buildUpcomingBabyDates({ babies, now, horizonDays: 45 }),
     recent_events: [...events].sort(byCreatedDesc).slice(0, 100).map(formatEvent)
+  };
+}
+
+function buildBilling({ subscriptions = [], payments = [] } = {}) {
+  const now = Date.now();
+  const activeSubscriptions = subscriptions.filter(item =>
+    item.status === 'active' && item.current_period_end && new Date(item.current_period_end).getTime() > now
+  );
+  const paidPayments = payments.filter(item => item.status === 'paid');
+  const failedPayments = payments.filter(item => ['invoice_failed', 'failed', 'cancelled'].includes(item.status));
+  const pendingPayments = payments.filter(item => item.status === 'created');
+  const paidStars = paidPayments.reduce((sum, item) => sum + Number(item.total_amount || 0), 0);
+
+  return {
+    active_subscriptions: activeSubscriptions.length,
+    paid_payments: paidPayments.length,
+    paid_stars: paidStars,
+    failed_payments: failedPayments.length,
+    pending_payments: pendingPayments.length,
+    month_subscriptions: activeSubscriptions.filter(item => item.plan === 'month').length,
+    year_subscriptions: activeSubscriptions.filter(item => item.plan === 'year').length
   };
 }
 
@@ -172,12 +198,47 @@ function formatEvent(event = {}) {
   };
 }
 
+function formatSubscription(subscription = {}) {
+  return {
+    id: subscription.id || '',
+    user_id: subscription.user_id || null,
+    telegram_id: subscription.telegram_id || null,
+    plan: subscription.plan || '',
+    status: subscription.status || '',
+    source: subscription.source || '',
+    current_period_end: subscription.current_period_end || null,
+    updated_at: subscription.updated_at || subscription.created_at || null
+  };
+}
+
+function formatPayment(payment = {}) {
+  return {
+    id: payment.id || '',
+    user_id: payment.user_id || null,
+    telegram_id: payment.telegram_id || null,
+    plan: payment.plan || '',
+    currency: payment.currency || '',
+    total_amount: Number(payment.total_amount || 0),
+    status: payment.status || '',
+    created_at: payment.created_at || null,
+    paid_at: payment.paid_at || null
+  };
+}
+
 function byCreatedDesc(a, b) {
   return new Date(b.created_at || 0) - new Date(a.created_at || 0);
 }
 
 function byUpdatedDesc(a, b) {
   return new Date(b.updated_at || 0) - new Date(a.updated_at || 0);
+}
+
+function byPeriodEndDesc(a, b) {
+  return new Date(b.current_period_end || 0) - new Date(a.current_period_end || 0);
+}
+
+function byPaymentCreatedDesc(a, b) {
+  return new Date(b.created_at || b.paid_at || 0) - new Date(a.created_at || a.paid_at || 0);
 }
 
 function byProfileCompleteness(a, b) {
