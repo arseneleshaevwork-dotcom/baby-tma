@@ -111,6 +111,15 @@
       color: var(--danger);
     }
 
+    .admin-actions { margin-bottom:16px; }
+    .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .action-row { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
+    .action-row label { flex:1; min-width:180px; }
+    .action-result { min-height:42px; margin-top:10px; padding:10px; background:#f8fafc; border:1px solid var(--line); border-radius:6px; white-space:pre-wrap; }
+    textarea { width:100%; min-height:88px; resize:vertical; border:1px solid var(--line); border-radius:6px; padding:9px 10px; font:inherit; }
+    button.secondary { background:#475569; }
+    button.danger { background:#b42318; }
+
     .grid {
       display: grid;
       gap: 12px;
@@ -253,6 +262,29 @@
 
     <div class="status" id="status"></div>
 
+    <section class="card admin-actions">
+      <div class="section-title"><h2>Управление пользователем</h2><span class="muted">по Telegram ID</span></div>
+      <div class="action-grid">
+        <div>
+          <div class="action-row">
+            <label>Telegram ID<input id="manageTelegramId" inputmode="numeric" placeholder="123456789"></label>
+            <button id="lookupUser" type="button">Найти</button>
+          </div>
+          <div class="action-row" style="margin-top:10px">
+            <button type="button" data-admin-action="grant" data-days="30">Premium 30 дней</button>
+            <button type="button" data-admin-action="grant" data-days="365">Premium 1 год</button>
+            <button class="danger" type="button" data-admin-action="revoke">Отозвать</button>
+            <button class="secondary" type="button" data-admin-action="reminders">Включить напоминания</button>
+          </div>
+        </div>
+        <div>
+          <label>Сообщение в бот<textarea id="manageMessage" maxlength="2000" placeholder="Текст сообщения пользователю"></textarea></label>
+          <button id="sendUserMessage" type="button" style="margin-top:8px">Отправить сообщение</button>
+        </div>
+      </div>
+      <div class="action-result mono" id="manageResult">Выберите пользователя.</div>
+    </section>
+
     <section class="grid metrics" id="metrics"></section>
 
     <section class="grid sections">
@@ -392,18 +424,24 @@
       const url = new URL(window.location.href);
       const tokenFromUrl = url.searchParams.get('token');
       if (tokenFromUrl) {
-        localStorage.setItem(TOKEN_KEY, tokenFromUrl);
+        sessionStorage.setItem(TOKEN_KEY, tokenFromUrl);
         els.token.value = tokenFromUrl;
         url.searchParams.delete('token');
         history.replaceState(null, '', url.toString());
       } else {
-        els.token.value = localStorage.getItem(TOKEN_KEY) || '';
+        els.token.value = sessionStorage.getItem(TOKEN_KEY) || '';
       }
 
       els.form.addEventListener('submit', event => {
         event.preventDefault();
         loadDashboard();
       });
+      document.getElementById('lookupUser').addEventListener('click', () => runAdminAction('lookup'));
+      document.getElementById('sendUserMessage').addEventListener('click', () => runAdminAction('send_message'));
+      document.querySelectorAll('[data-admin-action]').forEach(button => button.addEventListener('click', () => {
+        const action = button.dataset.adminAction;
+        runAdminAction(action === 'grant' ? 'grant_premium' : action === 'revoke' ? 'revoke_premium' : 'enable_reminders', Number(button.dataset.days || 0));
+      }));
 
       if (els.token.value) loadDashboard();
       else setStatus('Введите admin token и нажмите “Обновить”.');
@@ -417,7 +455,7 @@
         return;
       }
 
-      localStorage.setItem(TOKEN_KEY, token);
+      sessionStorage.setItem(TOKEN_KEY, token);
       setLoading(true);
       setStatus('Загружаю данные...');
 
@@ -436,6 +474,34 @@
       } finally {
         setLoading(false);
       }
+    }
+
+    async function runAdminAction(action, days = 0) {
+      const token = els.token.value.trim();
+      const telegramId = document.getElementById('manageTelegramId').value.trim();
+      const result = document.getElementById('manageResult');
+      if (!token || !/^\d{4,20}$/.test(telegramId)) { result.textContent = 'Укажите admin token и корректный Telegram ID.'; return; }
+      const payload = { action, telegram_id: Number(telegramId) };
+      if (days) payload.days = days;
+      if (action === 'send_message') payload.message = document.getElementById('manageMessage').value.trim();
+      result.textContent = 'Выполняю...';
+      try {
+        const response = await fetch('https://jfyprwisnrubhhowipdm.functions.supabase.co/admin-actions', {
+          method:'POST', headers:{ 'content-type':'application/json', 'x-admin-token':token }, body:JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'request_failed');
+        result.textContent = formatAdminResult(data);
+        if (action !== 'lookup') loadDashboard();
+      } catch(error) { result.textContent = `Ошибка: ${error.message}`; }
+    }
+
+    function formatAdminResult(data) {
+      if (data.sent) return 'Сообщение отправлено.';
+      const baby = data.baby ? `${data.baby.name || 'Без имени'}${data.baby.birthdate ? ', ' + data.baby.birthdate : ''}` : 'профиль малыша не заполнен';
+      const subscription = data.subscription ? `${data.subscription.status}, до ${formatDateTime(data.subscription.current_period_end)}` : 'нет Premium';
+      const reminders = data.notifications?.enabled ? 'включены' : 'выключены';
+      return `Пользователь: ${data.user?.first_name || 'Без имени'} (@${data.user?.username || 'нет'})\nМалыш: ${baby}\nPremium: ${subscription}\nНапоминания: ${reminders}`;
     }
 
     function renderDashboard(data) {

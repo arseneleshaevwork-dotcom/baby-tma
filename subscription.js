@@ -37,25 +37,51 @@ const SUB = (() => {
     refreshPremiumStatus();
   }
 
-  function startTrial() {
-    if (localStorage.getItem(KEY_TRIAL_DATE)) return; // already started
-    localStorage.setItem(KEY_TRIAL_DATE, Date.now().toString());
-    _trialActive = true;
-    _trialDaysLeft = TRIAL_DAYS;
-    _renderHeaderBadge();
-    _showConfetti();
-    if (window.BabyAnalytics) BabyAnalytics.track('trial_started');
-    showToast('🎉 7 дней Premium бесплатно активированы!');
+  async function startTrial() {
+    if (localStorage.getItem(KEY_TRIAL_DATE)) return false;
+    const initData = _getTelegramInitData();
+    const endpoint = window.BABY_SUBSCRIPTION_STATUS_ENDPOINT;
+    if (!initData || !endpoint) {
+      showToast('Пробный период активируется внутри Telegram.');
+      return false;
+    }
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData, start_trial: true })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.active || data.status !== 'trial') {
+        showToast(data.error === 'trial_already_used' ? 'Пробный период уже был использован.' : 'Не удалось активировать пробный период.');
+        return false;
+      }
+      localStorage.setItem(KEY_TRIAL_DATE, Date.now().toString());
+      _applyServerPremium(data);
+      _isPremium = false;
+      _trialActive = true;
+      _trialDaysLeft = Math.max(1, Math.ceil((new Date(data.current_period_end) - Date.now()) / 86400000));
+      _renderHeaderBadge();
+      _showConfetti();
+      if (window.BabyAnalytics) BabyAnalytics.track('trial_started');
+      showToast('🎉 7 дней Premium бесплатно активированы!');
+      return true;
+    } catch(e) {
+      showToast('Не удалось активировать пробный период.');
+      return false;
+    }
   }
 
   function _applyServerPremium(subscription) {
     const active = Boolean(subscription && subscription.active && subscription.current_period_end);
-    _isPremium = active;
+    const isTrial = active && subscription.status === 'trial';
+    _isPremium = active && !isTrial;
     _premiumUntil = active ? subscription.current_period_end : null;
     localStorage.setItem(KEY_PREMIUM, active ? '1' : '0');
     if (_premiumUntil) localStorage.setItem(KEY_PREMIUM_UNTIL, _premiumUntil);
     else localStorage.removeItem(KEY_PREMIUM_UNTIL);
-    _trialActive = false;
+    _trialActive = isTrial;
+    _trialDaysLeft = isTrial ? Math.max(1, Math.ceil((new Date(subscription.current_period_end) - Date.now()) / 86400000)) : 0;
     _renderHeaderBadge();
   }
 
@@ -92,7 +118,7 @@ const SUB = (() => {
     const msgs = {
       diaryUnlimited:  '📓 Неограниченный дневник — в Premium',
       articlesAll:     '📚 Все статьи доступны в Premium',
-      aiAnalysis:      '🤖 AI анализ — в Premium',
+      aiAnalysis:      '📊 Расширенный анализ дневника — в Premium',
       scheduleProfiles:'⚙️ Профили ситуаций — в Premium',
       shareCard:       '📱 Отчёт для семьи — в Premium',
       notifications:   '🔔 Напоминания — в Premium',
@@ -101,8 +127,8 @@ const SUB = (() => {
     if (typeof showToast === 'function') showToast(msg);
     // Navigate to premium page after short delay
     setTimeout(() => {
-      const btn = document.getElementById('bn-premium');
-      if (btn) btn.click();
+      if (typeof goPage === 'function') goPage('premium', null);
+      if (typeof renderPremiumPage === 'function') renderPremiumPage();
     }, 1500);
   }
 
@@ -240,7 +266,7 @@ function _renderTrialActive(days) {
       </button>
     </div>
     <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
-      Отмените в любой момент
+      Месячная подписка продлевается автоматически · годовой доступ оплачивается один раз
     </p>
   `;
 }
@@ -292,24 +318,24 @@ function _renderFreePage() {
       </button>
     </div>
     <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
-      Отмените в любой момент · Безопасная оплата
+      Месячная подписка продлевается автоматически · годовой доступ оплачивается один раз
     </p>
   `;
 }
 
 function _featuresList(unlocked) {
   const features = [
-    { icon:'🌙', title:'Нормы сна 0–3 года', sub:'Научная база ВОЗ/AAP', premium:false },
+    { icon:'🌙', title:'Ориентиры сна 0–3 года', sub:'Диапазоны по возрасту', premium:false },
     { icon:'📅', title:'Генератор режима дня', sub:'Базовый для всех', premium:false },
     { icon:'📓', title:'Дневник сна', sub:unlocked ? 'Неограниченно' : 'Только 7 дней', premium:true },
-    { icon:'💬', title:'Консультант FAQ', sub:'40+ вопросов и ответов', premium:false },
+    { icon:'💬', title:'Помощник по режиму', sub:'Ответы на частые вопросы', premium:false },
     { icon:'📚', title:'База знаний', sub:unlocked ? 'Все главы и статьи' : '5 статей бесплатно', premium:true },
     { icon:'⚙️', title:'Профили ситуаций', sub:'Болезнь, путешествие, жара', premium:true },
-    { icon:'🤖', title:'AI анализ дневника', sub:'Недосып, паттерны, регрессы', premium:true },
+    { icon:'📊', title:'Анализ дневника', sub:'Недосып, повторяющиеся события и динамика', premium:true },
     { icon:'📆', title:'Календарь сна', sub:'Скачки, регрессы и переходы', premium:true },
     { icon:'🌙', title:'Ритуал засыпания', sub:'Таймер + белый шум', premium:false },
     { icon:'📱', title:'Отчёт для семьи', sub:'Сон, недосып и план на завтра', premium:true },
-    { icon:'🔔', title:'Умные напоминания', sub:'Кастомные push-уведомления', premium:true },
+    { icon:'🔔', title:'Умные напоминания', sub:'Сообщения в Telegram по вашему режиму', premium:true },
   ];
 
   return `<div class="features-list">${features.map(f => {
@@ -331,9 +357,9 @@ function _declDays(n) {
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
-function handleStartTrial() {
-  SUB.startTrial();
-  setTimeout(() => renderPremiumPage(), 300);
+async function handleStartTrial() {
+  await SUB.startTrial();
+  renderPremiumPage();
 }
 
 async function handleSubscribe(plan) {

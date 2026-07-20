@@ -51,18 +51,35 @@ function calcDayNaps(pairs) {
   return (pairs || []).reduce((sum, pair) => sum + calcDuration(pair[0], pair[1]), 0);
 }
 
-function calcNightLen(bed, wake) {
-  return calcDuration(bed, wake);
+function calcNightLen(bed, wake, awakeMin = 0) {
+  return Math.max(0, calcDuration(bed, wake) - Math.max(0, Number(awakeMin) || 0));
+}
+
+function sameNap(quickNap, pair) {
+  return quickNap && pair && quickNap.start === pair[0] && quickNap.end === pair[1];
+}
+
+function classifySleepEvent(start, end, durationMin) {
+  const duration = Math.max(0, Number(durationMin) || 0);
+  const startHour = start instanceof Date ? start.getHours() : 12;
+  const crossesDate = start instanceof Date && end instanceof Date
+    ? localDateKey(start) !== localDateKey(end)
+    : false;
+  return crossesDate || duration >= 240 || ((startHour >= 18 || startHour < 5) && duration >= 120) ? 'night' : 'nap';
 }
 
 function mergeManualLog(existing = {}, manual = {}) {
   const quickNaps = Array.isArray(existing.quickNaps) ? existing.quickNaps : [];
-  const manualDayNaps = calcDayNaps([
+  const manualPairs = [
     [manual.nap1s, manual.nap1e],
     [manual.nap2s, manual.nap2e],
     [manual.nap3s, manual.nap3e]
-  ]);
-  const quickDayNaps = quickNaps.reduce((sum, nap) => sum + (Number(nap.dur) || 0), 0);
+  ];
+  const manualDayNaps = calcDayNaps(manualPairs);
+  const quickDayNaps = quickNaps.reduce((sum, nap) => {
+    const alreadyEntered = manualPairs.some(pair => sameNap(nap, pair));
+    return sum + (alreadyEntered ? 0 : (Number(nap.dur) || 0));
+  }, 0);
   const selected = Array.isArray(manual.selectedTags) ? manual.selectedTags : [];
   const existingTags = Array.isArray(existing.tags) ? existing.tags : [];
   const tags = [...new Set([...existingTags, ...selected])];
@@ -79,8 +96,9 @@ function mergeManualLog(existing = {}, manual = {}) {
     nap2e: manual.nap2e,
     nap3s: manual.nap3s,
     nap3e: manual.nap3e,
+    nightAwakeMin: Math.max(0, Number(manual.nightAwakeMin) || 0),
     dayNaps: manualDayNaps + quickDayNaps,
-    nightLen: calcNightLen(manual.bed, manual.wake),
+    nightLen: calcNightLen(manual.bed, manual.wake, manual.nightAwakeMin),
     mood: manual.mood,
     tags,
     note,
@@ -89,30 +107,36 @@ function mergeManualLog(existing = {}, manual = {}) {
   };
 }
 
-function getOrCreateTodayLog(logs) {
-  const today = localDateKey();
-  let log = logs.find(l => l.date === today);
+function getOrCreateLogForDate(logs, date, defaults = {}) {
+  let log = logs.find(l => l.date === date);
   if (!log) {
     const wake = document.getElementById('lgWake')?.value || document.getElementById('wakeTime')?.value || '07:00';
     const bed = document.getElementById('lgBed')?.value || '19:30';
     log = {
-      date: today,
-      wake,
-      bed,
+      date,
+      wake: defaults.wake || wake,
+      bed: defaults.bed || bed,
       nap1s: '', nap1e: '', nap2s: '', nap2e: '', nap3s: '', nap3e: '',
       dayNaps: 0,
       nightLen: calcNightLen(bed, wake),
+      nightAwakeMin: 0,
       mood: moodSel,
       tags: [],
       note: '',
       quickNaps: [],
+      sleepEvents: [],
       nightWakings: 0
     };
     logs.push(log);
   }
   if (!Array.isArray(log.quickNaps)) log.quickNaps = [];
+  if (!Array.isArray(log.sleepEvents)) log.sleepEvents = [];
   if (!Array.isArray(log.tags)) log.tags = [];
   return log;
+}
+
+function getOrCreateTodayLog(logs) {
+  return getOrCreateLogForDate(logs, localDateKey());
 }
 
 function startQuickSleep() {
@@ -130,22 +154,36 @@ function finishQuickSleep() {
   const start = new Date(started);
   const end = new Date();
   const dur = Math.max(1, Math.round((end - start) / 60000));
+  const kind = classifySleepEvent(start, end, dur);
   const logs = getLogs();
-  const log = getOrCreateTodayLog(logs);
+  const log = getOrCreateLogForDate(logs, localDateKey(start), {
+    bed: hm(start), wake: hm(end)
+  });
 
-  log.quickNaps.push({ start: hm(start), end: hm(end), dur });
-  log.dayNaps = (log.dayNaps || 0) + dur;
-  if (!log.nap1s) { log.nap1s = hm(start); log.nap1e = hm(end); }
-  else if (!log.nap2s) { log.nap2s = hm(start); log.nap2e = hm(end); }
-  else if (!log.nap3s) { log.nap3s = hm(start); log.nap3e = hm(end); }
+  log.sleepEvents.push({
+    startAt: start.toISOString(),
+    endAt: end.toISOString(),
+    start: hm(start),
+    end: hm(end),
+    dur,
+    kind
+  });
+  if (kind === 'night') {
+    log.bed = hm(start);
+    log.wake = hm(end);
+    log.nightLen = calcNightLen(log.bed, log.wake, log.nightAwakeMin);
+  } else {
+    log.quickNaps.push({ start: hm(start), end: hm(end), dur });
+    log.dayNaps = (log.dayNaps || 0) + dur;
+  }
 
   saveLogs(logs);
   localStorage.removeItem(QUICK_SLEEP_KEY);
-  if (window.BabyAnalytics) BabyAnalytics.track('sleep_finished', { duration_min: dur });
+  if (window.BabyAnalytics) BabyAnalytics.track('sleep_finished', { duration_min: dur, kind });
   renderQuickSleepControls();
   if (typeof _updateFab === 'function') _updateFab();
   renderTracker();
-  showToast(`🌤 Сон записан: ${dur} мин`);
+  showToast(`${kind === 'night' ? '🌙 Ночной сон' : '🌤 Дневной сон'} записан: ${dur} мин`);
 }
 
 function quickSleepTag(tag) {
@@ -218,6 +256,7 @@ function saveLog() {
   const nap3s = document.getElementById('lgNap3S') ? document.getElementById('lgNap3S').value : '';
   const nap3e = document.getElementById('lgNap3E') ? document.getElementById('lgNap3E').value : '';
   const bed   = document.getElementById('lgBed').value;
+  const nightAwakeMin = document.getElementById('lgNightAwake')?.value || 0;
   const note  = document.getElementById('lgNote').value.trim();
 
   if (!wake || !bed) { showToast('Укажите время подъёма и укладывания'); return; }
@@ -227,7 +266,7 @@ function saveLog() {
   const existing = logs.find(l => l.date === today) || {};
   const log = mergeManualLog(existing, {
     date: today, wake, bed,
-    nap1s, nap1e, nap2s, nap2e, nap3s, nap3e,
+    nap1s, nap1e, nap2s, nap2e, nap3s, nap3e, nightAwakeMin,
     selectedTags: [...selectedTags],
     mood: moodSel,
     note
@@ -433,7 +472,7 @@ function renderAnalysisLocked(logs, age) {
       <p>${summary && summary.sleepDebt
         ? `По последним записям накопилось около ${(summary.sleepDebt / 60).toFixed(1)}ч недосыпа. Premium покажет причину, календарь скачков и план на завтра.`
         : 'После 3 записей дневника Premium показывает паттерны сна, календарь скачков и план на завтра.'}</p>
-      <button class="recovery-btn" onclick="document.getElementById('bn-premium')?.click();hapticLight()">
+      <button class="recovery-btn" onclick="goPage('premium',null);renderPremiumPage();hapticLight()">
         ⭐ Открыть Premium-анализ
       </button>
     </div>
@@ -563,6 +602,7 @@ function renderTracker() {
   renderQuickSleepControls();
 
   const logs = getLogs();
+  hydrateTodayLog(logs);
   const now  = new Date();
   const diaryLimit = _getDiaryLimit();
   const days  = trackerPeriod === 'week' ? 7 : (diaryLimit === Infinity ? 30 : Math.min(7, diaryLimit));
@@ -652,7 +692,7 @@ function renderTracker() {
   // Show limit banner if free user has more logs than shown
   if (diaryLimit !== Infinity && logs.length > diaryLimit) {
     html += `
-      <div class="diary-limit-banner" onclick="document.getElementById('bn-premium')?.click();hapticLight()">
+      <div class="diary-limit-banner" onclick="goPage('premium',null);renderPremiumPage();hapticLight()">
         <span class="dlb-icon">🔒</span>
         <div class="dlb-text">
           <strong>Показано ${diaryLimit} из ${logs.length} дней</strong>
@@ -667,6 +707,25 @@ function renderTracker() {
 
   // Run analysis on full logs (not limited view)
   if (logs.length >= 3) analyzeAndSuggest(logs);
+}
+
+function hydrateTodayLog(logs) {
+  const active = document.activeElement;
+  if (active && active.closest && active.closest('#page-tracker') && ['INPUT', 'TEXTAREA'].includes(active.tagName)) return;
+  const log = (logs || []).find(item => item.date === localDateKey());
+  if (!log) return;
+  const values = {
+    lgWake: log.wake, lgBed: log.bed,
+    lgNap1S: log.nap1s, lgNap1E: log.nap1e,
+    lgNap2S: log.nap2s, lgNap2E: log.nap2e,
+    lgNap3S: log.nap3s, lgNap3E: log.nap3e,
+    lgNightAwake: log.nightAwakeMin || 0,
+    lgNote: log.note || ''
+  };
+  Object.entries(values).forEach(([id, value]) => {
+    const input = document.getElementById(id);
+    if (input && value !== undefined && value !== null) input.value = value;
+  });
 }
 
 function renderNormStatus(normStatus) {
@@ -707,6 +766,7 @@ if (typeof module !== 'undefined') {
     calcDayNaps,
     calcDuration,
     calcNightLen,
+    classifySleepEvent,
     localDateKey,
     mergeManualLog,
     toMin

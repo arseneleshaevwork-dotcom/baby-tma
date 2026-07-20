@@ -80,15 +80,19 @@ function createAnalytics(env = {}) {
     const queue = readQueue();
     if (!queue.length) return true;
 
-    const response = await fetcher(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ events: queue })
-    });
+    try {
+      const response = await fetcher(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ events: queue, init_data: getTelegramInitData(telegram) })
+      });
 
-    if (!response || !response.ok) return false;
-    writeQueue([]);
-    return true;
+      if (!response || !response.ok) return false;
+      writeQueue([]);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   function buildEvent(event, payload) {
@@ -127,6 +131,11 @@ function createAnalytics(env = {}) {
   }
 
   return { track, flush, getBabyProfile, saveBabyProfile, _readQueue: readQueue };
+}
+
+function getTelegramInitData(telegram) {
+  try { return telegram && telegram.WebApp ? telegram.WebApp.initData || '' : ''; }
+  catch (e) { return ''; }
 }
 
 function getAttribution(env = {}) {

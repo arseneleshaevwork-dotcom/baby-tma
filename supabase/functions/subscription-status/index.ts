@@ -29,6 +29,34 @@ Deno.serve(async (req) => {
     .eq('telegram_id', telegramId)
     .maybeSingle();
 
+  if (body?.start_trial) {
+    if (subscription) return json({ ok: false, error: 'trial_already_used' }, 409);
+    const { data: user } = await supabase
+      .from('users')
+      .upsert({
+        telegram_id: telegramId,
+        username: auth.user.username || null,
+        first_name: auth.user.first_name || null,
+        language_code: auth.user.language_code || null,
+        last_seen_at: new Date().toISOString()
+      }, { onConflict: 'telegram_id' })
+      .select('id')
+      .single();
+    const start = new Date();
+    const end = new Date(start.getTime() + 7 * 86400000);
+    const { error } = await supabase.from('subscriptions').insert({
+      user_id: user?.id || null,
+      telegram_id: telegramId,
+      plan: 'trial',
+      status: 'active',
+      source: 'trial',
+      current_period_start: start.toISOString(),
+      current_period_end: end.toISOString()
+    });
+    if (error) return json({ ok: false, error: 'trial_create_failed' }, 500);
+    return json({ ok: true, active: true, plan: 'trial', status: 'trial', current_period_end: end.toISOString(), source: 'trial' });
+  }
+
   const active = subscription?.status === 'active'
     && subscription?.current_period_end
     && new Date(subscription.current_period_end).getTime() > Date.now();
@@ -37,7 +65,7 @@ Deno.serve(async (req) => {
     ok: true,
     active: Boolean(active),
     plan: active ? subscription.plan : null,
-    status: active ? subscription.status : 'free',
+    status: active && subscription.source === 'trial' ? 'trial' : (active ? subscription.status : 'free'),
     current_period_end: active ? subscription.current_period_end : null,
     source: active ? subscription.source : null
   });

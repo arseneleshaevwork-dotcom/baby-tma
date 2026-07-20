@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-token',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-token, x-cron-token',
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
 
@@ -13,8 +13,12 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   const adminToken = Deno.env.get('ADMIN_TOKEN');
+  const cronToken = Deno.env.get('CRON_TOKEN');
   const providedToken = req.headers.get('x-admin-token') || '';
-  if (!adminToken || providedToken !== adminToken) return json({ error: 'unauthorized' }, 401);
+  const providedCronToken = req.headers.get('x-cron-token') || '';
+  const adminAuthorized = Boolean(adminToken && providedToken === adminToken);
+  const cronAuthorized = Boolean(cronToken && providedCronToken === cronToken);
+  if (!adminAuthorized && !cronAuthorized) return json({ error: 'unauthorized' }, 401);
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -27,6 +31,10 @@ Deno.serve(async (req) => {
   const dryRun = Boolean(body?.dry_run);
   const today = dateOnly(body?.date || new Date().toISOString());
   const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  const scheduled = body?.run_scheduled === false
+    ? []
+    : await processScheduledReminders({ supabase, botToken, dryRun });
 
   const [settingsResult, babiesResult, deliveriesResult] = await Promise.all([
     supabase
@@ -94,8 +102,46 @@ Deno.serve(async (req) => {
     });
   }
 
-  return json({ ok: true, dry_run: dryRun, date: today, planned: jobs.length, sent });
+  return json({ ok: true, dry_run: dryRun, date: today, planned: jobs.length, sent, scheduled });
 });
+
+async function processScheduledReminders({ supabase, botToken, dryRun }: any) {
+  const now = new Date();
+  const overdue = new Date(now.getTime() - 10 * 60000);
+  const { data: rows, error } = await supabase.from('schedule_reminders')
+    .select('id,user_id,telegram_id,chat_id,reminder_type,title,message,scheduled_at')
+    .eq('status', 'pending')
+    .lte('scheduled_at', now.toISOString())
+    .gte('scheduled_at', overdue.toISOString())
+    .order('scheduled_at', { ascending: true })
+    .limit(500);
+  if (error) return [{ error: error.message }];
+
+  const results: any[] = [];
+  for (const row of rows || []) {
+    if (dryRun) {
+      results.push({ id: row.id, chat_id: row.chat_id, reminder_type: row.reminder_type, dry_run: true });
+      continue;
+    }
+    const result = await sendTelegram(botToken, row.chat_id, row.message);
+    await supabase.from('schedule_reminders').update({
+      status: result.ok ? 'sent' : 'failed',
+      sent_at: result.ok ? now.toISOString() : null,
+      error: result.ok ? null : result.error
+    }).eq('id', row.id).eq('status', 'pending');
+    await supabase.from('events').insert({
+      event_name: 'notification_sent',
+      user_id: row.user_id,
+      telegram_id: row.telegram_id,
+      payload: { reminder_type: `schedule_${row.reminder_type}`, scheduled_at: row.scheduled_at, ok: result.ok }
+    });
+    results.push({ id: row.id, chat_id: row.chat_id, reminder_type: row.reminder_type, ok: result.ok });
+  }
+
+  await supabase.from('schedule_reminders').update({ status: 'expired' })
+    .eq('status', 'pending').lt('scheduled_at', overdue.toISOString());
+  return results;
+}
 
 function buildReminderJobs({ babies, settings, today, delivered }: {
   babies: any[];

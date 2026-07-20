@@ -85,7 +85,7 @@ function buildAdminDashboard({ events = [], babies = [], subscriptions = [], pay
     bot_started_not_opened: botStartedNotOpened,
     sources: buildSources(events),
     ai_questions: buildAiQuestions(events),
-    billing: buildBilling({ subscriptions, payments }),
+    billing: buildBilling({ subscriptions, payments, now }),
     subscriptions: subscriptions.map(formatSubscription).sort(byPeriodEndDesc).slice(0, 100),
     payments: payments.map(formatPayment).sort(byPaymentCreatedDesc).slice(0, 100),
     babies: babies.map(formatBaby).sort(byProfileCompleteness),
@@ -94,10 +94,10 @@ function buildAdminDashboard({ events = [], babies = [], subscriptions = [], pay
   };
 }
 
-function buildBilling({ subscriptions = [], payments = [] } = {}) {
-  const now = Date.now();
+function buildBilling({ subscriptions = [], payments = [], now = new Date() } = {}) {
+  const nowMs = new Date(now).getTime();
   const activeSubscriptions = subscriptions.filter(item =>
-    item.status === 'active' && item.current_period_end && new Date(item.current_period_end).getTime() > now
+    item.status === 'active' && item.current_period_end && new Date(item.current_period_end).getTime() > nowMs
   );
   const paidPayments = payments.filter(item => item.status === 'paid');
   const failedPayments = payments.filter(item => ['invoice_failed', 'failed', 'cancelled'].includes(item.status));

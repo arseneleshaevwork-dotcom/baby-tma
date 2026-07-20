@@ -97,6 +97,20 @@ function scheduleReminders(blocks) {
   _renderReminderBadge(reminderPlan.length);
   _renderReminderList(reminderPlan);
 
+  if (isNotificationsEnabled() && _tgUserId && window.BabyAnalytics && reminderPlan.length) {
+    BabyAnalytics.track('schedule_reminders_planned', {
+      reminders: reminderPlan.map(item => ({
+        id: item.id,
+        kind: item.kind,
+        type: item.type,
+        title: item.title,
+        at: item.at,
+        message: item.message
+      }))
+    });
+    BabyAnalytics.flush();
+  }
+
   if (reminderPlan.length > 0 && typeof showToast === 'function') {
     showToast(`🔔 Напоминания установлены: ${reminderPlan.length}`);
   }

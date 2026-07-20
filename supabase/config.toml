@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.subscription-status]
 verify_jwt = false
+
+[functions.admin-actions]
+verify_jwt = false

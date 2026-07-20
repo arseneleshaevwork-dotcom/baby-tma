@@ -94,7 +94,7 @@ function buildSchedule(age,wakeMin,feedType,activity,bufferMin,shifts){
     cur=Math.max(cur,ns-5);
     push('sleep','😴','Укладывание'+(p.nd.length>1?' сна №'+(i+1):''),'Приглушённый свет, тишина, белый шум',0);
     cur=ns;
-    push('sleep','💤','Дневной сон'+(p.nd.length>1?' №'+(i+1):''),'~'+p.nd[i]+' мин · Не будите раньше',p.nd[i]);
+    push('sleep','💤','Дневной сон'+(p.nd.length>1?' №'+(i+1):''),'Ориентир: ~'+p.nd[i]+' мин',p.nd[i]);
     push('hygiene','🌤️','Пробуждение после сна','Зайдите с улыбкой, объятия',10);
 
     if(!isOld&&feedType!=='solids'){
@@ -123,7 +123,7 @@ function buildSchedule(age,wakeMin,feedType,activity,bufferMin,shifts){
 
   cur=Math.max(cur,bedtime-45);
   push('hygiene','🛁','Купание','Тёплая ванна 36–37°C · массаж',20);
-  if(!isOld) push('feed','🤱','Вечернее кормление','Сытое кормление — залог долгого ночного сна',15);
+  if(!isOld) push('feed','🤱','Вечернее кормление','Спокойное кормление по признакам голода',15);
   push('sleep','📖','Ритуал укладывания','Колыбельная / сказка в полумраке',12);
   cur=bedtime;
   push('sleep','🌙','Ночной сон','Укладывание: '+fmt(bedtime)+' · Ночной сон ~'+p.ns+'ч · Подъём ~'+fmt(bedtime+p.ns*60),0);
@@ -161,7 +161,7 @@ function renderSchedule(blocks,daySegs,p){
   });
 
   document.getElementById('schedTitle').textContent='Режим для малыша — '+p.label;
-  document.getElementById('schedSubtitle').textContent='Подъём в '+fmt(_wakeMin)+' · '+p.nd.length+' дн. сна · AAP/ВОЗ/NHS';
+  document.getElementById('schedSubtitle').textContent='Подъём в '+fmt(_wakeMin)+' · '+p.nd.length+' дн. сна · возрастной ориентир';
   document.getElementById('schedBadge').textContent=p.label;
   const dsh=(p.nd.reduce((a,b)=>a+b,0)/60).toFixed(1);
   document.getElementById('statsRow').innerHTML=
@@ -255,8 +255,7 @@ function renderStatCharts(p,daySegs){
   barCI=new Chart(document.getElementById('barChart'),{type:'bar',
     data:{labels:['Ночной сон','Дневной сон','Всего сна'],
       datasets:[
-        {label:'Ваш малыш',data:[p.ns,(daySleepMin/60).toFixed(1),p.ts],backgroundColor:'rgba(139,92,246,.7)',borderRadius:8,borderSkipped:false},
-        {label:'Норма ВОЗ',data:[p.ns,(daySleepMin/60).toFixed(1),p.ts],backgroundColor:'rgba(74,222,128,.35)',borderRadius:8,borderSkipped:false}
+        {label:'Ориентир режима',data:[p.ns,(daySleepMin/60).toFixed(1),p.ts],backgroundColor:['rgba(124,131,232,.75)','rgba(93,201,160,.72)','rgba(255,154,123,.72)'],borderRadius:8,borderSkipped:false}
       ]},
     options:{responsive:true,
       plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},
@@ -283,12 +282,12 @@ function renderStatCharts(p,daySegs){
 // ─── Tips ────────────────────────────────────────────────────────────────────
 function getTips(age){
   const all=[
-    [0,3,'Белый шум (60 дБ) сокращает время засыпания новорождённых на 40% — исследование AAP'],
+    [0,3,'Если используете белый шум, держите источник подальше от кроватки и выбирайте минимальную комфортную громкость'],
     [0,3,'Признаки усталости важнее часов: зевота, потирание глаз — укладывайте сразу'],
     [4,6,'Регресс в 4 месяца — нейрологическая перестройка мозга. Режим и ритуалы помогут за 2–6 недель'],
-    [4,6,'Идеальная температура в комнате для сна: 18–21°C (NHS)'],
+    [4,6,'Ориентир температуры для сна: 16–20°C; проверяйте, не горячая ли грудь или шея малыша'],
     [6,9,'Первые продукты прикорма давайте утром — если будет реакция, увидите днём'],
-    [6,9,'Между новыми продуктами — 3 дня наблюдения (рекомендация ВОЗ)'],
+    [6,9,'Вводите новые продукты по одному, чтобы заметить возможную реакцию'],
     [9,12,'Переход 2→1 сон: в 12–18 мес. Признак: отказ от одного сна 5+ дней подряд'],
     [12,23,'1 дневной сон: укладывайте не позже 13:00, иначе трудно уснуть в 19:30'],
     [18,36,'Малышам нужна предсказуемость: одинаковый ритуал каждый вечер'],

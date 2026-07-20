@@ -72,7 +72,8 @@ Deno.serve(async (req) => {
       description: 'Premium-функции: расширенный дневник, отчеты, подсказки, напоминания и аналитика.',
       payload,
       currency: 'XTR',
-      prices: [{ label: plan.label, amount: plan.stars }]
+      prices: [{ label: plan.label, amount: plan.stars }],
+      ...(planKey === 'month' ? { subscription_period: 2592000 } : {})
     })
   });
 
