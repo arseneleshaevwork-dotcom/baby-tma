@@ -348,7 +348,7 @@ async function chatSend() {
   } catch (error) {
     typing?.remove();
     const message = error?.code === 'daily_limit'
-      ? `Лимит онлайн-ответов на сегодня исчерпан (${Number(error.limit) || 6}). Я всё равно могу дать локальную подсказку:<br><br>${findAnswer(q)}`
+      ? `Лимит онлайн-ответов на сегодня исчерпан (${Number(error.limit) || 4}). Я всё равно могу дать локальную подсказку:<br><br>${findAnswer(q)}`
       : `Онлайн-помощник сейчас недоступен. Вот локальная подсказка, чтобы не оставлять вас без ответа:<br><br>${findAnswer(q)}`;
     addMsg(message, 'bot');
     if (window.BabyAnalytics) BabyAnalytics.track('ai_answer_failed', { reason: String(error?.code || error?.name || 'unknown').slice(0, 40) });

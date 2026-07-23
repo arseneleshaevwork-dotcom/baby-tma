@@ -5,6 +5,8 @@ const ALLOWED_TAGS = new Set([
 
 export const AI_CONSENT_VERSION = '2026-07-24-v1';
 export const MAX_QUESTION_LENGTH = 1500;
+export const FREE_DAILY_LIMIT = 4;
+export const PREMIUM_DAILY_LIMIT = 40;
 
 export function sanitizeQuestion(value) {
   return String(value || '').replace(/\u0000/g, '').trim().slice(0, MAX_QUESTION_LENGTH);

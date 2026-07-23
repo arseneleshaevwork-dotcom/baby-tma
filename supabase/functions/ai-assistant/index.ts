@@ -1,7 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   AI_CONSENT_VERSION,
+  FREE_DAILY_LIMIT,
   MAX_QUESTION_LENGTH,
+  PREMIUM_DAILY_LIMIT,
   extractOutputText,
   sanitizeAgeMonths,
   sanitizeDiary,
@@ -77,7 +79,7 @@ Deno.serve(async req => {
   const premium = subscription?.status === 'active'
     && subscription.current_period_end
     && new Date(subscription.current_period_end).getTime() > Date.now();
-  const dailyLimit = premium ? 40 : 6;
+  const dailyLimit = premium ? PREMIUM_DAILY_LIMIT : FREE_DAILY_LIMIT;
   const since = new Date();
   since.setUTCHours(0, 0, 0, 0);
   const { count } = await supabase.from('ai_requests').select('id', { count: 'exact', head: true })

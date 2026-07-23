@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import {
+  FREE_DAILY_LIMIT,
+  PREMIUM_DAILY_LIMIT,
   extractOutputText,
   sanitizeAgeMonths,
   sanitizeDiary,
@@ -33,4 +35,9 @@ test('extracts Responses API text and chooses curated sources', () => {
   assert.equal(text, 'Ответ');
   assert.match(selectSources('как вводить прикорм')[0].url, /who\.int/);
   assert.match(selectSources('плохо спит')[0].url, /healthychildren\.org/);
+});
+
+test('keeps free and premium AI limits explicit', () => {
+  assert.equal(FREE_DAILY_LIMIT, 4);
+  assert.equal(PREMIUM_DAILY_LIMIT, 40);
 });
