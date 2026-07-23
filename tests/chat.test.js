@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { findAnswer } = require('../chat');
+const { findAnswer, buildAiDiary } = require('../chat');
 
 global.localStorage = {
   getItem(key) {
@@ -43,4 +43,19 @@ test('gives structured fallback with next questions', () => {
   const answer = findAnswer('что купить домой');
   assert.match(answer, /уточните/i);
   assert.match(answer, /возраст/i);
+});
+
+test('AI diary payload contains only approved fields from the last 14 days', () => {
+  const now = new Date('2026-07-24T12:00:00');
+  const diary = buildAiDiary([
+    { date: '2026-07-10', wake: '07:00', bed: '20:00', note: 'private note', babyName: 'Миша' },
+    { date: '2026-07-12', wake: '06:40', bed: '19:50', dayNaps: 130, nightLen: 610, nightWakings: 2, note: 'private note' },
+    { date: '2026-07-24', wake: '07:10', bed: '20:10', dayNaps: 120, nightLen: 620, nightWakings: 1, tags: ['teeth'] }
+  ], now);
+  assert.strictEqual(diary.length, 2);
+  assert.deepStrictEqual(Object.keys(diary[0]), [
+    'date', 'wake', 'bedtime', 'day_sleep_min', 'night_sleep_min', 'night_wakings', 'tags'
+  ]);
+  assert.ok(!JSON.stringify(diary).includes('private note'));
+  assert.ok(!JSON.stringify(diary).includes('Миша'));
 });

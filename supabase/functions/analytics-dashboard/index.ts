@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
   const since = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  const [eventsResult, babiesResult, subscriptionsResult, paymentsResult] = await Promise.all([
+  const [eventsResult, babiesResult, subscriptionsResult, paymentsResult, aiRequestsResult] = await Promise.all([
     supabase
       .from('events')
       .select('id,event_name,user_id,client_id,telegram_id,attribution,payload,created_at')
@@ -81,29 +81,38 @@ Deno.serve(async (req) => {
       .select('id,user_id,telegram_id,plan,currency,total_amount,status,created_at,paid_at')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
-      .limit(1000)
+      .limit(1000),
+    supabase
+      .from('ai_requests')
+      .select('telegram_id,status,model,input_tokens,output_tokens,created_at')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(5000)
   ]);
 
   if (eventsResult.error) return json({ error: 'events_query_failed', details: eventsResult.error.message }, 500);
   if (babiesResult.error) return json({ error: 'babies_query_failed', details: babiesResult.error.message }, 500);
   if (subscriptionsResult.error) return json({ error: 'subscriptions_query_failed', details: subscriptionsResult.error.message }, 500);
   if (paymentsResult.error) return json({ error: 'payments_query_failed', details: paymentsResult.error.message }, 500);
+  if (aiRequestsResult.error) return json({ error: 'ai_requests_query_failed', details: aiRequestsResult.error.message }, 500);
 
   return json(buildDashboard({
     events: eventsResult.data || [],
     babies: babiesResult.data || [],
     subscriptions: subscriptionsResult.data || [],
     payments: paymentsResult.data || [],
+    aiRequests: aiRequestsResult.data || [],
     rangeDays,
     generatedAt: new Date().toISOString()
   }));
 });
 
-function buildDashboard({ events, babies, subscriptions = [], payments = [], rangeDays, generatedAt }: {
+function buildDashboard({ events, babies, subscriptions = [], payments = [], aiRequests = [], rangeDays, generatedAt }: {
   events: any[];
   babies: any[];
   subscriptions?: any[];
   payments?: any[];
+  aiRequests?: any[];
   rangeDays: number;
   generatedAt: string;
 }) {
@@ -156,13 +165,27 @@ function buildDashboard({ events, babies, subscriptions = [], payments = [], ran
     opened_and_left: openedAndLeft,
     bot_started_not_opened: botStartedNotOpened,
     sources: buildSources(events),
-    ai_questions: buildAiQuestions(events),
     billing: buildBilling({ subscriptions, payments }),
+    ai_usage: buildAiUsage(aiRequests),
     subscriptions: (subscriptions || []).map(formatSubscription).sort(byPeriodEndDesc).slice(0, 100),
     payments: (payments || []).map(formatPayment).sort(byPaymentCreatedDesc).slice(0, 100),
     babies: babies.map(formatBaby).sort(byProfileCompleteness),
     upcoming_dates: buildUpcomingBabyDates({ babies, now: generatedAt, horizonDays: 45 }),
     recent_events: [...events].sort(byCreatedDesc).slice(0, 100).map(formatEvent)
+  };
+}
+
+function buildAiUsage(requests: any[] = []) {
+  const completed = requests.filter(item => item.status === 'completed');
+  return {
+    requests: requests.length,
+    completed: completed.length,
+    failed: requests.filter(item => item.status === 'failed').length,
+    rate_limited: requests.filter(item => item.status === 'rate_limited').length,
+    unique_users: new Set(requests.map(item => item.telegram_id).filter(Boolean)).size,
+    input_tokens: completed.reduce((sum, item) => sum + Number(item.input_tokens || 0), 0),
+    output_tokens: completed.reduce((sum, item) => sum + Number(item.output_tokens || 0), 0),
+    model: completed.find(item => item.model)?.model || requests.find(item => item.model)?.model || ''
   };
 }
 
@@ -209,19 +232,6 @@ function buildSources(events: any[]) {
     .map(row => ({ ...row, users: row.users.size }))
     .sort((a, b) => Number(a.campaign === 'unknown') - Number(b.campaign === 'unknown') || b.users - a.users || b.events - a.events)
     .slice(0, 20);
-}
-
-function buildAiQuestions(events: any[]) {
-  return [...events]
-    .filter(event => event.event_name === 'ai_question_sent' && event.payload && event.payload.question)
-    .sort(byCreatedDesc)
-    .slice(0, 50)
-    .map(event => ({
-      question: String(event.payload.question || '').slice(0, 300),
-      created_at: event.created_at || null,
-      client_id: event.client_id || null,
-      telegram_id: event.telegram_id || null
-    }));
 }
 
 function buildUpcomingBabyDates({ babies, now, horizonDays }: { babies: any[]; now: string; horizonDays: number }) {

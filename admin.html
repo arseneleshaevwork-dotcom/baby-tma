@@ -315,6 +315,14 @@
 
       <div class="card wide">
         <div class="section-title">
+          <h2>ИИ-помощник</h2>
+          <span class="muted">без текста вопросов</span>
+        </div>
+        <div id="aiUsage"></div>
+      </div>
+
+      <div class="card wide">
+        <div class="section-title">
           <h2>Подписки</h2>
           <span class="muted">до 100 строк</span>
         </div>
@@ -343,14 +351,6 @@
           <span class="muted">UTM / start_param</span>
         </div>
         <div id="sources"></div>
-      </div>
-
-      <div class="card wide">
-        <div class="section-title">
-          <h2>Вопросы ИИ</h2>
-          <span class="muted">последние 50</span>
-        </div>
-        <div id="aiQuestions"></div>
       </div>
 
       <div class="card wide">
@@ -408,11 +408,11 @@
       funnel: document.getElementById('funnel'),
       dropoffs: document.getElementById('dropoffs'),
       billing: document.getElementById('billing'),
+      aiUsage: document.getElementById('aiUsage'),
       subscriptions: document.getElementById('subscriptions'),
       payments: document.getElementById('payments'),
       upcomingDates: document.getElementById('upcomingDates'),
       sources: document.getElementById('sources'),
-      aiQuestions: document.getElementById('aiQuestions'),
       babies: document.getElementById('babies'),
       babyCount: document.getElementById('babyCount'),
       events: document.getElementById('events')
@@ -511,11 +511,11 @@
       renderFunnel(data.funnel || []);
       renderDropoffs(data);
       renderBilling(data.billing || {});
+      renderAiUsage(data.ai_usage || {});
       renderSubscriptions(data.subscriptions || []);
       renderPayments(data.payments || []);
       renderUpcomingDates(data.upcoming_dates || []);
       renderSources(data.sources || []);
-      renderAiQuestions(data.ai_questions || []);
       renderBabies(data.babies || []);
       renderEvents(data.recent_events || []);
     }
@@ -569,6 +569,26 @@
         ['Ошибки оплаты', number(billing.failed_payments), 'invoice_failed / failed / cancelled']
       ];
       els.billing.innerHTML = `
+        <div class="grid metrics" style="margin-bottom:0">
+          ${cards.map(([label, value, hint]) => `
+            <article class="card">
+              <div class="metric-label">${escapeHtml(label)}</div>
+              <div class="metric-value">${escapeHtml(value)}</div>
+              <div class="muted">${escapeHtml(hint)}</div>
+            </article>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function renderAiUsage(usage) {
+      const cards = [
+        ['Успешные ответы', number(usage.completed), `${number(usage.unique_users)} пользователей`],
+        ['Ошибки', number(usage.failed), 'сбои модели или сети'],
+        ['Достигли лимита', number(usage.rate_limited), 'запросы сверх дневного лимита'],
+        ['Токены', number(Number(usage.input_tokens || 0) + Number(usage.output_tokens || 0)), usage.model || 'модель не настроена']
+      ];
+      els.aiUsage.innerHTML = `
         <div class="grid metrics" style="margin-bottom:0">
           ${cards.map(([label, value, hint]) => `
             <article class="card">
@@ -669,27 +689,6 @@
                 <td>${number(item.app_opens)}</td>
                 <td>${number(item.profiles)}</td>
                 <td>${number(item.schedules)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `;
-    }
-
-    function renderAiQuestions(items) {
-      if (!items.length) {
-        els.aiQuestions.innerHTML = '<div class="empty">Вопросов пока нет</div>';
-        return;
-      }
-      els.aiQuestions.innerHTML = `
-        <table>
-          <thead><tr><th>Время</th><th>Вопрос</th><th>Пользователь</th></tr></thead>
-          <tbody>
-            ${items.map(item => `
-              <tr>
-                <td>${formatDateTime(item.created_at)}</td>
-                <td>${escapeHtml(item.question)}</td>
-                <td class="mono">${escapeHtml(shortId(item.telegram_id || item.client_id || ''))}</td>
               </tr>
             `).join('')}
           </tbody>

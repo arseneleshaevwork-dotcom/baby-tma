@@ -32,7 +32,7 @@ const { buildUpcomingBabyDates } = typeof require === 'function'
   ? require('./baby-milestones')
   : { buildUpcomingBabyDates: () => [] };
 
-function buildAdminDashboard({ events = [], babies = [], subscriptions = [], payments = [], generatedAt, rangeDays = 30, now = new Date() } = {}) {
+function buildAdminDashboard({ events = [], babies = [], subscriptions = [], payments = [], aiRequests = [], generatedAt, rangeDays = 30, now = new Date() } = {}) {
   const totals = Object.fromEntries(TRACKED_EVENTS.map(event => [event, 0]));
   const usersByEvent = Object.fromEntries(TRACKED_EVENTS.map(event => [event, new Set()]));
   const userEvents = new Map();
@@ -84,13 +84,27 @@ function buildAdminDashboard({ events = [], babies = [], subscriptions = [], pay
     opened_and_left: openedAndLeft,
     bot_started_not_opened: botStartedNotOpened,
     sources: buildSources(events),
-    ai_questions: buildAiQuestions(events),
     billing: buildBilling({ subscriptions, payments, now }),
+    ai_usage: buildAiUsage(aiRequests),
     subscriptions: subscriptions.map(formatSubscription).sort(byPeriodEndDesc).slice(0, 100),
     payments: payments.map(formatPayment).sort(byPaymentCreatedDesc).slice(0, 100),
     babies: babies.map(formatBaby).sort(byProfileCompleteness),
     upcoming_dates: buildUpcomingBabyDates({ babies, now, horizonDays: 45 }),
     recent_events: [...events].sort(byCreatedDesc).slice(0, 100).map(formatEvent)
+  };
+}
+
+function buildAiUsage(requests = []) {
+  const completed = requests.filter(item => item.status === 'completed');
+  return {
+    requests: requests.length,
+    completed: completed.length,
+    failed: requests.filter(item => item.status === 'failed').length,
+    rate_limited: requests.filter(item => item.status === 'rate_limited').length,
+    unique_users: new Set(requests.map(item => item.telegram_id).filter(Boolean)).size,
+    input_tokens: completed.reduce((sum, item) => sum + Number(item.input_tokens || 0), 0),
+    output_tokens: completed.reduce((sum, item) => sum + Number(item.output_tokens || 0), 0),
+    model: completed.find(item => item.model)?.model || requests.find(item => item.model)?.model || ''
   };
 }
 
@@ -137,19 +151,6 @@ function buildSources(events) {
     .map(row => ({ ...row, users: row.users.size }))
     .sort((a, b) => Number(a.campaign === 'unknown') - Number(b.campaign === 'unknown') || b.users - a.users || b.events - a.events)
     .slice(0, 20);
-}
-
-function buildAiQuestions(events) {
-  return [...events]
-    .filter(event => event.event_name === 'ai_question_sent' && event.payload && event.payload.question)
-    .sort(byCreatedDesc)
-    .slice(0, 50)
-    .map(event => ({
-      question: String(event.payload.question || '').slice(0, 300),
-      created_at: event.created_at || null,
-      client_id: event.client_id || null,
-      telegram_id: event.telegram_id || null
-    }));
 }
 
 function identityFor(row = {}) {

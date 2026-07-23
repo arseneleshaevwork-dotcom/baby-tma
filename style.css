@@ -634,6 +634,12 @@ body::after {
 /* ═══════════════════════════════════════════════════════
    CHAT
 ═══════════════════════════════════════════════════════ */
+body[data-page="chat"] .app-header,
+body[data-page="profile"] .app-header { display:none; }
+body[data-page="chat"] #page-chat,
+body[data-page="profile"] #page-profile { padding-top:16px; }
+.chat-page-title { font-size:1.05rem; margin-bottom:8px; }
+.chat-topic-label { color:var(--text-hint); font-size:.7rem; font-weight:800; text-transform:uppercase; margin-bottom:7px; }
 .chat-topics { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:12px; }
 .chat-topic-btn {
   padding:7px 13px; background:linear-gradient(135deg,#FFF0F8,#F8F0FF);
@@ -677,6 +683,28 @@ body::after {
   touch-action:manipulation; box-shadow:var(--shadow-btn);
 }
 .chat-send:active { transform:scale(.93); box-shadow:none; }
+.chat-send:disabled, .chat-input:disabled { opacity:.55; cursor:not-allowed; }
+.chat-typing { color:var(--text-hint); font-weight:700; }
+.chat-sources { display:grid; gap:5px; margin-top:10px; padding-top:9px; border-top:1px solid var(--border-soft); }
+.chat-sources strong { font-size:.7rem; text-transform:uppercase; color:var(--text-hint) !important; }
+.chat-sources a { color:#6f4b87; font-size:.76rem; font-weight:700; overflow-wrap:anywhere; }
+
+.ai-consent-modal {
+  position:fixed; inset:0; z-index:10020; align-items:flex-end; justify-content:center;
+  background:rgba(61,44,62,.62); padding-top:24px;
+}
+.ai-consent-sheet {
+  width:100%; max-width:480px; max-height:calc(100vh - 24px); overflow-y:auto;
+  background:#fff; border-radius:24px 24px 0 0; padding:24px 20px calc(24px + env(safe-area-inset-bottom));
+  color:var(--text-dark);
+}
+.ai-consent-icon { width:44px; height:44px; display:grid; place-items:center; border-radius:50%; background:#F8F0FF; font-size:1.35rem; margin-bottom:12px; }
+.ai-consent-sheet h2 { font-size:1.12rem; line-height:1.25; margin-bottom:8px; }
+.ai-consent-sheet p, .ai-consent-sheet li { font-size:.82rem; line-height:1.45; color:var(--text-mid); }
+.ai-consent-sheet ul { margin:8px 0 12px; padding-left:20px; }
+.ai-consent-safe { padding:10px 12px; background:#F3FFF9; border:1px solid rgba(93,201,160,.25); border-radius:8px; font-size:.76rem; line-height:1.45; color:var(--text-mid); margin-bottom:14px; }
+.ai-consent-sheet .cta-outline-btn { margin-top:8px; }
+.ai-consent-sheet > a { display:block; text-align:center; margin-top:12px; color:#6f4b87; font-size:.76rem; font-weight:700; }
 
 /* ═══════════════════════════════════════════════════════
    TRACKER / DIARY
@@ -1329,6 +1357,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   gap: 6px;
   pointer-events: none;
 }
+body[data-page="chat"] #fabSleepWrap,
+body[data-page="profile"] #fabSleepWrap { display:none; }
 #fabSleepTimer {
   background: rgba(61,44,62,.85);
   color: #fff;

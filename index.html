@@ -33,9 +33,9 @@
 })();
 </script>
 
-<link rel="stylesheet" href="style.css?v=20260720">
+<link rel="stylesheet" href="style.css?v=20260724">
 </head>
-<body>
+<body data-page="home">
 
 <!-- ═══════════════════════════════════════════════════════
      HEADER
@@ -244,7 +244,8 @@
 ═══════════════════════════════════════════════════════ -->
 <div id="page-chat" class="page">
   <div class="card">
-    <div class="section-title">Быстрые темы</div>
+    <div class="section-title chat-page-title">ИИ-помощник</div>
+    <div class="chat-topic-label">Быстрые темы</div>
     <div class="chat-topics" id="chatTopics"></div>
     <div class="chat-messages" id="chatMessages"></div>
     <div class="chat-disclaimer">Подсказки помогают с режимом и дневником, но не заменяют врача. При температуре, вялости, проблемах с дыханием или резком ухудшении обращайтесь за медицинской помощью.</div>
@@ -503,6 +504,7 @@
     <button onclick="goPage('articles',null);hapticLight()"><span>📚</span><div><strong>База знаний</strong><small>Сон, кормление и развитие</small></div><b>›</b></button>
     <button onclick="goPage('ritual',null);hapticLight()"><span>🌙</span><div><strong>Ритуал сна</strong><small>Таймер и спокойные звуки</small></div><b>›</b></button>
     <button onclick="toggleNotifications();hapticLight()"><span>🔔</span><div><strong>Напоминания</strong><small id="profileNotifStatus">Настроить в Telegram</small></div><b>›</b></button>
+    <button onclick="manageAiConsent();hapticLight()"><span>✨</span><div><strong>ИИ и данные</strong><small id="profileAiStatus">Спросим согласие перед первым вопросом</small></div><b>›</b></button>
     <button onclick="exportAllData();hapticLight()"><span>📥</span><div><strong>Скачать мои данные</strong><small>Профиль, дневник и настройки</small></div><b>›</b></button>
     <button onclick="openSupport();hapticLight()"><span>💬</span><div><strong>Поддержка</strong><small>Написать в Telegram</small></div><b>›</b></button>
     <button onclick="window.open('privacy.html','_blank','noopener');hapticLight()"><span>🔐</span><div><strong>Конфиденциальность</strong><small>Как хранятся и используются данные</small></div><b>›</b></button>
@@ -558,21 +560,38 @@
   </div>
 </div>
 
+<div id="aiConsentModal" class="ai-consent-modal" role="dialog" aria-modal="true" aria-labelledby="aiConsentTitle" style="display:none">
+  <div class="ai-consent-sheet">
+    <div class="ai-consent-icon">✨</div>
+    <h2 id="aiConsentTitle">Разрешить персональный ответ?</h2>
+    <p>Для ответа будут отправлены в OpenAI:</p>
+    <ul>
+      <li>текст вашего вопроса;</li>
+      <li>возраст малыша в месяцах;</li>
+      <li>обезличенные показатели сна за последние 14 дней.</li>
+    </ul>
+    <div class="ai-consent-safe">Имя, дата рождения, заметки и Telegram ID в запрос модели не передаются. ИИ не заменяет врача.</div>
+    <button class="save-log-btn" onclick="acceptAiConsent();hapticSuccess()">Разрешить и продолжить</button>
+    <button class="cta-outline-btn" onclick="closeAiConsent();hapticLight()">Не сейчас</button>
+    <a href="privacy.html" target="_blank" rel="noopener">Подробнее о данных</a>
+  </div>
+</div>
+
 <!-- Scripts -->
-<script src="analytics-config.js?v=20260720"></script>
-<script src="analytics.js?v=20260720"></script>
-<script src="tma.js?v=20260720"></script>
-<script src="chat.js?v=20260720"></script>
-<script src="sleep-intelligence.js?v=20260720"></script>
-<script src="baby-milestones.js?v=20260720"></script>
-<script src="tracker.js?v=20260720"></script>
-<script src="articles.js?v=20260720"></script>
-<script src="subscription.js?v=20260720"></script>
-<script src="onboarding.js?v=20260720"></script>
-<script src="reminder-planner.js?v=20260720"></script>
-<script src="notifications.js?v=20260720"></script>
-<script src="app.js?v=20260720"></script>
-<script src="premium.js?v=20260720"></script>
+<script src="analytics-config.js?v=20260724"></script>
+<script src="analytics.js?v=20260724"></script>
+<script src="tma.js?v=20260724"></script>
+<script src="chat.js?v=20260724"></script>
+<script src="sleep-intelligence.js?v=20260724"></script>
+<script src="baby-milestones.js?v=20260724"></script>
+<script src="tracker.js?v=20260724"></script>
+<script src="articles.js?v=20260724"></script>
+<script src="subscription.js?v=20260724"></script>
+<script src="onboarding.js?v=20260724"></script>
+<script src="reminder-planner.js?v=20260724"></script>
+<script src="notifications.js?v=20260724"></script>
+<script src="app.js?v=20260724"></script>
+<script src="premium.js?v=20260724"></script>
 
 <script>
 // ─── Low-end device detection ────────────────────────────────────────────────
@@ -590,6 +609,7 @@ function goPage(id, btn) {
   var page = document.getElementById('page-' + id);
   if (!page) return;
   page.classList.add('active');
+  document.body.dataset.page = id;
   if (btn) btn.classList.add('active');
   if (window.BabyAnalytics) {
     BabyAnalytics.track('page_open', { page: id });
@@ -1156,6 +1176,8 @@ function renderProfilePage() {
   }
   var notif = document.getElementById('profileNotifStatus');
   if (notif) notif.textContent = typeof isNotificationsEnabled === 'function' && isNotificationsEnabled() ? 'Включены' : 'Выключены';
+  var aiStatus = document.getElementById('profileAiStatus');
+  if (aiStatus) aiStatus.textContent = typeof hasAiConsent === 'function' && hasAiConsent() ? 'Разрешено · нажмите, чтобы отозвать' : 'Спросим согласие перед первым вопросом';
 }
 
 function saveProfileSettings() {
@@ -1187,6 +1209,7 @@ function exportAllData() {
   data.settings.notifications = localStorage.getItem('babymode_notif_enabled') || '';
   data.settings.wake_time = localStorage.getItem('babymode_wake_time') || '';
   data.settings.feed_type = localStorage.getItem('babymode_feed_type') || '';
+  data.settings.ai_consent = localStorage.getItem('babymode_ai_consent_v1') || '';
   var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json;charset=utf-8'});
   var link = document.createElement('a');
   link.href = URL.createObjectURL(blob); link.download = 'baby-mode-data.json'; link.click();

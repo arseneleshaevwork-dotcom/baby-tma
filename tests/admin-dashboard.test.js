@@ -84,6 +84,11 @@ test('builds admin totals, funnel and baby table from raw analytics rows', () =>
         created_at: '2026-06-11T10:00:00.000Z'
       }
     ],
+    aiRequests: [
+      { telegram_id: 1, status: 'completed', model: 'gpt-5.6-terra', input_tokens: 300, output_tokens: 120 },
+      { telegram_id: 1, status: 'failed', model: 'gpt-5.6-terra' },
+      { telegram_id: 2, status: 'rate_limited', model: 'gpt-5.6-terra' }
+    ],
     generatedAt: '2026-06-14T00:00:00.000Z',
     rangeDays: 30,
     now: '2026-06-14T00:00:00.000Z'
@@ -105,7 +110,11 @@ test('builds admin totals, funnel and baby table from raw analytics rows', () =>
   assert.strictEqual(dashboard.upcoming_dates[0].event_date, '2026-06-20');
   assert.strictEqual(dashboard.sources[0].campaign, 'sleep_june');
   assert.strictEqual(dashboard.sources[0].users, 1);
-  assert.strictEqual(dashboard.ai_questions[0].question, 'плохо спит ночью');
+  assert.strictEqual(dashboard.ai_usage.completed, 1);
+  assert.strictEqual(dashboard.ai_usage.failed, 1);
+  assert.strictEqual(dashboard.ai_usage.rate_limited, 1);
+  assert.strictEqual(dashboard.ai_usage.unique_users, 2);
+  assert.strictEqual(dashboard.ai_usage.input_tokens + dashboard.ai_usage.output_tokens, 420);
   assert.strictEqual(dashboard.billing.active_subscriptions, 1);
   assert.strictEqual(dashboard.billing.paid_stars, 299);
   assert.strictEqual(dashboard.billing.pending_payments, 1);

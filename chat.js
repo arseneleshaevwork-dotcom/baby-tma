@@ -206,14 +206,171 @@ function buildFallbackAnswer(q, age, name) {
   Если есть температура, вялость, проблемы с дыханием, судороги, обезвоживание или резкое ухудшение — лучше сразу связаться с педиатром.`;
 }
 
-function chatSend() {
+const AI_CONSENT_KEY = 'babymode_ai_consent_v1';
+let _chatBusy = false;
+let _consentResolve = null;
+
+function _getAiTelegramInitData() {
+  try { return window.Telegram?.WebApp?.initData || ''; }
+  catch (_) { return ''; }
+}
+
+function buildAiDiary(logs, now = new Date()) {
+  const cutoff = new Date(now.getTime() - 13 * 86400000);
+  cutoff.setHours(0, 0, 0, 0);
+  return (Array.isArray(logs) ? logs : []).filter(log => {
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(String(log?.date || '')) ? new Date(`${log.date}T12:00:00`) : null;
+    return date && !Number.isNaN(date.getTime()) && date >= cutoff && date <= now;
+  }).sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(-14).map(log => ({
+    date: log.date,
+    wake: log.wake || null,
+    bedtime: log.bed || null,
+    day_sleep_min: Math.max(0, Math.round(Number(log.dayNaps) || 0)),
+    night_sleep_min: Math.max(0, Math.round(Number(log.nightLen) || 0)),
+    night_wakings: Math.max(0, Math.round(Number(log.nightWakings) || 0)),
+    tags: Array.isArray(log.tags) ? log.tags.slice(0, 8) : []
+  }));
+}
+
+function buildAiPayload(question) {
+  const { age } = _getBabyContext();
+  return {
+    initData: _getAiTelegramInitData(),
+    consent: true,
+    question: String(question || '').trim().slice(0, 1500),
+    ageMonths: age || null,
+    diary: buildAiDiary(typeof getLogs === 'function' ? getLogs() : [])
+  };
+}
+
+function hasAiConsent() {
+  try { return localStorage.getItem(AI_CONSENT_KEY) === 'granted'; }
+  catch (_) { return false; }
+}
+
+function requestAiConsent() {
+  if (hasAiConsent()) return Promise.resolve(true);
+  const modal = document.getElementById('aiConsentModal');
+  if (!modal) return Promise.resolve(false);
+  modal.style.display = 'flex';
+  return new Promise(resolve => { _consentResolve = resolve; });
+}
+
+function acceptAiConsent() {
+  localStorage.setItem(AI_CONSENT_KEY, 'granted');
+  if (window.BabyAnalytics) BabyAnalytics.track('ai_consent_granted', { version: '2026-07-24-v1' });
+  finishAiConsent(true);
+}
+
+function closeAiConsent() {
+  if (window.BabyAnalytics) BabyAnalytics.track('ai_consent_declined', { version: '2026-07-24-v1' });
+  finishAiConsent(false);
+}
+
+function finishAiConsent(granted) {
+  const modal = document.getElementById('aiConsentModal');
+  if (modal) modal.style.display = 'none';
+  const resolve = _consentResolve;
+  _consentResolve = null;
+  if (resolve) resolve(granted);
+  if (typeof renderProfilePage === 'function') renderProfilePage();
+}
+
+async function revokeAiConsent() {
+  localStorage.removeItem(AI_CONSENT_KEY);
+  const endpoint = window.BABY_AI_ENDPOINT || '';
+  const initData = _getAiTelegramInitData();
+  if (endpoint && initData) {
+    try {
+      await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData, action: 'revoke_consent' })
+      });
+    } catch (_) {}
+  }
+  if (window.BabyAnalytics) BabyAnalytics.track('ai_consent_revoked');
+  if (typeof renderProfilePage === 'function') renderProfilePage();
+  if (typeof showToast === 'function') showToast('Согласие для ИИ-помощника отозвано');
+}
+
+function manageAiConsent() {
+  if (!hasAiConsent()) {
+    if (typeof goPage === 'function') goPage('chat', document.getElementById('bn-chat'));
+    if (typeof showToast === 'function') showToast('Согласие появится перед первым вопросом');
+    return;
+  }
+  const run = ok => { if (ok) revokeAiConsent(); };
+  const tg = window.Telegram?.WebApp;
+  if (tg && typeof tg.showConfirm === 'function') tg.showConfirm('Отозвать согласие на передачу данных ИИ-помощнику?', run);
+  else run(window.confirm('Отозвать согласие на передачу данных ИИ-помощнику?'));
+}
+
+async function chatSend() {
   const inp = document.getElementById('chatInput');
   const q = inp.value.trim();
-  if (!q) return;
-  if (window.BabyAnalytics) BabyAnalytics.track('ai_question_sent', { length: q.length, question: q.slice(0, 300) });
+  if (!q || _chatBusy) return;
+  if (q.length > 1500) { if (typeof showToast === 'function') showToast('Сократите вопрос до 1500 символов'); return; }
   addMsg(q, 'user');
   inp.value = '';
-  setTimeout(() => addMsg(findAnswer(q), 'bot'), 400);
+  const initData = _getAiTelegramInitData();
+  const endpoint = window.BABY_AI_ENDPOINT || '';
+  if (!initData || !endpoint) {
+    setTimeout(() => addMsg(findAnswer(q), 'bot'), 300);
+    return;
+  }
+
+  const consent = await requestAiConsent();
+  if (!consent) {
+    addMsg('Без согласия я не отправляю вопрос внешнему ИИ. Ниже оставляю локальную подсказку:<br><br>' + findAnswer(q), 'bot');
+    return;
+  }
+
+  _chatBusy = true;
+  setChatBusy(true);
+  const typing = addMsg('<span class="chat-typing">Готовлю ответ<span>...</span></span>', 'bot');
+  if (window.BabyAnalytics) BabyAnalytics.track('ai_question_sent', { length: q.length, diary_days: buildAiPayload(q).diary.length });
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildAiPayload(q))
+    });
+    clearTimeout(timeout);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.answer) throw Object.assign(new Error(data.error || 'request_failed'), { code: data.error, limit: data.limit });
+    typing?.remove();
+    addMsg(formatAiAnswer(data.answer, data.sources), 'bot');
+    if (window.BabyAnalytics) BabyAnalytics.track('ai_answer_received', { remaining: data.remaining });
+  } catch (error) {
+    typing?.remove();
+    const message = error?.code === 'daily_limit'
+      ? `Лимит онлайн-ответов на сегодня исчерпан (${Number(error.limit) || 6}). Я всё равно могу дать локальную подсказку:<br><br>${findAnswer(q)}`
+      : `Онлайн-помощник сейчас недоступен. Вот локальная подсказка, чтобы не оставлять вас без ответа:<br><br>${findAnswer(q)}`;
+    addMsg(message, 'bot');
+    if (window.BabyAnalytics) BabyAnalytics.track('ai_answer_failed', { reason: String(error?.code || error?.name || 'unknown').slice(0, 40) });
+  } finally {
+    _chatBusy = false;
+    setChatBusy(false);
+  }
+}
+
+function setChatBusy(busy) {
+  const button = document.getElementById('btn-chat-send');
+  const input = document.getElementById('chatInput');
+  if (button) button.disabled = busy;
+  if (input) input.disabled = busy;
+}
+
+function formatAiAnswer(answer, sources) {
+  const text = escapeHtml(String(answer || '')).replace(/\n/g, '<br>');
+  const validSources = (Array.isArray(sources) ? sources : []).filter(source => /^https:\/\//.test(String(source?.url || ''))).slice(0, 3);
+  if (!validSources.length) return text;
+  const links = validSources.map(source => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label || 'Источник')}</a>`).join('');
+  return `${text}<div class="chat-sources"><strong>Проверенные источники</strong>${links}</div>`;
 }
 
 function chatTopic(t) {
@@ -232,6 +389,7 @@ function addMsg(text, role) {
   else div.innerHTML = text;
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
+  return div;
 }
 
 function chatKeydown(e) {
@@ -251,7 +409,7 @@ function initChat() {
     : age
     ? `Мне известно, что малышу ${age} мес. `
     : '';
-  addMsg(`Привет! 👋 Я помогу с режимом малыша: сон, кормление, плач, скачки развития, уход и вечерний ритуал. ${babyInfo}<br><br>Можно спросить, почему малыш долго засыпает, часто просыпается ночью, сколько должен спать в вашем возрасте или как мягко наладить день. <strong>Если вести дневник 3+ дня, я буду отвечать с учётом ваших записей.</strong>`, 'bot');
+  addMsg(`Привет! Я ИИ-помощник «Режима малыша». Помогу разобрать сон, кормление, плач, развитие, уход и записи дневника. ${babyInfo}<br><br>Опишите ситуацию своими словами, например: «6 месяцев, ночью просыпается каждый час, а днём спит три раза». Я предложу спокойный план действий и отмечу, когда лучше обратиться к врачу. <strong>Перед первым онлайн-ответом я покажу, какие данные будут переданы.</strong>`, 'bot');
 }
 
 let _topicsInited = false;
@@ -269,6 +427,8 @@ function initTopics(container) {
 if (typeof module !== 'undefined') {
   module.exports = {
     findAnswer,
-    normalizeQuestion
+    normalizeQuestion,
+    buildAiDiary,
+    buildAiPayload
   };
 }

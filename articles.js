@@ -438,7 +438,7 @@ const ARTICLE_SOURCES = {
     { label: 'CDC: приготовление смеси', url: 'https://www.cdc.gov/infant-toddler-nutrition/formula-feeding/preparation-and-storage.html' }
   ],
   development: [
-    { label: 'NHS: температура у детей', url: 'https://www.nhs.uk/conditions/fever-in-children/' },
+    { label: 'NHS: температура у детей', url: 'https://www.nhs.uk/symptoms/fever-in-children/' },
     { label: 'AAP: безопасный сон', url: 'https://www.healthychildren.org/English/ages-stages/baby/sleep/Pages/A-Parents-Guide-to-Safe-Sleep.aspx' }
   ]
 };
