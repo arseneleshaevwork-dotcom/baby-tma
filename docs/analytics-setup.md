@@ -66,6 +66,20 @@ curl "https://api.telegram.org/bot<telegram_bot_token>/setWebhook?url=https://jf
 
 Do not commit Telegram bot tokens to the repository.
 
+## Baby Agent
+
+The AI function verifies Telegram `initData`, applies consent and daily limits, then calls the isolated Baby Agent over a signed server-to-server request. Do not put the shared secret in frontend files.
+
+```bash
+supabase secrets set \
+  BABY_AGENT_URL='https://<agent-host>/baby-agent/v1/answer' \
+  BABY_AGENT_SHARED_SECRET='<same-64-char-secret-as-agent>' \
+  --project-ref jfyprwisnrubhhowipdm
+supabase functions deploy ai-assistant --project-ref jfyprwisnrubhhowipdm
+```
+
+The application sends only age and the approved 14-day sleep fields. Raw questions and diary rows are not stored in `ai_requests`; the table contains operational metadata and optional `helpful` / `not_helpful` feedback only.
+
 ## Telegram Stars subscriptions
 
 Premium payments use Telegram Stars:

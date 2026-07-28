@@ -688,6 +688,11 @@ body[data-page="profile"] #page-profile { padding-top:16px; }
 .chat-sources { display:grid; gap:5px; margin-top:10px; padding-top:9px; border-top:1px solid var(--border-soft); }
 .chat-sources strong { font-size:.7rem; text-transform:uppercase; color:var(--text-hint) !important; }
 .chat-sources a { color:#6f4b87; font-size:.76rem; font-weight:700; overflow-wrap:anywhere; }
+.chat-feedback { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:10px; padding-top:9px; border-top:1px solid var(--border-soft); color:var(--text-hint); font-size:.72rem; font-weight:800; }
+.chat-feedback > div { display:flex; gap:6px; }
+.chat-feedback button { min-height:30px; padding:5px 9px; border:1px solid var(--border); border-radius:6px; background:var(--white); color:var(--text-mid); font:700 .7rem 'Nunito',inherit; cursor:pointer; }
+.chat-feedback button:active { background:var(--cream); }
+.chat-feedback button:disabled { opacity:.5; cursor:default; }
 
 .ai-consent-modal {
   position:fixed; inset:0; z-index:10020; align-items:flex-end; justify-content:center;

@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { findAnswer, buildAiDiary } = require('../chat');
+const { findAnswer, buildAiDiary, formatAiAnswer } = require('../chat');
 
 global.localStorage = {
   getItem(key) {
@@ -58,4 +58,13 @@ test('AI diary payload contains only approved fields from the last 14 days', () 
   ]);
   assert.ok(!JSON.stringify(diary).includes('private note'));
   assert.ok(!JSON.stringify(diary).includes('Миша'));
+});
+
+test('online AI answer escapes content and adds feedback only for a valid request id', () => {
+  const html = formatAiAnswer('<script>alert(1)</script>', [{ label: 'Источник', url: 'https://example.com' }], '123e4567-e89b-12d3-a456-426614174000');
+  assert.ok(!html.includes('<script>'));
+  assert.match(html, /&lt;script&gt;/);
+  assert.match(html, /chat-feedback/);
+  assert.match(html, /noopener noreferrer/);
+  assert.ok(!formatAiAnswer('Ответ', [], 'bad-id').includes('chat-feedback'));
 });

@@ -343,8 +343,8 @@ async function chatSend() {
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.answer) throw Object.assign(new Error(data.error || 'request_failed'), { code: data.error, limit: data.limit });
     typing?.remove();
-    addMsg(formatAiAnswer(data.answer, data.sources), 'bot');
-    if (window.BabyAnalytics) BabyAnalytics.track('ai_answer_received', { remaining: data.remaining });
+    addMsg(formatAiAnswer(data.answer, data.sources, data.request_id), 'bot');
+    if (window.BabyAnalytics) BabyAnalytics.track('ai_answer_received', { remaining: data.remaining, mode: data.mode || 'unknown' });
   } catch (error) {
     typing?.remove();
     const message = error?.code === 'daily_limit'
@@ -365,12 +365,36 @@ function setChatBusy(busy) {
   if (input) input.disabled = busy;
 }
 
-function formatAiAnswer(answer, sources) {
+function formatAiAnswer(answer, sources, requestId) {
   const text = escapeHtml(String(answer || '')).replace(/\n/g, '<br>');
   const validSources = (Array.isArray(sources) ? sources : []).filter(source => /^https:\/\//.test(String(source?.url || ''))).slice(0, 3);
-  if (!validSources.length) return text;
-  const links = validSources.map(source => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label || 'Источник')}</a>`).join('');
-  return `${text}<div class="chat-sources"><strong>Проверенные источники</strong>${links}</div>`;
+  const links = validSources.length
+    ? `<div class="chat-sources"><strong>Проверенные источники</strong>${validSources.map(source => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label || 'Источник')}</a>`).join('')}</div>`
+    : '';
+  const safeRequestId = /^[0-9a-f-]{36}$/i.test(String(requestId || '')) ? String(requestId) : '';
+  const feedback = safeRequestId
+    ? `<div class="chat-feedback" data-request-id="${safeRequestId}"><span>Ответ помог?</span><div><button type="button" onclick="sendAiFeedback('${safeRequestId}','helpful',this)">Полезно</button><button type="button" onclick="sendAiFeedback('${safeRequestId}','not_helpful',this)">Не помогло</button></div></div>`
+    : '';
+  return `${text}${links}${feedback}`;
+}
+
+async function sendAiFeedback(requestId, rating, button) {
+  const group = button?.closest('.chat-feedback');
+  if (!group || !/^[0-9a-f-]{36}$/i.test(String(requestId || '')) || !['helpful', 'not_helpful'].includes(rating)) return;
+  group.querySelectorAll('button').forEach(item => { item.disabled = true; });
+  try {
+    const response = await fetch(window.BABY_AI_ENDPOINT || '', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initData: _getAiTelegramInitData(), action: 'feedback', requestId, rating })
+    });
+    if (!response.ok) throw new Error('feedback_failed');
+    group.innerHTML = '<span>Спасибо, это поможет улучшить ответы.</span>';
+    if (window.BabyAnalytics) BabyAnalytics.track('ai_feedback', { rating });
+  } catch (_) {
+    group.querySelectorAll('button').forEach(item => { item.disabled = false; });
+    if (typeof showToast === 'function') showToast('Не удалось сохранить оценку');
+  }
 }
 
 function chatTopic(t) {
@@ -429,6 +453,7 @@ if (typeof module !== 'undefined') {
     findAnswer,
     normalizeQuestion,
     buildAiDiary,
-    buildAiPayload
+    buildAiPayload,
+    formatAiAnswer
   };
 }

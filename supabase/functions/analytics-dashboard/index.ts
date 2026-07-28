@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       .limit(1000),
     supabase
       .from('ai_requests')
-      .select('telegram_id,status,model,input_tokens,output_tokens,created_at')
+      .select('telegram_id,status,model,mode,feedback,input_tokens,output_tokens,created_at')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(5000)
@@ -177,6 +177,7 @@ function buildDashboard({ events, babies, subscriptions = [], payments = [], aiR
 
 function buildAiUsage(requests: any[] = []) {
   const completed = requests.filter(item => item.status === 'completed');
+  const rated = completed.filter(item => item.feedback);
   return {
     requests: requests.length,
     completed: completed.length,
@@ -185,7 +186,12 @@ function buildAiUsage(requests: any[] = []) {
     unique_users: new Set(requests.map(item => item.telegram_id).filter(Boolean)).size,
     input_tokens: completed.reduce((sum, item) => sum + Number(item.input_tokens || 0), 0),
     output_tokens: completed.reduce((sum, item) => sum + Number(item.output_tokens || 0), 0),
-    model: completed.find(item => item.model)?.model || requests.find(item => item.model)?.model || ''
+    model: completed.find(item => item.model)?.model || requests.find(item => item.model)?.model || '',
+    knowledge_answers: completed.filter(item => item.mode === 'knowledge').length,
+    model_answers: completed.filter(item => item.mode === 'model').length,
+    feedback_total: rated.length,
+    helpful: rated.filter(item => item.feedback === 'helpful').length,
+    not_helpful: rated.filter(item => item.feedback === 'not_helpful').length
   };
 }
 

@@ -582,9 +582,14 @@
     }
 
     function renderAiUsage(usage) {
+      const helpfulShare = Number(usage.feedback_total) > 0
+        ? Math.round(Number(usage.helpful || 0) / Number(usage.feedback_total) * 100)
+        : 0;
       const cards = [
         ['Успешные ответы', number(usage.completed), `${number(usage.unique_users)} пользователей`],
         ['Ошибки', number(usage.failed), 'сбои модели или сети'],
+        ['Полезность', `${number(helpfulShare)}%`, `${number(usage.helpful)} из ${number(usage.feedback_total)} оценок`],
+        ['Режим ответов', `${number(usage.knowledge_answers)} / ${number(usage.model_answers)}`, 'база знаний / модель'],
         ['Достигли лимита', number(usage.rate_limited), 'запросы сверх дневного лимита'],
         ['Токены', number(Number(usage.input_tokens || 0) + Number(usage.output_tokens || 0)), usage.model || 'модель не настроена']
       ];
