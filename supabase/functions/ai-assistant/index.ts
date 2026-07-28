@@ -120,6 +120,7 @@ Deno.serve(async req => {
     return json({ ok: false, error: 'daily_limit', limit: dailyLimit }, 429, corsHeaders);
   }
 
+  const startedAt = performance.now();
   try {
     const agentBody = JSON.stringify({
       session_id: await pseudonymousSessionId(telegramId, agentSecret),
@@ -149,6 +150,7 @@ Deno.serve(async req => {
       status: 'completed',
       model: String(result?.model || (result?.mode === 'knowledge' ? 'baby-knowledge' : AGENT_NAME)).slice(0, 120),
       mode: String(result?.mode || 'unknown').slice(0, 40),
+      latency_ms: Math.max(0, Math.round(performance.now() - startedAt)),
       input_tokens: Number(result?.usage?.input_tokens) || null,
       output_tokens: Number(result?.usage?.output_tokens) || null
     });
@@ -161,7 +163,11 @@ Deno.serve(async req => {
       remaining: Math.max(0, dailyLimit - (activeCount || 1))
     }, 200, corsHeaders);
   } catch (error) {
-    await updateRequest(supabase, requestLog?.id, { status: 'failed', mode: 'unavailable' });
+    await updateRequest(supabase, requestLog?.id, {
+      status: 'failed',
+      mode: 'unavailable',
+      latency_ms: Math.max(0, Math.round(performance.now() - startedAt))
+    });
     console.error('Baby Agent request failed', error instanceof Error ? error.message : 'unknown');
     return json({ ok: false, error: 'ai_unavailable' }, 502, corsHeaders);
   }

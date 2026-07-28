@@ -127,6 +127,7 @@ create table if not exists public.ai_requests (
   output_tokens integer,
   feedback text check (feedback in ('helpful', 'not_helpful')),
   feedback_at timestamptz,
+  latency_ms integer check (latency_ms >= 0),
   created_at timestamptz not null default now()
 );
 

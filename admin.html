@@ -590,6 +590,8 @@
         ['Ошибки', number(usage.failed), 'сбои модели или сети'],
         ['Полезность', `${number(helpfulShare)}%`, `${number(usage.helpful)} из ${number(usage.feedback_total)} оценок`],
         ['Режим ответов', `${number(usage.knowledge_answers)} / ${number(usage.model_answers)}`, 'база знаний / модель'],
+        ['Скорость p95', `${number(Math.round(Number(usage.p95_latency_ms || 0) / 100) / 10)} сек`, `среднее ${number(Math.round(Number(usage.average_latency_ms || 0) / 100) / 10)} сек`],
+        ['Доля ошибок', `${number(usage.error_rate)}%`, 'от всех запросов за период'],
         ['Достигли лимита', number(usage.rate_limited), 'запросы сверх дневного лимита'],
         ['Токены', number(Number(usage.input_tokens || 0) + Number(usage.output_tokens || 0)), usage.model || 'модель не настроена']
       ];

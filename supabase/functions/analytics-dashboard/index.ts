@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       .limit(1000),
     supabase
       .from('ai_requests')
-      .select('telegram_id,status,model,mode,feedback,input_tokens,output_tokens,created_at')
+      .select('telegram_id,status,model,mode,feedback,latency_ms,input_tokens,output_tokens,created_at')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(5000)
@@ -178,10 +178,12 @@ function buildDashboard({ events, babies, subscriptions = [], payments = [], aiR
 function buildAiUsage(requests: any[] = []) {
   const completed = requests.filter(item => item.status === 'completed');
   const rated = completed.filter(item => item.feedback);
+  const latencies = completed.map(item => Number(item.latency_ms)).filter(Number.isFinite).sort((a, b) => a - b);
+  const failures = requests.filter(item => item.status === 'failed').length;
   return {
     requests: requests.length,
     completed: completed.length,
-    failed: requests.filter(item => item.status === 'failed').length,
+    failed: failures,
     rate_limited: requests.filter(item => item.status === 'rate_limited').length,
     unique_users: new Set(requests.map(item => item.telegram_id).filter(Boolean)).size,
     input_tokens: completed.reduce((sum, item) => sum + Number(item.input_tokens || 0), 0),
@@ -191,8 +193,16 @@ function buildAiUsage(requests: any[] = []) {
     model_answers: completed.filter(item => item.mode === 'model').length,
     feedback_total: rated.length,
     helpful: rated.filter(item => item.feedback === 'helpful').length,
-    not_helpful: rated.filter(item => item.feedback === 'not_helpful').length
+    not_helpful: rated.filter(item => item.feedback === 'not_helpful').length,
+    average_latency_ms: latencies.length ? Math.round(latencies.reduce((sum, value) => sum + value, 0) / latencies.length) : 0,
+    p95_latency_ms: percentile95(latencies),
+    error_rate: requests.length ? Math.round(failures / requests.length * 1000) / 10 : 0
   };
+}
+
+function percentile95(values: number[]) {
+  if (!values.length) return 0;
+  return values[Math.min(values.length - 1, Math.ceil(values.length * 0.95) - 1)];
 }
 
 function buildBilling({ subscriptions = [], payments = [] }: { subscriptions?: any[]; payments?: any[] } = {}) {

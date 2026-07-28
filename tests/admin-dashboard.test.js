@@ -85,7 +85,7 @@ test('builds admin totals, funnel and baby table from raw analytics rows', () =>
       }
     ],
     aiRequests: [
-      { telegram_id: 1, status: 'completed', model: 'baby-knowledge', mode: 'knowledge', feedback: 'helpful', input_tokens: 300, output_tokens: 120 },
+      { telegram_id: 1, status: 'completed', model: 'baby-knowledge', mode: 'knowledge', feedback: 'helpful', latency_ms: 1200, input_tokens: 300, output_tokens: 120 },
       { telegram_id: 1, status: 'failed', model: 'gpt-5.6-terra' },
       { telegram_id: 2, status: 'rate_limited', model: 'gpt-5.6-terra' }
     ],
@@ -118,6 +118,8 @@ test('builds admin totals, funnel and baby table from raw analytics rows', () =>
   assert.strictEqual(dashboard.ai_usage.knowledge_answers, 1);
   assert.strictEqual(dashboard.ai_usage.helpful, 1);
   assert.strictEqual(dashboard.ai_usage.feedback_total, 1);
+  assert.strictEqual(dashboard.ai_usage.p95_latency_ms, 1200);
+  assert.strictEqual(dashboard.ai_usage.error_rate, 33.3);
   assert.strictEqual(dashboard.billing.active_subscriptions, 1);
   assert.strictEqual(dashboard.billing.paid_stars, 299);
   assert.strictEqual(dashboard.billing.pending_payments, 1);
