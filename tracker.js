@@ -3,6 +3,7 @@
 
 const TRACKER_KEY = 'babymode_logs';
 const QUICK_SLEEP_KEY = 'babymode_quick_sleep_start';
+const LAST_DIARY_MUTATION_KEY = 'babymode_last_diary_mutation_v1';
 let trackerPeriod = 'week';
 let moodSel = '😊';
 let trackerChartInst = null;
@@ -23,6 +24,42 @@ function getLogs() {
   try { return JSON.parse(localStorage.getItem(TRACKER_KEY) || '[]'); } catch(e) { return []; }
 }
 function saveLogs(logs) { localStorage.setItem(TRACKER_KEY, JSON.stringify(logs)); }
+
+function rememberDiaryMutation(logs, label) {
+  localStorage.setItem(LAST_DIARY_MUTATION_KEY, JSON.stringify({
+    at: Date.now(),
+    label: String(label || 'изменение'),
+    logs: Array.isArray(logs) ? logs : []
+  }));
+}
+
+function getDiaryUndoState(now = Date.now()) {
+  try {
+    const state = JSON.parse(localStorage.getItem(LAST_DIARY_MUTATION_KEY) || 'null');
+    if (!state || !Array.isArray(state.logs) || !Number.isFinite(state.at)) return null;
+    return now - state.at <= 30 * 60000 ? state : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function renderUndoDiaryButton() {
+  const button = document.getElementById('undoDiaryBtn');
+  if (!button) return;
+  const state = getDiaryUndoState();
+  button.style.display = state ? 'block' : 'none';
+  if (state) button.textContent = `↶ Отменить: ${state.label}`;
+}
+
+function undoLastDiaryAction() {
+  const state = getDiaryUndoState();
+  if (!state) { localStorage.removeItem(LAST_DIARY_MUTATION_KEY); renderUndoDiaryButton(); showToast('Отменять уже нечего'); return; }
+  saveLogs(state.logs);
+  localStorage.removeItem(LAST_DIARY_MUTATION_KEY);
+  renderTracker();
+  if (typeof renderTodayPlan === 'function') renderTodayPlan();
+  showToast('Последнее действие отменено');
+}
 
 function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -140,6 +177,10 @@ function getOrCreateTodayLog(logs) {
 }
 
 function startQuickSleep() {
+  if (parseInt(localStorage.getItem(QUICK_SLEEP_KEY) || '0')) {
+    showToast('Сон уже идёт');
+    return;
+  }
   localStorage.setItem(QUICK_SLEEP_KEY, String(Date.now()));
   if (window.BabyAnalytics) BabyAnalytics.track('sleep_started');
   renderQuickSleepControls();
@@ -156,6 +197,7 @@ function finishQuickSleep() {
   const dur = Math.max(1, Math.round((end - start) / 60000));
   const kind = classifySleepEvent(start, end, dur);
   const logs = getLogs();
+  rememberDiaryMutation(logs, 'запись сна');
   const log = getOrCreateLogForDate(logs, localDateKey(start), {
     bed: hm(start), wake: hm(end)
   });
@@ -183,11 +225,13 @@ function finishQuickSleep() {
   renderQuickSleepControls();
   if (typeof _updateFab === 'function') _updateFab();
   renderTracker();
+  if (typeof renderTodayPlan === 'function') renderTodayPlan();
   showToast(`${kind === 'night' ? '🌙 Ночной сон' : '🌤 Дневной сон'} записан: ${dur} мин`);
 }
 
 function quickSleepTag(tag) {
   const logs = getLogs();
+  rememberDiaryMutation(logs, tag === 'night_wake' ? 'ночное пробуждение' : 'отметку дня');
   const log = getOrCreateTodayLog(logs);
   if (tag === 'night_wake') {
     log.nightWakings = (log.nightWakings || 0) + 1;
@@ -200,9 +244,11 @@ function quickSleepTag(tag) {
   saveLogs(logs);
   if (window.BabyAnalytics) BabyAnalytics.track('quick_tag_added', { tag });
   renderTracker();
+  if (typeof renderTodayPlan === 'function') renderTodayPlan();
 }
 
 function renderQuickSleepControls() {
+  renderUndoDiaryButton();
   const status = document.getElementById('quickSleepStatus');
   const timer = document.getElementById('quickSleepTimer');
   if (!status || !timer) return;
@@ -263,6 +309,7 @@ function saveLog() {
 
   const today = localDateKey();
   const logs = getLogs();
+  rememberDiaryMutation(logs, 'сохранение дня');
   const existing = logs.find(l => l.date === today) || {};
   const log = mergeManualLog(existing, {
     date: today, wake, bed,
@@ -289,6 +336,7 @@ function saveLog() {
   showToast('✅ День сохранён!');
   if (typeof hapticSuccess === 'function') hapticSuccess();
   renderTracker();
+  if (typeof renderTodayPlan === 'function') renderTodayPlan();
 
   // Check if we have 3+ days to run analysis
   const allLogs = getLogs();
@@ -336,6 +384,9 @@ function renderAnalysis(suggestions, summary) {
     ? SleepIntel.buildTomorrowPlan(summary, age, _getTomorrowPlanContext())
     : null;
   const calendar = typeof SleepIntel !== 'undefined' ? SleepIntel.getSleepCalendar(age) : [];
+  const weekly = window.BabyCoach && typeof SleepIntel !== 'undefined'
+    ? BabyCoach.buildWeeklyReview(getLogs(), age, SleepIntel)
+    : null;
 
   block.innerHTML = `
     <div class="analysis-header">
@@ -354,6 +405,7 @@ function renderAnalysis(suggestions, summary) {
         </div>
       </div>
     ` : ''}
+    ${weekly ? renderWeeklyReview(weekly) : ''}
     ${calendar.length ? renderSleepCalendar(calendar) : ''}
     ${plan ? renderTomorrowPlan(plan) : ''}
     ${suggestions.map(s => `
@@ -372,6 +424,27 @@ function renderAnalysis(suggestions, summary) {
     `).join('')}
   `;
   block.style.display = 'block';
+}
+
+function renderWeeklyReview(review) {
+  return `
+    <div class="weekly-review-card">
+      <div class="weekly-review-head"><span>Итог периода</span><strong>${review.title}</strong></div>
+      <div class="weekly-review-trend">${review.trend}</div>
+      <div class="weekly-review-stats">
+        <span><strong>${review.night}</strong> ночью</span>
+        <span><strong>${review.day}</strong> днём</span>
+        <span><strong>${review.sleepDebt}</strong> недосып</span>
+      </div>
+      <div class="weekly-review-focus"><small>Главный фокус</small><strong>${review.focus}</strong><p>${review.reason}</p></div>
+      <button onclick="openWeeklyReviewInChat();hapticLight()">Обсудить итог с помощником</button>
+    </div>`;
+}
+
+function openWeeklyReviewInChat() {
+  if (window.BabyAnalytics) BabyAnalytics.track('weekly_review_opened', { source: 'diary' });
+  if (typeof goPage === 'function') goPage('chat', document.getElementById('bn-chat'));
+  if (typeof chatQuickAction === 'function') setTimeout(() => chatQuickAction('weekly'), 100);
 }
 
 function renderSleepCalendar(calendar) {
@@ -467,7 +540,7 @@ function renderAnalysisLocked(logs, age) {
     <div class="analysis-card analysis-info">
       <div class="analysis-card-header">
         <span>🌙</span>
-        <strong>${summary && summary.sleepDebt ? 'Вижу признаки недосыпа' : 'Готов анализ режима'}</strong>
+        <strong>${summary && summary.sleepDebt ? 'Вижу признаки недосыпа' : 'Закономерность найдена'}</strong>
       </div>
       <p>${summary && summary.sleepDebt
         ? `По последним записям накопилось около ${(summary.sleepDebt / 60).toFixed(1)}ч недосыпа. Premium покажет причину, календарь скачков и план на завтра.`
@@ -504,6 +577,179 @@ function shareLog() {
   }
 
   openFamilyReportModal();
+}
+
+function buildPdfReportModel(logs, options = {}) {
+  const days = Math.min(30, Math.max(1, Number(options.days) || 7));
+  const recent = (Array.isArray(logs) ? logs : [])
+    .slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
+    .slice(-days);
+  const average = key => recent.length
+    ? Math.round(recent.reduce((sum, log) => sum + Math.max(0, Number(log[key]) || 0), 0) / recent.length)
+    : 0;
+  return {
+    days,
+    babyName: String(options.babyName || '').trim().slice(0, 40),
+    age: Math.max(0, Number(options.age) || 0),
+    generatedAt: options.generatedAt || new Date().toISOString(),
+    avgNight: average('nightLen'),
+    avgDay: average('dayNaps'),
+    avgTotal: average('nightLen') + average('dayNaps'),
+    rows: recent.map(log => ({
+      date: String(log.date || ''),
+      wake: String(log.wake || '—'),
+      bed: String(log.bed || '—'),
+      nightMin: Math.max(0, Number(log.nightLen) || 0),
+      dayMin: Math.max(0, Number(log.dayNaps) || 0),
+      nightWakings: Math.max(0, Number(log.nightWakings) || 0),
+      tags: Array.isArray(log.tags) ? log.tags.slice(0, 3) : []
+    }))
+  };
+}
+
+function openPdfReportMenu() {
+  const logs = getLogs();
+  if (!logs.length) { showToast('Нет данных для отчёта'); return; }
+  if (typeof SUB !== 'undefined' && !SUB.can('shareCard')) {
+    SUB.requirePremium('shareCard', function(){});
+    return;
+  }
+  let modal = document.getElementById('pdfReportModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'pdfReportModal';
+    document.body.appendChild(modal);
+  }
+  modal.className = 'family-report-modal show';
+  modal.innerHTML = `
+    <div class="frm-sheet pdf-report-sheet">
+      <div class="frm-handle"></div>
+      <div class="frm-title">PDF-отчёт о сне</div>
+      <div class="frm-sub">Удобно сохранить себе или отправить консультанту</div>
+      <div class="pdf-periods">
+        <button onclick="exportPdfReport(7)"><strong>7 дней</strong><span>Короткий итог</span></button>
+        <button onclick="exportPdfReport(14)"><strong>14 дней</strong><span>Для анализа</span></button>
+        <button onclick="exportPdfReport(30)"><strong>30 дней</strong><span>Полная динамика</span></button>
+      </div>
+      <button class="cta-outline-btn" onclick="closePdfReportMenu();hapticLight()">Закрыть</button>
+    </div>`;
+}
+
+function closePdfReportMenu() {
+  document.getElementById('pdfReportModal')?.classList.remove('show');
+}
+
+async function exportPdfReport(days) {
+  closePdfReportMenu();
+  const model = buildPdfReportModel(getLogs(), {
+    days,
+    babyName: localStorage.getItem('babymode_baby_name') || '',
+    age: parseInt(localStorage.getItem('babymode_last_age') || '0')
+  });
+  if (!model.rows.length) { showToast('Нет данных для отчёта'); return; }
+  showToast('Готовлю PDF...');
+  try {
+    const jsPDF = await loadJsPdf();
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+    const rowsPerPage = 8;
+    const pages = Math.max(1, Math.ceil(model.rows.length / rowsPerPage));
+    for (let page = 0; page < pages; page++) {
+      if (page) doc.addPage();
+      const rows = model.rows.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+      const canvas = drawPdfReportPage(model, rows, page + 1, pages);
+      doc.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+    }
+    doc.save(`rezhim-malysha-${localDateKey()}.pdf`);
+    if (window.BabyAnalytics) BabyAnalytics.track('pdf_report_exported', { days: model.rows.length });
+    showToast('PDF-отчёт готов');
+  } catch (error) {
+    console.error('PDF export failed:', error);
+    showToast('Не удалось создать PDF. Попробуйте ещё раз при стабильном интернете.');
+  }
+}
+
+function loadJsPdf() {
+  if (window.jspdf?.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-jspdf-loader]');
+    if (existing) {
+      existing.addEventListener('load', () => resolve(window.jspdf.jsPDF), { once: true });
+      existing.addEventListener('error', reject, { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.dataset.jspdfLoader = '1';
+    script.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+    script.onload = () => window.jspdf?.jsPDF ? resolve(window.jspdf.jsPDF) : reject(new Error('jspdf_missing'));
+    script.onerror = () => reject(new Error('jspdf_load_failed'));
+    document.head.appendChild(script);
+  });
+}
+
+function drawPdfReportPage(model, rows, page, pages) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1240;
+  canvas.height = 1754;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fffaf7';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#3d2c3e';
+  ctx.font = '800 54px Arial, sans-serif';
+  ctx.fillText('Режим малыша', 84, 105);
+  ctx.fillStyle = '#8d758f';
+  ctx.font = '28px Arial, sans-serif';
+  const child = model.babyName ? `${model.babyName}${model.age ? ` · ${model.age} мес.` : ''}` : (model.age ? `${model.age} мес.` : 'Дневник сна');
+  ctx.fillText(`${child} · отчёт за ${model.rows.length} дн.`, 84, 150);
+  ctx.textAlign = 'right';
+  ctx.fillText(`${page}/${pages}`, 1156, 110);
+  ctx.textAlign = 'left';
+
+  const metrics = [
+    ['Ночной сон', formatReportDuration(model.avgNight)],
+    ['Дневной сон', formatReportDuration(model.avgDay)],
+    ['Всего', formatReportDuration(model.avgTotal)]
+  ];
+  metrics.forEach((metric, index) => {
+    const x = 84 + index * 362;
+    ctx.fillStyle = index === 0 ? '#f1e8ff' : index === 1 ? '#e3f7ef' : '#ffe9df';
+    ctx.fillRect(x, 205, 330, 150);
+    ctx.fillStyle = '#756276';
+    ctx.font = '24px Arial, sans-serif';
+    ctx.fillText(metric[0], x + 24, 250);
+    ctx.fillStyle = '#3d2c3e';
+    ctx.font = '800 40px Arial, sans-serif';
+    ctx.fillText(metric[1], x + 24, 314);
+  });
+
+  ctx.fillStyle = '#3d2c3e';
+  ctx.font = '800 34px Arial, sans-serif';
+  ctx.fillText('Записи дневника', 84, 430);
+  rows.forEach((row, index) => {
+    const y = 470 + index * 140;
+    ctx.fillStyle = index % 2 ? '#ffffff' : '#f8f3f8';
+    ctx.fillRect(84, y, 1072, 112);
+    ctx.fillStyle = '#3d2c3e';
+    ctx.font = '800 27px Arial, sans-serif';
+    ctx.fillText(new Date(row.date + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }), 108, y + 42);
+    ctx.fillStyle = '#756276';
+    ctx.font = '24px Arial, sans-serif';
+    ctx.fillText(`Подъём ${row.wake} · ночь ${formatReportDuration(row.nightMin)} · день ${formatReportDuration(row.dayMin)} · сон ${row.bed}`, 108, y + 82);
+    if (row.nightWakings) {
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#b45d64';
+      ctx.fillText(`Пробуждений: ${row.nightWakings}`, 1128, y + 42);
+      ctx.textAlign = 'left';
+    }
+  });
+  ctx.fillStyle = '#8d758f';
+  ctx.font = '22px Arial, sans-serif';
+  ctx.fillText('Ориентиры не заменяют консультацию врача. Важны самочувствие и индивидуальные потребности ребёнка.', 84, 1670);
+  return canvas;
+}
+
+function formatReportDuration(minutes) {
+  const value = Math.max(0, Math.round(Number(minutes) || 0));
+  return `${Math.floor(value / 60)} ч ${value % 60} мин`;
 }
 
 function openFamilyReportModal() {
@@ -763,6 +1009,7 @@ function exportLog() {
 
 if (typeof module !== 'undefined') {
   module.exports = {
+    buildPdfReportModel,
     calcDayNaps,
     calcDuration,
     calcNightLen,

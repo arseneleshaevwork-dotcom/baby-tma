@@ -150,6 +150,7 @@ function getSituationAdjustment(situation){
 
 function renderSchedule(blocks,daySegs,p){
   window._lastBlocks=blocks;
+  persistTodaySchedule(blocks);
   const age=_age,minWW=MIN_WW[Object.keys(MIN_WW).map(Number).filter(k=>k<=age).pop()]||40;
 
   // Status: check if each nap's wake window is within limits
@@ -233,6 +234,26 @@ function renderSchedule(blocks,daySegs,p){
     }, 200);
     setTimeout(function(){ clearInterval(_chartRetry); }, 5000);
   }
+}
+
+function persistTodaySchedule(blocks){
+  try {
+    const now=new Date();
+    const date=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const safeBlocks=(Array.isArray(blocks)?blocks:[]).slice(0,40).map(block=>({
+      time:String(block.time||'').slice(0,5),
+      tag:String(block.tag||'active').slice(0,20),
+      title:String(block.title||'').slice(0,120),
+      note:String(block.note||'').slice(0,240)
+    }));
+    window._lastBlocksDate=date;
+    localStorage.setItem('babymode_today_schedule_v1',JSON.stringify({
+      date,
+      created_at:new Date().toISOString(),
+      age_months:_age,
+      blocks:safeBlocks
+    }));
+  } catch(e) {}
 }
 
 function renderStatCharts(p,daySegs){

@@ -33,7 +33,7 @@
 })();
 </script>
 
-<link rel="stylesheet" href="style.css?v=20260729-1">
+<link rel="stylesheet" href="style.css?v=20260729-2">
 </head>
 <body data-page="home">
 
@@ -61,7 +61,8 @@
     <div class="today-kicker">Сегодня</div>
     <div class="today-title" id="todayMainTitle">Соберите спокойный режим дня</div>
     <div class="today-sub" id="todayMainSub">Возраст, подъем и тип дня уже достаточно, чтобы получить первый план.</div>
-    <button class="gen-btn today-primary" id="btn-generate" onclick="generateAndSwitch()">✨ Собрать режим на сегодня</button>
+    <div class="today-reason" id="todayMainReason" style="display:none"></div>
+    <button class="gen-btn today-primary" id="btn-generate" onclick="handleHomePrimaryAction()">✨ Собрать режим на сегодня</button>
     <div class="today-actions">
       <button onclick="goPage('tracker',document.getElementById('bn-tracker'));hapticLight()">😴 Записать сон</button>
       <button onclick="goPage('chat',document.getElementById('bn-chat'));hapticLight()">💬 Спросить помощника</button>
@@ -152,6 +153,8 @@
 
   <!-- ─── SMART HOME CARD: Что сейчас с малышом ──────────── -->
   <div class="card home-insight-card" id="homeInsightCard" style="display:none">
+    <div class="hic-coach" id="hicCoach"></div>
+
     <!-- baby status pill -->
     <div class="hic-status" id="hicStatus"></div>
 
@@ -245,6 +248,8 @@
 <div id="page-chat" class="page">
   <div class="card">
     <div class="section-title chat-page-title">ИИ-помощник</div>
+    <div class="chat-topic-label">По вашему режиму</div>
+    <div class="chat-quick-actions" id="chatQuickActions"></div>
     <div class="chat-topic-label">Быстрые темы</div>
     <div class="chat-topics" id="chatTopics"></div>
     <div class="chat-messages" id="chatMessages"></div>
@@ -280,6 +285,7 @@
         <button onclick="quickSleepTag('night_wake');hapticLight()">🌙 Проснулся ночью</button>
         <button onclick="quickSleepTag('long_soothe');hapticLight()">⏳ Долго укладывали</button>
       </div>
+      <button class="diary-undo-btn" id="undoDiaryBtn" onclick="undoLastDiaryAction();hapticLight()" style="display:none">↶ Отменить последнее действие</button>
     </div>
 
     <div class="tracker-grid">
@@ -326,7 +332,8 @@
       <div class="section-title" style="margin-bottom:0">📈 История</div>
       <div style="display:flex;gap:8px">
         <button class="export-btn" onclick="shareLog()" style="color:var(--clr-primary)">📤 Поделиться</button>
-        <button class="export-btn" onclick="exportLog()">⬇ TXT</button>
+        <button class="export-btn" onclick="openPdfReportMenu()">PDF</button>
+        <button class="export-btn" onclick="exportLog()">TXT</button>
       </div>
     </div>
     <div class="period-tabs">
@@ -349,6 +356,8 @@
     </div>
     <p style="font-size:.82rem;color:var(--text-hint);margin-top:4px;font-weight:500">Практические материалы со ссылками на официальные источники</p>
   </div>
+
+  <div class="card age-learning-card" id="ageLearningPath"></div>
 
   <!-- ─── RED FLAGS CARD ──────────────────────────────────────── -->
   <div class="card red-flags-card">
@@ -506,6 +515,7 @@
     <button onclick="toggleNotifications();hapticLight()"><span>🔔</span><div><strong>Напоминания</strong><small id="profileNotifStatus">Настроить в Telegram</small></div><b>›</b></button>
     <button onclick="manageAiConsent();hapticLight()"><span>✨</span><div><strong>ИИ и данные</strong><small id="profileAiStatus">Спросим согласие перед первым вопросом</small></div><b>›</b></button>
     <button onclick="exportAllData();hapticLight()"><span>📥</span><div><strong>Скачать мои данные</strong><small>Профиль, дневник и настройки</small></div><b>›</b></button>
+    <button onclick="importBackupData();hapticLight()"><span>↥</span><div><strong>Восстановить резервную копию</strong><small id="profileBackupStatus">Импортировать сохранённый JSON-файл</small></div><b>›</b></button>
     <button onclick="openSupport();hapticLight()"><span>💬</span><div><strong>Поддержка</strong><small>Написать в Telegram</small></div><b>›</b></button>
     <button onclick="window.open('privacy.html','_blank','noopener');hapticLight()"><span>🔐</span><div><strong>Конфиденциальность</strong><small>Как хранятся и используются данные</small></div><b>›</b></button>
     <button class="danger-row" onclick="confirmDeleteLocalData();hapticLight()"><span>🗑</span><div><strong>Удалить данные с устройства</strong><small>Очистить профиль и дневник</small></div><b>›</b></button>
@@ -581,16 +591,17 @@
 <script src="analytics-config.js?v=20260724"></script>
 <script src="analytics.js?v=20260724"></script>
 <script src="tma.js?v=20260724"></script>
-<script src="chat.js?v=20260729-1"></script>
-<script src="sleep-intelligence.js?v=20260724"></script>
+<script src="chat.js?v=20260729-2"></script>
+<script src="sleep-intelligence.js?v=20260729-2"></script>
+<script src="daily-coach.js?v=20260729-2"></script>
 <script src="baby-milestones.js?v=20260724"></script>
-<script src="tracker.js?v=20260724"></script>
-<script src="articles.js?v=20260724"></script>
-<script src="subscription.js?v=20260729-1"></script>
+<script src="tracker.js?v=20260729-2"></script>
+<script src="articles.js?v=20260729-2"></script>
+<script src="subscription.js?v=20260729-2"></script>
 <script src="onboarding.js?v=20260729-1"></script>
 <script src="reminder-planner.js?v=20260724"></script>
 <script src="notifications.js?v=20260729-1"></script>
-<script src="app.js?v=20260724"></script>
+<script src="app.js?v=20260729-2"></script>
 <script src="premium.js?v=20260724"></script>
 
 <script>
@@ -627,9 +638,21 @@ function goPage(id, btn) {
 }
 
 // ─── Generate + switch ───────────────────────────────────────────────────────
+function handleHomePrimaryAction() {
+  var btn = document.getElementById('btn-generate');
+  var action = btn ? btn.dataset.action : 'generate';
+  if (action === 'sleep') {
+    if (window.BabyAnalytics) BabyAnalytics.track('next_sleep_started');
+    fabToggleSleep();
+    renderTodayPlan();
+    return;
+  }
+  generateAndSwitch();
+}
+
 function generateAndSwitch() {
   var btn = document.getElementById('btn-generate');
-  if (btn) { btn.classList.add('loading'); btn.textContent = '⏳ Генерирую...'; }
+  if (btn) { btn.classList.add('loading'); btn.disabled = true; btn.textContent = '⏳ Генерирую...'; }
   requestAnimationFrame(function() {
     try {
       if (typeof generate !== 'function') { if (typeof showToast === 'function') showToast('Ошибка: generate не загружена'); return; }
@@ -642,26 +665,68 @@ function generateAndSwitch() {
       if (typeof showToast === 'function') showToast('Ошибка: ' + e.message);
       console.error('generateAndSwitch error:', e);
     } finally {
-      if (btn) { btn.classList.remove('loading'); btn.textContent = '✨ Собрать режим на сегодня'; }
+      if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
+      renderTodayPlan();
     }
   });
 }
 
 function renderTodayPlan() {
-  var blocks = window._lastBlocks || [];
+  var blocks = getTodayScheduleBlocks();
   var card = document.getElementById('todayPlanCard');
   var list = document.getElementById('todayPlanList');
-  if (!card || !list || !blocks.length) return;
-
-  var important = blocks
-    .filter(function(b) { return b.tag === 'sleep' || b.tag === 'feed' || b.tag === 'walk'; })
-    .slice(0, 4);
-  var firstSleep = blocks.find(function(b) { return b.tag === 'sleep' && (b.title || '').includes('Дневной'); });
   var title = document.getElementById('todayMainTitle');
   var sub = document.getElementById('todayMainSub');
+  var reason = document.getElementById('todayMainReason');
+  var btn = document.getElementById('btn-generate');
+  if (!card || !list || !title || !sub || !btn) return;
 
-  if (title && firstSleep) title.textContent = 'Следующий сон около ' + firstSleep.time;
-  if (sub && firstSleep) sub.textContent = firstSleep.note || 'Начните спокойный ритуал заранее.';
+  if (!blocks.length) {
+    card.style.display = 'none';
+    title.textContent = 'Соберите спокойный режим дня';
+    sub.textContent = 'Возраст, подъём и тип дня уже достаточно, чтобы получить первый план.';
+    if (reason) reason.style.display = 'none';
+    btn.dataset.action = 'generate';
+    btn.textContent = '✨ Собрать режим на сегодня';
+    renderHomeInsights();
+    return;
+  }
+
+  var sleepStarted = parseInt(localStorage.getItem('babymode_quick_sleep_start') || '0');
+  var nextSleep = window.BabyCoach ? BabyCoach.getNextSleep(blocks, new Date()) : null;
+  if (sleepStarted) {
+    var elapsed = Math.max(0, Math.round((Date.now() - sleepStarted) / 60000));
+    title.textContent = 'Малыш сейчас спит';
+    sub.textContent = 'Сон идёт ' + (window.BabyCoach ? BabyCoach.formatDuration(elapsed) : elapsed + ' мин');
+    if (reason) { reason.textContent = 'Когда малыш проснётся, запись сохранится автоматически.'; reason.style.display = 'block'; }
+    btn.dataset.action = 'sleep';
+    btn.textContent = '🌤 Проснулся';
+  } else if (nextSleep) {
+    title.textContent = 'Следующий сон около ' + nextSleep.time;
+    sub.textContent = 'Примерно через ' + nextSleep.countdown;
+    if (reason) {
+      reason.textContent = nextSleep.minutesUntil > 10
+        ? 'Подготовку лучше начать через ' + nextSleep.preparation + '. ' + nextSleep.note
+        : 'Пора приглушить свет и начать привычный ритуал. ' + nextSleep.note;
+      reason.style.display = 'block';
+    }
+    btn.dataset.action = 'sleep';
+    btn.textContent = '😴 Уснул';
+  } else {
+    title.textContent = 'План на сегодня завершён';
+    sub.textContent = 'Можно сохранить итог дня и подготовить режим на завтра.';
+    if (reason) reason.style.display = 'none';
+    btn.dataset.action = 'generate';
+    btn.textContent = 'Обновить режим';
+  }
+
+  var nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  var important = blocks.filter(function(b) {
+      var parts = String(b.time || '').split(':').map(Number);
+      var at = parts.length === 2 ? parts[0] * 60 + parts[1] : -1;
+      return (b.tag === 'sleep' || b.tag === 'feed' || b.tag === 'walk') && at >= nowMinutes - 5;
+    })
+    .slice(0, 4);
 
   list.innerHTML = important.map(function(b) {
     return '<div class="today-step">'
@@ -669,8 +734,25 @@ function renderTodayPlan() {
       + '<div><strong>' + b.title + '</strong><span>' + b.note + '</span></div>'
       + '</div>';
   }).join('');
-  card.style.display = 'block';
+  card.style.display = important.length ? 'block' : 'none';
   renderHomeInsights();
+}
+
+function getTodayScheduleBlocks() {
+  var now = new Date();
+  var today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  if (window._lastBlocksDate === today && Array.isArray(window._lastBlocks) && window._lastBlocks.length) return window._lastBlocks;
+  try {
+    var saved = JSON.parse(localStorage.getItem('babymode_today_schedule_v1') || 'null');
+    if (saved && saved.date === today && Array.isArray(saved.blocks)) {
+      window._lastBlocks = saved.blocks;
+      window._lastBlocksDate = today;
+      return saved.blocks;
+    }
+  } catch(e) {}
+  window._lastBlocks = [];
+  window._lastBlocksDate = '';
+  return [];
 }
 
 // ─── Situation selector ──────────────────────────────────────────────────────
@@ -996,9 +1078,49 @@ function renderHomeInsights() {
   if (!card || typeof SleepIntel === 'undefined') return;
 
   const age = parseInt(localStorage.getItem('babymode_last_age') || document.getElementById('ageMonths')?.value || '0');
-  if (!age) return;
+  if (!age) { card.style.display = 'none'; return; }
 
   card.style.display = 'block';
+  const logs = typeof getLogs === 'function' ? getLogs() : [];
+  const coachEl = document.getElementById('hicCoach');
+  const planEl = document.getElementById('hicPlan');
+  const statsEl = document.getElementById('hicStats');
+  if (planEl) planEl.style.display = 'none';
+  if (statsEl) { statsEl.style.display = 'none'; statsEl.innerHTML = ''; }
+  window._homePlan = null;
+
+  if (coachEl && window.BabyCoach) {
+    const progress = BabyCoach.getLearningProgress(logs);
+    if (!progress.ready) {
+      coachEl.innerHTML = `
+        <div class="coach-learning">
+          <div class="coach-learning-head"><strong>Собираем ваш режим</strong><span>${progress.completed}/${progress.required} дней</span></div>
+          <div class="coach-progress"><span style="width:${progress.percent}%"></span></div>
+          <p>Ещё ${progress.remaining} ${progress.remaining === 1 ? 'день' : 'дня'} записей, и приложение начнёт замечать закономерности сна.</p>
+          <button onclick="goPage('tracker',document.getElementById('bn-tracker'));hapticLight()">Добавить день в дневник</button>
+        </div>`;
+    } else {
+      const morning = BabyCoach.buildMorningSummary(logs, age, SleepIntel);
+      const premium = typeof SUB === 'undefined' || SUB.can('aiAnalysis');
+      if (!localStorage.getItem('babymode_personal_plan_ready_v1')) {
+        localStorage.setItem('babymode_personal_plan_ready_v1', new Date().toISOString());
+        if (window.BabyAnalytics) BabyAnalytics.track('personal_plan_ready', { diary_days: progress.totalDays });
+      }
+      coachEl.innerHTML = premium && morning ? `
+        <div class="coach-summary coach-${morning.tone}">
+          <div class="coach-summary-kicker">Вывод по последней записи</div>
+          <strong>${morning.title}</strong>
+          <div class="coach-summary-stats">${morning.stats} · ${morning.reason}</div>
+          <p>${morning.action}</p>
+        </div>` : `
+        <div class="coach-summary coach-ready">
+          <div class="coach-summary-kicker">Режим изучен</div>
+          <strong>Закономерность найдена</strong>
+          <p>По ${progress.totalDays} дням уже можно объяснить изменения сна и собрать следующий шаг.</p>
+          <button onclick="goPage('premium',null);renderPremiumPage();hapticLight()">Показать персональный разбор</button>
+        </div>`;
+    }
+  }
 
   // ── Status pill: milestone or regression ──
   const statusEl = document.getElementById('hicStatus');
@@ -1050,12 +1172,10 @@ function renderHomeInsights() {
     }
   }
 
-  // ── Tomorrow plan (if 3+ diary days) ──
-  const logs = typeof getLogs === 'function' ? getLogs() : [];
-  const planEl  = document.getElementById('hicPlan');
-  const statsEl = document.getElementById('hicStats');
-
-  if (logs.length >= 3) {
+  // ── Tomorrow plan (Premium, after 3 diary days) ──
+  const hasPremiumAnalysis = typeof SUB === 'undefined' || SUB.can('aiAnalysis');
+  const progress = window.BabyCoach ? BabyCoach.getLearningProgress(logs) : { ready: logs.length >= 3 };
+  if (progress.ready && hasPremiumAnalysis) {
     const summary = SleepIntel.summarizeSleepLogs(logs, age);
     const ctx     = { wake: logs[logs.length-1]?.wake || '07:00', bedtime: logs[logs.length-1]?.bed || '20:00' };
     const plan    = SleepIntel.buildTomorrowPlan(summary, age, ctx);
@@ -1178,6 +1298,14 @@ function renderProfilePage() {
   if (notif) notif.textContent = typeof isNotificationsEnabled === 'function' && isNotificationsEnabled() ? 'Включены' : 'Выключены';
   var aiStatus = document.getElementById('profileAiStatus');
   if (aiStatus) aiStatus.textContent = typeof hasAiConsent === 'function' && hasAiConsent() ? 'Разрешено · нажмите, чтобы отозвать' : 'Спросим согласие перед первым вопросом';
+  var backupStatus = document.getElementById('profileBackupStatus');
+  if (backupStatus) {
+    var backupAt = localStorage.getItem('babymode_last_backup_at');
+    var restoreAt = localStorage.getItem('babymode_last_backup_restore');
+    backupStatus.textContent = restoreAt
+      ? 'Последнее восстановление: ' + new Date(restoreAt).toLocaleDateString('ru-RU')
+      : backupAt ? 'Копия создана: ' + new Date(backupAt).toLocaleDateString('ru-RU') : 'Импортировать сохранённый JSON-файл';
+  }
 }
 
 function saveProfileSettings() {
@@ -1209,12 +1337,83 @@ function exportAllData() {
   data.settings.notifications = localStorage.getItem('babymode_notif_enabled') || '';
   data.settings.wake_time = localStorage.getItem('babymode_wake_time') || '';
   data.settings.feed_type = localStorage.getItem('babymode_feed_type') || '';
-  data.settings.ai_consent = localStorage.getItem('babymode_ai_consent_v1') || '';
+  data.settings.ai_consent = localStorage.getItem('babymode_ai_consent_v2') || '';
   var blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json;charset=utf-8'});
   var link = document.createElement('a');
   link.href = URL.createObjectURL(blob); link.download = 'baby-mode-data.json'; link.click();
   setTimeout(function(){ URL.revokeObjectURL(link.href); }, 1000);
-  showToast('Данные подготовлены');
+  localStorage.setItem('babymode_last_backup_at', new Date().toISOString());
+  if (window.BabyAnalytics) BabyAnalytics.track('backup_exported', { diary_days: data.diary.length });
+  renderProfilePage();
+  showToast('Резервная копия скачана');
+}
+
+function importBackupData() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json,.json';
+  input.onchange = function() {
+    var file = input.files && input.files[0];
+    if (!file || file.size > 2 * 1024 * 1024) { showToast('Выберите JSON-файл до 2 МБ'); return; }
+    var reader = new FileReader();
+    reader.onload = function() {
+      try {
+        var data = JSON.parse(String(reader.result || ''));
+        if (!data || typeof data !== 'object' || !data.profile || !Array.isArray(data.diary)) throw new Error('invalid_backup');
+        var diary = data.diary.map(sanitizeBackupDiaryEntry).filter(Boolean).slice(-1000);
+        localStorage.setItem('babymode_logs', JSON.stringify(diary));
+        var profile = data.profile || {};
+        if (typeof profile.name === 'string') {
+          var safeName = profile.name.replace(/[^а-яёА-ЯЁa-zA-Z\s-]/g, '').trim().slice(0, 40);
+          if (safeName) localStorage.setItem('babymode_baby_name', safeName);
+        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(String(profile.birthdate || '')) && new Date(profile.birthdate + 'T00:00:00') <= new Date()) localStorage.setItem('babymode_baby_birthdate', profile.birthdate);
+        if (/^\d{1,2}$/.test(String(profile.age_months || ''))) localStorage.setItem('babymode_last_age', String(Math.min(36, Math.max(1, Number(profile.age_months)))));
+        var settings = data.settings || {};
+        if (/^\d{2}:\d{2}$/.test(String(settings.wake_time || ''))) localStorage.setItem('babymode_wake_time', settings.wake_time);
+        if (['breast','formula','mixed','solids'].includes(settings.feed_type)) localStorage.setItem('babymode_feed_type', settings.feed_type);
+        localStorage.setItem('babymode_last_backup_restore', new Date().toISOString());
+        if (window.BabyAnalytics) BabyAnalytics.track('backup_imported', { diary_days: diary.length });
+        renderProfilePage();
+        if (typeof renderTracker === 'function') renderTracker();
+        renderTodayPlan();
+        showToast('Резервная копия восстановлена');
+      } catch(e) {
+        showToast('Файл не похож на резервную копию приложения');
+      }
+    };
+    reader.onerror = function() { showToast('Не удалось прочитать файл'); };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function sanitizeBackupDiaryEntry(log) {
+  if (!log || !/^\d{4}-\d{2}-\d{2}$/.test(String(log.date || ''))) return null;
+  var parsedDate = new Date(String(log.date) + 'T12:00:00');
+  if (Number.isNaN(parsedDate.getTime()) || parsedDate > new Date()) return null;
+  var safeTime = function(value, fallback) { return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || '')) ? String(value) : (fallback || ''); };
+  var safeNumber = function(value, max) { return Math.min(max, Math.max(0, Number(value) || 0)); };
+  var allowedTags = ['long_soothe','cry_sleep','cry_wake','illness','travel','teeth','regression','slept_well'];
+  var quickNaps = (Array.isArray(log.quickNaps) ? log.quickNaps : []).slice(0, 10).map(function(nap) {
+    var start = safeTime(nap && nap.start, '');
+    var end = safeTime(nap && nap.end, '');
+    return start && end ? { start:start, end:end, dur:safeNumber(nap && nap.dur, 1440) } : null;
+  }).filter(Boolean);
+  return {
+    date:String(log.date),
+    wake:safeTime(log.wake, '07:00'), bed:safeTime(log.bed, '19:30'),
+    nap1s:safeTime(log.nap1s, ''), nap1e:safeTime(log.nap1e, ''),
+    nap2s:safeTime(log.nap2s, ''), nap2e:safeTime(log.nap2e, ''),
+    nap3s:safeTime(log.nap3s, ''), nap3e:safeTime(log.nap3e, ''),
+    dayNaps:safeNumber(log.dayNaps, 1440), nightLen:safeNumber(log.nightLen, 1440),
+    nightAwakeMin:safeNumber(log.nightAwakeMin, 720), nightWakings:safeNumber(log.nightWakings, 50),
+    mood:['😊','😐','😢','😴','🤒'].includes(log.mood) ? log.mood : '😊',
+    tags:(Array.isArray(log.tags) ? log.tags : []).filter(function(tag) { return allowedTags.includes(tag); }).slice(0, allowedTags.length),
+    note:String(log.note || '').replace(/[<>]/g, '').slice(0, 500),
+    quickNaps:quickNaps,
+    sleepEvents:[]
+  };
 }
 
 function openSupport() {
@@ -1269,6 +1468,7 @@ window.addEventListener('DOMContentLoaded', function() {
   if (typeof renderPremiumPage === 'function') renderPremiumPage();
   if (typeof renderTracker === 'function') renderTracker();
   renderProfilePage();
+  renderTodayPlan();
 
   // Sync FAB state on load
   _updateFab();

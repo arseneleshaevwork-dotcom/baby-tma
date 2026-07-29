@@ -1,5 +1,6 @@
 const assert = require('assert');
 const {
+  buildPdfReportModel,
   calcDayNaps,
   calcNightLen,
   classifySleepEvent,
@@ -85,4 +86,18 @@ test('does not count the same quick and manual nap twice', () => {
     selectedTags: [], mood: '😊', note: '', nightAwakeMin: 0
   });
   assert.strictEqual(merged.dayNaps, 30);
+});
+
+test('builds a bounded PDF report model with average sleep values', () => {
+  const logs = [
+    { date:'2026-06-13', wake:'07:00', bed:'20:00', nightLen:660, dayNaps:120, nightWakings:1 },
+    { date:'2026-06-14', wake:'07:10', bed:'20:10', nightLen:630, dayNaps:150, nightWakings:0 },
+    { date:'2026-06-15', wake:'06:50', bed:'19:50', nightLen:690, dayNaps:90, nightWakings:2 }
+  ];
+  const report = buildPdfReportModel(logs, { days:2, babyName:'Миша', age:8, generatedAt:'2026-06-15T12:00:00Z' });
+  assert.strictEqual(report.rows.length, 2);
+  assert.strictEqual(report.rows[0].date, '2026-06-14');
+  assert.strictEqual(report.avgNight, 660);
+  assert.strictEqual(report.avgDay, 120);
+  assert.strictEqual(report.avgTotal, 780);
 });

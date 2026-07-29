@@ -405,6 +405,50 @@ function chatTopic(t) {
   setTimeout(() => addMsg(random.a, 'bot'), 300);
 }
 
+function chatQuickAction(action) {
+  const { age } = _getBabyContext();
+  const logs = typeof getLogs === 'function' ? getLogs() : [];
+  if (action === 'next_sleep') {
+    const blocks = typeof getTodayScheduleBlocks === 'function' ? getTodayScheduleBlocks() : [];
+    const next = window.BabyCoach ? BabyCoach.getNextSleep(blocks, new Date()) : null;
+    addMsg('Когда следующий сон?', 'user');
+    addMsg(next
+      ? `<strong>Следующий сон около ${escapeHtml(next.time)}</strong><br>До него примерно ${escapeHtml(next.countdown)}. ${next.minutesUntil > 10 ? `Начните подготовку через ${escapeHtml(next.preparation)}.` : 'Спокойный ритуал лучше начать уже сейчас.'}`
+      : 'На сегодня не вижу будущего сна. Соберите или обновите режим на главной, и я сразу посчитаю время.', 'bot');
+    return;
+  }
+
+  if (action === 'weekly') {
+    if (typeof SUB !== 'undefined' && !SUB.can('aiAnalysis')) { SUB.requirePremium('aiAnalysis', function(){}); return; }
+    const progress = window.BabyCoach ? BabyCoach.getLearningProgress(logs) : { ready: logs.length >= 3, completed: logs.length, required: 3 };
+    if (!progress.ready) {
+      addMsg('Итог недели', 'user');
+      addMsg(`Для персонального итога нужно 3 дня дневника. Сейчас собрано ${progress.completed}/${progress.required}.`, 'bot');
+      return;
+    }
+    const review = window.BabyCoach && typeof SleepIntel !== 'undefined' ? BabyCoach.buildWeeklyReview(logs, age || 6, SleepIntel) : null;
+    addMsg('Покажи итог недели', 'user');
+    if (!review) { addMsg('Пока не удалось собрать итог. Проверьте записи дневника.', 'bot'); return; }
+    addMsg(`<strong>${escapeHtml(review.title)}</strong><br>${escapeHtml(review.trend)}<br><br>🌙 Ночной сон: <b>${escapeHtml(review.night)}</b><br>☀️ Дневной сон: <b>${escapeHtml(review.day)}</b><br>Недосып: <b>${escapeHtml(review.sleepDebt)}</b><br><br><strong>Главный фокус:</strong> ${escapeHtml(review.focus)}<br>${escapeHtml(review.reason)}`, 'bot');
+    if (window.BabyAnalytics) BabyAnalytics.track('weekly_review_opened', { source: 'chat' });
+    return;
+  }
+
+  if (action === 'bad_night' && typeof SUB !== 'undefined' && !SUB.can('aiAnalysis')) {
+    SUB.requirePremium('aiAnalysis', function(){});
+    return;
+  }
+  const questions = {
+    bad_night: 'Разбери прошлую ночь по моему дневнику: что могло повлиять и что сделать сегодня?',
+    today: 'Что сейчас важнее всего учесть в режиме малыша сегодня?',
+    transition: 'Как понять, что малыш готов к переходу на меньшее количество дневных снов?'
+  };
+  const input = document.getElementById('chatInput');
+  if (!input || !questions[action]) return;
+  input.value = questions[action];
+  chatSend();
+}
+
 function addMsg(text, role) {
   const box = document.getElementById('chatMessages');
   if (!box) return;
@@ -435,6 +479,25 @@ function initChat() {
     ? `Мне известно, что малышу ${age} мес. `
     : '';
   addMsg(`Привет! Я ИИ-помощник «Режима малыша». Помогу разобрать сон, кормление, плач, развитие, уход и записи дневника. ${babyInfo}<br><br>Опишите ситуацию своими словами, например: «6 месяцев, ночью просыпается каждый час, а днём спит три раза». Я предложу спокойный план действий и отмечу, когда лучше обратиться к врачу. <strong>Перед первым онлайн-ответом я покажу, какие данные будут переданы.</strong>`, 'bot');
+  initQuickChatActions(document.getElementById('chatQuickActions'));
+}
+
+function initQuickChatActions(container) {
+  if (!container || container.children.length) return;
+  const actions = [
+    ['next_sleep', '⏱ Когда следующий сон'],
+    ['bad_night', '🌙 Разобрать ночь ⭐'],
+    ['weekly', '📊 Итог недели ⭐'],
+    ['transition', '↘ Переход между снами']
+  ];
+  actions.forEach(([id, label]) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'chat-quick-btn';
+    button.textContent = label;
+    button.onclick = () => { chatQuickAction(id); if (typeof hapticLight === 'function') hapticLight(); };
+    container.appendChild(button);
+  });
 }
 
 let _topicsInited = false;

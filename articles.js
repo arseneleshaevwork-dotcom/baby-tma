@@ -420,6 +420,7 @@ const ARTICLES = [
 
 let openArticleId = null;
 let articleFilter = 'all';
+const READ_ARTICLES_KEY = 'babymode_read_articles_v1';
 
 const CATEGORIES = {
   all:         { label: 'Все', emoji: '📚' },
@@ -444,6 +445,7 @@ const ARTICLE_SOURCES = {
 };
 
 function renderArticles() {
+  renderAgeLearningPath();
   const container = document.getElementById('articlesContainer');
   if (!container) return;
 
@@ -451,7 +453,8 @@ function renderArticles() {
   const filtered = articleFilter === 'all'
     ? ARTICLES
     : ARTICLES.filter(a => a.category === articleFilter);
-  const visible = unlocked ? filtered : filtered.slice(0, 5);
+  const freeIds = new Set(ARTICLES.slice(0, 5).map(article => article.id));
+  const visible = unlocked ? filtered : filtered.filter(article => freeIds.has(article.id));
   const lockedCount = Math.max(0, filtered.length - visible.length);
 
   // Category filters
@@ -519,6 +522,7 @@ function setArticleFilter(cat) {
 
 function toggleArticle(id) {
   openArticleId = openArticleId === id ? null : id;
+  if (openArticleId) markArticleRead(id);
   renderArticles();
   if (openArticleId) {
     setTimeout(() => {
@@ -527,6 +531,61 @@ function toggleArticle(id) {
     }, 50);
   }
   if (typeof hapticLight === 'function') hapticLight();
+}
+
+function getReadArticleIds() {
+  try {
+    const ids = JSON.parse(localStorage.getItem(READ_ARTICLES_KEY) || '[]');
+    return new Set(Array.isArray(ids) ? ids.filter(id => typeof id === 'string') : []);
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function markArticleRead(id) {
+  const read = getReadArticleIds();
+  read.add(id);
+  localStorage.setItem(READ_ARTICLES_KEY, JSON.stringify([...read]));
+}
+
+function renderAgeLearningPath() {
+  const container = document.getElementById('ageLearningPath');
+  if (!container || !window.BabyCoach) return;
+  const age = parseInt(localStorage.getItem('babymode_last_age') || document.getElementById('ageMonths')?.value || '0');
+  if (!age) { container.style.display = 'none'; return; }
+  const learning = BabyCoach.getAgeLearningPath(age);
+  const read = getReadArticleIds();
+  const freeIds = new Set(ARTICLES.slice(0, 5).map(article => article.id));
+  const unlocked = typeof SUB === 'undefined' || SUB.can('articlesAll');
+  container.innerHTML = `
+    <div class="age-path-head">
+      <div><small>Маршрут для ${age} мес.</small><strong>${learning.title}</strong></div>
+      <span>${learning.items.filter(item => read.has(item.id)).length}/${learning.items.length}</span>
+    </div>
+    <div class="age-path-list">
+      ${learning.items.map(item => `
+        <button type="button" class="age-path-row ${read.has(item.id) ? 'done' : ''}" onclick="openAgePathArticle('${item.id}')">
+          <span class="age-path-step">${read.has(item.id) ? '✓' : item.step}</span>
+          <strong>${item.label}</strong>
+          <span class="age-path-go">${unlocked || freeIds.has(item.id) ? 'Открыть' : '⭐'}</span>
+        </button>`).join('')}
+    </div>`;
+  container.style.display = 'block';
+}
+
+function openAgePathArticle(id) {
+  const article = ARTICLES.find(item => item.id === id);
+  if (!article) return;
+  const unlocked = typeof SUB === 'undefined' || SUB.can('articlesAll');
+  const freeIds = new Set(ARTICLES.slice(0, 5).map(item => item.id));
+  if (!unlocked && !freeIds.has(id)) { openArticlesPaywall(); return; }
+  articleFilter = article.category;
+  openArticleId = id;
+  markArticleRead(id);
+  renderArticles();
+  setTimeout(() => document.getElementById('art-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  const age = parseInt(localStorage.getItem('babymode_last_age') || '0');
+  if (window.BabyAnalytics) BabyAnalytics.track('age_article_opened', { article: id, age });
 }
 
 function searchArticles() {
