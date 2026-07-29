@@ -3,7 +3,7 @@ const ALLOWED_TAGS = new Set([
   'regression', 'slept_well'
 ]);
 
-export const AI_CONSENT_VERSION = '2026-07-24-v1';
+export const AI_CONSENT_VERSION = '2026-07-29-v2';
 export const MAX_QUESTION_LENGTH = 1500;
 export const FREE_DAILY_LIMIT = 4;
 export const PREMIUM_DAILY_LIMIT = 40;
@@ -39,6 +39,10 @@ export function sanitizeDiary(entries, now = new Date()) {
       tags: Array.isArray(item.tags) ? [...new Set(item.tags.filter(tag => ALLOWED_TAGS.has(tag)))].slice(0, 8) : []
     };
   }).filter(Boolean).sort((a, b) => a.date.localeCompare(b.date)).slice(-14);
+}
+
+export function sanitizeDiaryForPlan(entries, premium, now = new Date()) {
+  return premium ? sanitizeDiary(entries, now) : [];
 }
 
 export function selectSources(question) {

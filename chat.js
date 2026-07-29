@@ -206,7 +206,7 @@ function buildFallbackAnswer(q, age, name) {
   Если есть температура, вялость, проблемы с дыханием, судороги, обезвоживание или резкое ухудшение — лучше сразу связаться с педиатром.`;
 }
 
-const AI_CONSENT_KEY = 'babymode_ai_consent_v1';
+const AI_CONSENT_KEY = 'babymode_ai_consent_v2';
 let _chatBusy = false;
 let _consentResolve = null;
 
@@ -234,12 +234,13 @@ function buildAiDiary(logs, now = new Date()) {
 
 function buildAiPayload(question) {
   const { age } = _getBabyContext();
+  const canAnalyzeDiary = typeof SUB !== 'undefined' && SUB.can('aiAnalysis');
   return {
     initData: _getAiTelegramInitData(),
     consent: true,
     question: String(question || '').trim().slice(0, 1500),
     ageMonths: age || null,
-    diary: buildAiDiary(typeof getLogs === 'function' ? getLogs() : [])
+    diary: canAnalyzeDiary && typeof getLogs === 'function' ? buildAiDiary(getLogs()) : []
   };
 }
 

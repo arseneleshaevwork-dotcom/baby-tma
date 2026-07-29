@@ -17,6 +17,15 @@ function initNotifications() {
     }
   } catch(e) {}
 
+  if (typeof SUB !== 'undefined' && !SUB.can('notifications')) {
+    _notifTimers.forEach(t => clearTimeout(t));
+    _notifTimers = [];
+    _storeReminderPlan([]);
+    _renderReminderBadge(0);
+    _renderReminderList([]);
+    return;
+  }
+
   // Show prompt only if never asked before and not in low-end mode
   if (!localStorage.getItem(NOTIF_KEY)) {
     _showNotifPrompt();
@@ -69,6 +78,13 @@ function scheduleReminders(blocks) {
   // Clear old timers
   _notifTimers.forEach(t => clearTimeout(t));
   _notifTimers = [];
+
+  if (!isNotificationsEnabled()) {
+    _storeReminderPlan([]);
+    _renderReminderBadge(0);
+    _renderReminderList([]);
+    return;
+  }
 
   if (!blocks || !blocks.length) {
     _storeReminderPlan([]);
@@ -137,6 +153,10 @@ function toggleNotifications() {
     _renderReminderList([]);
     if (typeof showToast === 'function') showToast('🔕 Напоминания отключены');
   } else {
+    if (typeof SUB !== 'undefined' && !SUB.can('notifications')) {
+      SUB.requirePremium('notifications', function(){});
+      return;
+    }
     _showNotifPrompt();
   }
 }
@@ -165,6 +185,10 @@ function _storeReminderPlan(plan) {
 function _renderReminderBadge(count) {
   const badge = document.getElementById('reminderBadge');
   if (!badge) return;
+  if (typeof SUB !== 'undefined' && !SUB.can('notifications')) {
+    badge.textContent = 'Premium';
+    return;
+  }
   if (!isNotificationsEnabled()) {
     badge.textContent = 'Выкл';
   } else {

@@ -5,7 +5,7 @@ import {
   MAX_QUESTION_LENGTH,
   PREMIUM_DAILY_LIMIT,
   sanitizeAgeMonths,
-  sanitizeDiary,
+  sanitizeDiaryForPlan,
   sanitizeQuestion
 } from './policy.mjs';
 
@@ -104,7 +104,7 @@ Deno.serve(async req => {
   if (!agentUrl || !agentSecret) return json({ ok: false, error: 'ai_not_configured' }, 503, corsHeaders);
 
   const ageMonths = sanitizeAgeMonths(body?.ageMonths);
-  const diary = sanitizeDiary(body?.diary);
+  const diary = sanitizeDiaryForPlan(body?.diary, Boolean(premium));
   const { data: requestLog } = await supabase.from('ai_requests').insert({
     telegram_id: telegramId,
     user_id: user?.id || null,

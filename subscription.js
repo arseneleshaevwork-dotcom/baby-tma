@@ -6,6 +6,13 @@ const SUB = (() => {
   const KEY_PREMIUM_UNTIL = 'babymode_premium_until';
   const KEY_TRIAL_DATE = 'babymode_trial_start';
   const TRIAL_DAYS     = 7;
+  const PLAN_LIMITS = Object.freeze({
+    freeAiDaily: 4,
+    premiumAiDaily: 40,
+    freeDiaryDays: 7,
+    premiumDiaryContextDays: 14,
+    freeArticles: 5,
+  });
 
   // Feature gates — what's free vs premium
   const GATES = {
@@ -103,6 +110,7 @@ const SUB = (() => {
   function getPremiumUntil() { return _premiumUntil; }
   function isPremium()   { return _isPremium; }
   function isTrialActive() { return _trialActive; }
+  function getPlanLimits() { return { ...PLAN_LIMITS }; }
 
   // Show paywall if feature is locked
   function requirePremium(featureName, callback) {
@@ -199,7 +207,7 @@ const SUB = (() => {
     }
   }
 
-  return { init, startTrial, refreshPremiumStatus, can, getStatus, getDaysLeft, getPremiumUntil, isPremium, isTrialActive, requirePremium };
+  return { init, startTrial, refreshPremiumStatus, can, getStatus, getDaysLeft, getPremiumUntil, isPremium, isTrialActive, getPlanLimits, requirePremium };
 })();
 
 // ─── Premium Page Renderer ───────────────────────────────────────────────────
@@ -232,10 +240,7 @@ function _renderPremiumActive() {
       <div class="premium-active-title">Premium активен</div>
       <div class="premium-active-sub">${untilText}</div>
     </div>
-    <div class="card">
-      <div class="section-title">Ваши преимущества</div>
-      ${_featuresList(true)}
-    </div>
+    <div class="plan-comparison">${_featuresList(true)}</div>
   `;
 }
 
@@ -253,10 +258,7 @@ function _renderTrialActive(days) {
         <div class="ts-label">Бесплатного пробного периода</div>
       </div>
     </div>
-    <div class="card">
-      <div class="section-title">Что включено в Premium</div>
-      ${_featuresList(true)}
-    </div>
+    <div class="plan-comparison">${_featuresList(true)}</div>
     <div style="padding:0 0 8px">
       <button class="cta-sub-btn" onclick="handleSubscribe('month');hapticMedium()">
         ⭐ Premium за 299 ⭐ / 30 дней
@@ -277,7 +279,7 @@ function _renderFreePage() {
     <div class="sub-hero">
       <span class="sub-hero-emoji">✨</span>
       <h2>Режим Малыша Premium</h2>
-      <p>Откройте все возможности для вас и вашего малыша</p>
+      <p>Базовый режим остаётся бесплатным. Premium добавляет глубокий анализ и автоматизацию.</p>
     </div>
 
     ${!trialStarted ? `
@@ -304,10 +306,7 @@ function _renderFreePage() {
       </div>
     </div>
 
-    <div class="card">
-      <div class="section-title">Что вы получаете</div>
-      ${_featuresList(false)}
-    </div>
+    <div class="plan-comparison">${_featuresList(false)}</div>
 
     <div style="padding:0 0 8px">
       <button class="cta-sub-btn" onclick="handleSubscribe('year');hapticMedium()">
@@ -324,30 +323,44 @@ function _renderFreePage() {
 }
 
 function _featuresList(unlocked) {
-  const features = [
-    { icon:'🌙', title:'Ориентиры сна 0–3 года', sub:'Диапазоны по возрасту', premium:false },
-    { icon:'📅', title:'Генератор режима дня', sub:'Базовый для всех', premium:false },
-    { icon:'📓', title:'Дневник сна', sub:unlocked ? 'Неограниченно' : 'Только 7 дней', premium:true },
-    { icon:'💬', title:'Помощник по режиму', sub:'Ответы на частые вопросы', premium:false },
-    { icon:'📚', title:'База знаний', sub:unlocked ? 'Все главы и статьи' : '5 статей бесплатно', premium:true },
-    { icon:'⚙️', title:'Профили ситуаций', sub:'Болезнь, путешествие, жара', premium:true },
-    { icon:'📊', title:'Анализ дневника', sub:'Недосып, повторяющиеся события и динамика', premium:true },
-    { icon:'📆', title:'Календарь сна', sub:'Скачки, регрессы и переходы', premium:true },
-    { icon:'🌙', title:'Ритуал засыпания', sub:'Таймер + белый шум', premium:false },
-    { icon:'📱', title:'Отчёт для семьи', sub:'Сон, недосып и план на завтра', premium:true },
-    { icon:'🔔', title:'Умные напоминания', sub:'Сообщения в Telegram по вашему режиму', premium:true },
+  const limits = SUB.getPlanLimits();
+  const freeFeatures = [
+    { icon:'📅', title:'Режим дня', sub:'Генератор и ориентиры сна 0–3 года' },
+    { icon:'💬', title:`${limits.freeAiDaily} ИИ-ответа в день`, sub:'Общие вопросы по сну, кормлению и уходу' },
+    { icon:'📓', title:`Дневник за ${limits.freeDiaryDays} дней`, sub:'Запись сна, пробуждений и событий' },
+    { icon:'📚', title:`${limits.freeArticles} статей`, sub:'Базовые главы базы знаний' },
+    { icon:'🌙', title:'Ритуал засыпания', sub:'Таймер и спокойные звуки' },
   ];
+  const premiumFeatures = [
+    { icon:'✨', title:`${limits.premiumAiDaily} ИИ-ответов в день`, sub:`Персональный анализ дневника за ${limits.premiumDiaryContextDays} дней` },
+    { icon:'📊', title:'Вся история и аналитика', sub:'Тренды, недосып и повторяющиеся события' },
+    { icon:'📚', title:'Вся база знаний', sub:'Все главы по сну, развитию и кормлению' },
+    { icon:'⚙️', title:'Профили ситуаций', sub:'Болезнь, поездка, жара и гости' },
+    { icon:'📱', title:'Отчёты для семьи', sub:'Карточка сна и план на завтра' },
+    { icon:'🔔', title:'Умные напоминания', sub:'Сообщения в Telegram по режиму малыша' },
+  ];
+  const renderRows = (items, marker) => `<div class="features-list">${items.map(item => `
+    <div class="feat-row">
+      <div class="fi">${item.icon}</div>
+      <div class="ft">${item.title}<span>${item.sub}</span></div>
+      <div class="flock">${marker}</div>
+    </div>`).join('')}</div>`;
 
-  return `<div class="features-list">${features.map(f => {
-    const isPremiumLocked = f.premium && !unlocked;
-    return `
-      <div class="feat-row ${isPremiumLocked ? '' : ''}">
-        <div class="fi">${f.icon}</div>
-        <div class="ft">${f.title}<span>${f.sub}</span></div>
-        <div class="flock">${isPremiumLocked ? '🔒' : '✅'}</div>
-      </div>
-    `;
-  }).join('')}</div>`;
+  if (unlocked) {
+    return `<section class="plan-feature-group premium-plan-features">
+      <div class="plan-feature-heading"><strong>Premium</strong><span>Всё бесплатное и расширенные возможности</span></div>
+      ${renderRows([...freeFeatures, ...premiumFeatures], '✓')}
+    </section>`;
+  }
+  return `
+    <section class="plan-feature-group free-plan-features">
+      <div class="plan-feature-heading"><strong>Бесплатно</strong><span>Без ограничения по времени</span></div>
+      ${renderRows(freeFeatures, '✓')}
+    </section>
+    <section class="plan-feature-group premium-plan-features">
+      <div class="plan-feature-heading"><strong>Premium</strong><span>Для глубокого анализа и автоматизации</span></div>
+      ${renderRows(premiumFeatures, '★')}
+    </section>`;
 }
 
 function _declDays(n) {

@@ -33,7 +33,7 @@
 })();
 </script>
 
-<link rel="stylesheet" href="style.css?v=20260728-1">
+<link rel="stylesheet" href="style.css?v=20260729-1">
 </head>
 <body data-page="home">
 
@@ -564,11 +564,11 @@
   <div class="ai-consent-sheet">
     <div class="ai-consent-icon">✨</div>
     <h2 id="aiConsentTitle">Разрешить персональный ответ?</h2>
-    <p>Для ответа будут отправлены в OpenAI:</p>
+    <p>Для ответа будут отправлены изолированному ИИ-помощнику:</p>
     <ul>
       <li>текст вашего вопроса;</li>
       <li>возраст малыша в месяцах;</li>
-      <li>обезличенные показатели сна за последние 14 дней.</li>
+      <li>обезличенные показатели сна за 14 дней — только для Premium-анализа.</li>
     </ul>
     <div class="ai-consent-safe">Имя, дата рождения, заметки и Telegram ID в запрос модели не передаются. ИИ не заменяет врача.</div>
     <button class="save-log-btn" onclick="acceptAiConsent();hapticSuccess()">Разрешить и продолжить</button>
@@ -581,15 +581,15 @@
 <script src="analytics-config.js?v=20260724"></script>
 <script src="analytics.js?v=20260724"></script>
 <script src="tma.js?v=20260724"></script>
-<script src="chat.js?v=20260728-1"></script>
+<script src="chat.js?v=20260729-1"></script>
 <script src="sleep-intelligence.js?v=20260724"></script>
 <script src="baby-milestones.js?v=20260724"></script>
 <script src="tracker.js?v=20260724"></script>
 <script src="articles.js?v=20260724"></script>
-<script src="subscription.js?v=20260724"></script>
-<script src="onboarding.js?v=20260724"></script>
+<script src="subscription.js?v=20260729-1"></script>
+<script src="onboarding.js?v=20260729-1"></script>
 <script src="reminder-planner.js?v=20260724"></script>
-<script src="notifications.js?v=20260724"></script>
+<script src="notifications.js?v=20260729-1"></script>
 <script src="app.js?v=20260724"></script>
 <script src="premium.js?v=20260724"></script>
 
@@ -1276,7 +1276,7 @@ window.addEventListener('DOMContentLoaded', function() {
   // Render home cards
   setTimeout(function(){ renderHomeInsights(); renderBabyEventCard(); }, 200);
 
-  // Show trial offer on first launch (after 3s)
+  // Start onboarding only once on this device.
   var hasLaunched = localStorage.getItem('babymode_launched');
   if (!hasLaunched && typeof initOnboarding === 'function') {
     localStorage.setItem('babymode_launched', '1');

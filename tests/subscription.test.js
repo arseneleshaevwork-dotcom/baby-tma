@@ -68,6 +68,30 @@ test('does not expose demo premium activation API', () => {
   assert.strictEqual(vm.runInContext('SUB.activatePremium', context), undefined);
 });
 
+test('shows the actual free and premium limits', () => {
+  const { context } = createContext();
+  loadSubscription(context);
+
+  const limits = vm.runInContext('SUB.getPlanLimits()', context);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(limits)), {
+    freeAiDaily: 4,
+    premiumAiDaily: 40,
+    freeDiaryDays: 7,
+    premiumDiaryContextDays: 14,
+    freeArticles: 5
+  });
+  const html = vm.runInContext('_renderFreePage()', context);
+  assert.match(html, /4 ИИ-ответа в день/);
+  assert.match(html, /40 ИИ-ответов в день/);
+  assert.match(html, /Дневник за 7 дней/);
+  assert.match(html, /анализ дневника за 14 дней/i);
+});
+
+test('onboarding does not show an automatic trial toast', () => {
+  const source = fs.readFileSync('./onboarding.js', 'utf8');
+  assert.doesNotMatch(source, /Активируйте 7 дней Premium/);
+});
+
 test('subscribe outside Telegram does not set premium cache', async () => {
   const { context, store } = createContext({ initData: '' });
   loadSubscription(context);

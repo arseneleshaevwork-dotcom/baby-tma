@@ -60,6 +60,21 @@ test('AI diary payload contains only approved fields from the last 14 days', () 
   assert.ok(!JSON.stringify(diary).includes('Миша'));
 });
 
+test('free AI payload omits diary while premium includes it', () => {
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  global.getLogs = () => [{
+    date: yesterday,
+    wake: '07:00', bed: '20:00', dayNaps: 120, nightLen: 600, nightWakings: 2
+  }];
+  global.SUB = { can: () => false };
+  assert.deepStrictEqual(require('../chat').buildAiPayload('вопрос').diary, []);
+
+  global.SUB = { can: feature => feature === 'aiAnalysis' };
+  assert.strictEqual(require('../chat').buildAiPayload('вопрос').diary.length, 1);
+  delete global.getLogs;
+  delete global.SUB;
+});
+
 test('online AI answer escapes content and adds feedback only for a valid request id', () => {
   const html = formatAiAnswer('<script>alert(1)</script>', [{ label: 'Источник', url: 'https://example.com' }], '123e4567-e89b-12d3-a456-426614174000');
   assert.ok(!html.includes('<script>'));

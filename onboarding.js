@@ -268,14 +268,8 @@ function finishOnboarding() {
   }
   if (typeof hapticSuccess === 'function') hapticSuccess();
 
-  // Show trial offer after 1s
+  // Initialize reminders after the onboarding sheet has closed.
   setTimeout(() => {
-    if (typeof SUB !== 'undefined' && SUB.getStatus() === 'free') {
-      const trialStarted = !!localStorage.getItem('babymode_trial_start');
-      if (!trialStarted) {
-        showToast('🎁 Активируйте 7 дней Premium бесплатно!');
-      }
-    }
     if (typeof initNotifications === 'function') initNotifications();
-  }, 1000);
+  }, 400);
 }

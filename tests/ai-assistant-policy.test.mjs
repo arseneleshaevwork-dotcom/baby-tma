@@ -5,6 +5,7 @@ import {
   extractOutputText,
   sanitizeAgeMonths,
   sanitizeDiary,
+  sanitizeDiaryForPlan,
   sanitizeQuestion,
   selectSources
 } from '../supabase/functions/ai-assistant/policy.mjs';
@@ -40,4 +41,11 @@ test('extracts Responses API text and chooses curated sources', () => {
 test('keeps free and premium AI limits explicit', () => {
   assert.equal(FREE_DAILY_LIMIT, 4);
   assert.equal(PREMIUM_DAILY_LIMIT, 40);
+});
+
+test('sends diary context only for premium AI analysis', () => {
+  const rows = [{ date: '2026-07-24', dayNaps: 120, nightLen: 600 }];
+  const now = new Date('2026-07-24T12:00:00Z');
+  assert.deepEqual(sanitizeDiaryForPlan(rows, false, now), []);
+  assert.equal(sanitizeDiaryForPlan(rows, true, now).length, 1);
 });

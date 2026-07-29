@@ -1024,12 +1024,30 @@ body[data-page="profile"] #page-profile { padding-top:16px; }
 .plan-save { font-size:.7rem; color:var(--clr-primary); font-weight:800; margin-top:4px; }
 
 /* Features list */
+.plan-comparison { display:grid; gap:12px; margin-bottom:16px; }
+.plan-feature-group {
+  overflow:hidden; border:1.5px solid var(--border-soft); border-radius:8px;
+  background:var(--white); box-shadow:var(--shadow-sm);
+}
+.plan-feature-group.free-plan-features { border-color:rgba(93,201,160,.35); }
+.plan-feature-group.premium-plan-features { border-color:rgba(201,123,219,.32); }
+.plan-feature-heading {
+  display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+  padding:12px 14px; background:#F7FFF9;
+}
+.premium-plan-features .plan-feature-heading { background:#FCF5FF; }
+.plan-feature-heading strong { font-size:.9rem; color:var(--text-dark); }
+.plan-feature-heading span { max-width:62%; text-align:right; font-size:.68rem; line-height:1.35; color:var(--text-hint); font-weight:600; }
 .features-list { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+.plan-feature-group .features-list { gap:0; margin-bottom:0; }
 .feat-row {
   display:flex; align-items:center; gap:10px; padding:10px 12px;
   background:var(--white); border:1.5px solid var(--border-soft);
   border-radius:var(--radius-sm); box-shadow:var(--shadow-sm);
 }
+.plan-feature-group .feat-row { border:0; border-top:1px solid var(--border-soft); border-radius:0; box-shadow:none; }
+.free-plan-features .feat-row .flock { color:#3C9A78; }
+.premium-plan-features .feat-row .flock { color:var(--clr-primary); }
 .feat-row .fi { font-size:1.3rem; flex-shrink:0; }
 .feat-row .ft { flex:1; font-size:.82rem; font-weight:600; color:var(--text-dark); }
 .feat-row .ft span { display:block; font-size:.72rem; color:var(--text-hint); font-weight:500; }
@@ -1363,7 +1381,8 @@ button:focus-visible, input:focus-visible, select:focus-visible {
   pointer-events: none;
 }
 body[data-page="chat"] #fabSleepWrap,
-body[data-page="profile"] #fabSleepWrap { display:none; }
+body[data-page="profile"] #fabSleepWrap,
+body[data-page="premium"] #fabSleepWrap { display:none; }
 #fabSleepTimer {
   background: rgba(61,44,62,.85);
   color: #fff;
