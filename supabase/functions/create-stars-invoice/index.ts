@@ -1,7 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://arseneleshaevwork-dotcom.github.io',
+  'Vary': 'Origin',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
@@ -12,10 +13,10 @@ const PLANS = {
     stars: 299,
     days: 30
   },
-  year: {
-    label: 'Premium на 1 год',
+  half_year: {
+    label: 'Premium на 6 месяцев',
     stars: 1490,
-    days: 365
+    days: 180
   }
 } as const;
 
@@ -31,8 +32,10 @@ Deno.serve(async (req) => {
   }
 
   const body = await req.json().catch(() => ({}));
-  const planKey = String(body?.plan || 'month') as keyof typeof PLANS;
-  const plan = PLANS[planKey] || PLANS.month;
+  const requestedPlan = String(body?.plan || '');
+  if (!(requestedPlan in PLANS)) return json({ ok: false, error: 'invalid_plan' }, 400);
+  const planKey = requestedPlan as keyof typeof PLANS;
+  const plan = PLANS[planKey];
   const initData = String(body?.initData || '');
   const auth = await verifyTelegramInitData(initData, botToken);
   if (!auth.ok || !auth.user?.id) return json({ ok: false, error: 'telegram_auth_failed' }, 401);
@@ -53,8 +56,17 @@ Deno.serve(async (req) => {
 
   if (userError || !user?.id) return json({ ok: false, error: 'user_upsert_failed' }, 500);
 
+  const recentInvoiceWindow = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const { count: recentInvoices } = await supabase
+    .from('payments')
+    .select('id', { count: 'exact', head: true })
+    .eq('telegram_id', telegramId)
+    .eq('status', 'created')
+    .gte('created_at', recentInvoiceWindow);
+  if ((recentInvoices || 0) >= 5) return json({ ok: false, error: 'invoice_rate_limit' }, 429);
+
   const payload = `premium:${planKey}:${telegramId}:${crypto.randomUUID()}`;
-  await supabase.from('payments').insert({
+  const { error: paymentError } = await supabase.from('payments').insert({
     user_id: user.id,
     telegram_id: telegramId,
     invoice_payload: payload,
@@ -63,6 +75,7 @@ Deno.serve(async (req) => {
     total_amount: plan.stars,
     status: 'created'
   });
+  if (paymentError) return json({ ok: false, error: 'payment_create_failed' }, 500);
 
   const invoiceResponse = await fetch(`https://api.telegram.org/bot${botToken}/createInvoiceLink`, {
     method: 'POST',

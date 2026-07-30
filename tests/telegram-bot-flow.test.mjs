@@ -123,7 +123,21 @@ test('shows bot help with commands', () => {
   assert.equal(reply.action, 'help');
   assert.match(reply.text, /\/profile/);
   assert.match(reply.text, /\/reminders_on/);
+  assert.match(reply.text, /\/paysupport/);
   assert.match(reply.text, /\/reset/);
+});
+
+test('creates a payment support request without asking for card data', () => {
+  const reply = buildBotReply({
+    text: '/paysupport оплатил 299 Stars, Premium не открылся',
+    firstName: 'Анна',
+    baby: { name: 'Миша' },
+    miniAppUrl: 'https://example.test/app'
+  });
+
+  assert.equal(reply.action, 'payment_support');
+  assert.match(reply.support_message, /299 Stars/);
+  assert.match(reply.text, /Не отправляйте данные карты/);
 });
 
 test('normalizes supported birthdate formats and calculates full months', () => {

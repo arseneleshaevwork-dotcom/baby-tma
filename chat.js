@@ -345,6 +345,7 @@ async function chatSend() {
     if (!response.ok || !data.answer) throw Object.assign(new Error(data.error || 'request_failed'), { code: data.error, limit: data.limit });
     typing?.remove();
     addMsg(formatAiAnswer(data.answer, data.sources, data.request_id), 'bot');
+    renderChatContext(data.remaining);
     if (window.BabyAnalytics) BabyAnalytics.track('ai_answer_received', { remaining: data.remaining, mode: data.mode || 'unknown' });
   } catch (error) {
     typing?.remove();
@@ -364,6 +365,31 @@ function setChatBusy(busy) {
   const input = document.getElementById('chatInput');
   if (button) button.disabled = busy;
   if (input) input.disabled = busy;
+}
+
+function renderChatContext(remaining) {
+  if (typeof document === 'undefined') return;
+  const strip = document.getElementById('chatContextStrip');
+  const limit = document.getElementById('chatLimitLabel');
+  const canAnalyzeDiary = typeof SUB !== 'undefined' && SUB.can('aiAnalysis');
+  const logs = typeof getLogs === 'function' ? getLogs() : [];
+  const diaryDays = canAnalyzeDiary ? buildAiDiary(logs).length : 0;
+
+  if (limit) {
+    limit.textContent = Number.isFinite(Number(remaining))
+      ? `Осталось ${Math.max(0, Number(remaining))} сегодня`
+      : `До ${canAnalyzeDiary ? 40 : 4} вопросов в день`;
+  }
+  if (strip) {
+    const text = canAnalyzeDiary
+      ? diaryDays
+        ? `Дневник за ${diaryDays} ${diaryDays === 1 ? 'день' : diaryDays < 5 ? 'дня' : 'дней'} подключён к диалогу`
+        : 'Добавьте записи в дневник для персонального разбора'
+      : 'Ответ учитывает возраст малыша. Анализ дневника доступен в Premium';
+    strip.classList.toggle('is-premium-context', canAnalyzeDiary && diaryDays > 0);
+    strip.innerHTML = `<i data-lucide="${canAnalyzeDiary && diaryDays ? 'shield-check' : 'info'}"></i><span>${text}</span>`;
+  }
+  if (typeof refreshIcons === 'function') refreshIcons();
 }
 
 function formatAiAnswer(answer, sources, requestId) {
@@ -478,26 +504,28 @@ function initChat() {
     : age
     ? `Мне известно, что малышу ${age} мес. `
     : '';
-  addMsg(`Привет! Я ИИ-помощник «Режима малыша». Помогу разобрать сон, кормление, плач, развитие, уход и записи дневника. ${babyInfo}<br><br>Опишите ситуацию своими словами, например: «6 месяцев, ночью просыпается каждый час, а днём спит три раза». Я предложу спокойный план действий и отмечу, когда лучше обратиться к врачу. <strong>Перед первым онлайн-ответом я покажу, какие данные будут переданы.</strong>`, 'bot');
+  addMsg(`<strong>Здравствуйте${name ? ', ' + safeName : ''}.</strong><br>Я помогу разобраться со сном и режимом малыша. ${babyInfo}Опишите ситуацию своими словами, а я предложу понятный следующий шаг и отмечу, когда лучше обратиться к врачу.`, 'bot');
   initQuickChatActions(document.getElementById('chatQuickActions'));
+  renderChatContext();
 }
 
 function initQuickChatActions(container) {
   if (!container || container.children.length) return;
   const actions = [
-    ['next_sleep', '⏱ Когда следующий сон'],
-    ['bad_night', '🌙 Разобрать ночь ⭐'],
-    ['weekly', '📊 Итог недели ⭐'],
-    ['transition', '↘ Переход между снами']
+    ['next_sleep', 'clock-3', 'Когда следующий сон'],
+    ['bad_night', 'moon-star', 'Разобрать ночь', true],
+    ['weekly', 'chart-no-axes-column-increasing', 'Итог недели', true],
+    ['transition', 'route', 'Переход между снами']
   ];
-  actions.forEach(([id, label]) => {
+  actions.forEach(([id, icon, label, premium]) => {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'chat-quick-btn';
-    button.textContent = label;
+    button.innerHTML = `<i data-lucide="${icon}"></i><span>${label}${premium ? ' <small>Premium</small>' : ''}</span>`;
     button.onclick = () => { chatQuickAction(id); if (typeof hapticLight === 'function') hapticLight(); };
     container.appendChild(button);
   });
+  if (typeof refreshIcons === 'function') refreshIcons();
 }
 
 let _topicsInited = false;

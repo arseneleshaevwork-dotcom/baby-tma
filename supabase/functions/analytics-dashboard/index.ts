@@ -1,7 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://arseneleshaevwork-dotcom.github.io',
+  'Vary': 'Origin',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-token',
   'Access-Control-Allow-Methods': 'GET, OPTIONS'
 };
@@ -49,8 +50,8 @@ Deno.serve(async (req) => {
   if (req.method !== 'GET') return json({ error: 'method_not_allowed' }, 405);
 
   const adminToken = Deno.env.get('ADMIN_TOKEN');
-  const providedToken = req.headers.get('x-admin-token') || new URL(req.url).searchParams.get('token') || '';
-  if (!adminToken || providedToken !== adminToken) {
+  const providedToken = req.headers.get('x-admin-token') || '';
+  if (!adminToken || !safeEqual(providedToken, adminToken)) {
     return json({ error: 'unauthorized' }, 401);
   }
 
@@ -65,7 +66,18 @@ Deno.serve(async (req) => {
   const since = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-  const [eventsResult, babiesResult, subscriptionsResult, paymentsResult, aiRequestsResult] = await Promise.all([
+  const [
+    eventsResult,
+    babiesResult,
+    subscriptionsResult,
+    paymentsResult,
+    aiRequestsResult,
+    notificationSettingsResult,
+    notificationDeliveriesResult,
+    scheduleRemindersResult,
+    notificationRunsResult,
+    supportRequestsResult
+  ] = await Promise.all([
     supabase
       .from('events')
       .select('id,event_name,user_id,client_id,telegram_id,attribution,payload,created_at')
@@ -93,7 +105,34 @@ Deno.serve(async (req) => {
       .select('telegram_id,status,model,mode,feedback,latency_ms,input_tokens,output_tokens,created_at')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
-      .limit(5000)
+      .limit(5000),
+    supabase
+      .from('notification_settings')
+      .select('enabled,schedule_reminders,updated_at')
+      .limit(5000),
+    supabase
+      .from('notification_deliveries')
+      .select('status,sent_at,error')
+      .gte('sent_at', since)
+      .order('sent_at', { ascending: false })
+      .limit(5000),
+    supabase
+      .from('schedule_reminders')
+      .select('status,scheduled_at,sent_at,error,attempts')
+      .gte('scheduled_at', since)
+      .order('scheduled_at', { ascending: false })
+      .limit(5000),
+    supabase
+      .from('notification_runs')
+      .select('trigger,dry_run,planned,sent,failed,completed_at')
+      .order('completed_at', { ascending: false })
+      .limit(100),
+    supabase
+      .from('support_requests')
+      .select('id,telegram_id,category,message,status,created_at')
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+      .limit(100)
   ]);
 
   if (eventsResult.error) return json({ error: 'events_query_failed', details: eventsResult.error.message }, 500);
@@ -101,6 +140,11 @@ Deno.serve(async (req) => {
   if (subscriptionsResult.error) return json({ error: 'subscriptions_query_failed', details: subscriptionsResult.error.message }, 500);
   if (paymentsResult.error) return json({ error: 'payments_query_failed', details: paymentsResult.error.message }, 500);
   if (aiRequestsResult.error) return json({ error: 'ai_requests_query_failed', details: aiRequestsResult.error.message }, 500);
+  if (notificationSettingsResult.error) return json({ error: 'notification_settings_query_failed', details: notificationSettingsResult.error.message }, 500);
+  if (notificationDeliveriesResult.error) return json({ error: 'notification_deliveries_query_failed', details: notificationDeliveriesResult.error.message }, 500);
+  if (scheduleRemindersResult.error) return json({ error: 'schedule_reminders_query_failed', details: scheduleRemindersResult.error.message }, 500);
+  if (notificationRunsResult.error) return json({ error: 'notification_runs_query_failed', details: notificationRunsResult.error.message }, 500);
+  if (supportRequestsResult.error) return json({ error: 'support_requests_query_failed', details: supportRequestsResult.error.message }, 500);
 
   return json(buildDashboard({
     events: eventsResult.data || [],
@@ -108,17 +152,27 @@ Deno.serve(async (req) => {
     subscriptions: subscriptionsResult.data || [],
     payments: paymentsResult.data || [],
     aiRequests: aiRequestsResult.data || [],
+    notificationSettings: notificationSettingsResult.data || [],
+    notificationDeliveries: notificationDeliveriesResult.data || [],
+    scheduleReminders: scheduleRemindersResult.data || [],
+    notificationRuns: notificationRunsResult.data || [],
+    supportRequests: supportRequestsResult.data || [],
     rangeDays,
     generatedAt: new Date().toISOString()
   }));
 });
 
-function buildDashboard({ events, babies, subscriptions = [], payments = [], aiRequests = [], rangeDays, generatedAt }: {
+function buildDashboard({ events, babies, subscriptions = [], payments = [], aiRequests = [], notificationSettings = [], notificationDeliveries = [], scheduleReminders = [], notificationRuns = [], supportRequests = [], rangeDays, generatedAt }: {
   events: any[];
   babies: any[];
   subscriptions?: any[];
   payments?: any[];
   aiRequests?: any[];
+  notificationSettings?: any[];
+  notificationDeliveries?: any[];
+  scheduleReminders?: any[];
+  notificationRuns?: any[];
+  supportRequests?: any[];
   rangeDays: number;
   generatedAt: string;
 }) {
@@ -173,6 +227,8 @@ function buildDashboard({ events, babies, subscriptions = [], payments = [], aiR
     sources: buildSources(events),
     billing: buildBilling({ subscriptions, payments }),
     ai_usage: buildAiUsage(aiRequests),
+    operations: buildOperations({ notificationSettings, notificationDeliveries, scheduleReminders, notificationRuns, generatedAt }),
+    support_requests: supportRequests.map(formatSupportRequest),
     subscriptions: (subscriptions || []).map(formatSubscription).sort(byPeriodEndDesc).slice(0, 100),
     payments: (payments || []).map(formatPayment).sort(byPaymentCreatedDesc).slice(0, 100),
     babies: babies.map(formatBaby).sort(byProfileCompleteness),
@@ -228,7 +284,39 @@ function buildBilling({ subscriptions = [], payments = [] }: { subscriptions?: a
     failed_payments: failedPayments.length,
     pending_payments: pendingPayments.length,
     month_subscriptions: activeSubscriptions.filter(item => item.plan === 'month').length,
-    year_subscriptions: activeSubscriptions.filter(item => item.plan === 'year').length
+    half_year_subscriptions: activeSubscriptions.filter(item => item.plan === 'half_year').length,
+    legacy_year_subscriptions: activeSubscriptions.filter(item => item.plan === 'year').length
+  };
+}
+
+function buildOperations({ notificationSettings = [], notificationDeliveries = [], scheduleReminders = [], notificationRuns = [], generatedAt }: any) {
+  const now = new Date(generatedAt).getTime();
+  const allDeliveries = [...notificationDeliveries, ...scheduleReminders];
+  const sent = allDeliveries.filter(item => item.status === 'sent');
+  const failed = allDeliveries.filter(item => item.status === 'failed');
+  const pending = scheduleReminders.filter(item => ['pending', 'processing'].includes(item.status));
+  const nextDue = pending
+    .map(item => item.scheduled_at)
+    .filter(value => new Date(value).getTime() > now)
+    .sort()[0] || null;
+  const lastSent = sent
+    .map(item => item.sent_at)
+    .filter(Boolean)
+    .sort()
+    .reverse()[0] || null;
+
+  return {
+    reminders_enabled: notificationSettings.filter(item => item.enabled).length,
+    schedule_enabled: notificationSettings.filter(item => item.enabled && item.schedule_reminders).length,
+    sent: sent.length,
+    failed: failed.length,
+    pending: pending.length,
+    overdue: pending.filter(item => new Date(item.scheduled_at).getTime() <= now).length,
+    next_due_at: nextDue,
+    last_sent_at: lastSent,
+    last_run_at: notificationRuns[0]?.completed_at || null,
+    last_run_trigger: notificationRuns[0]?.trigger || null,
+    last_run_failed: Number(notificationRuns[0]?.failed || 0)
   };
 }
 
@@ -388,6 +476,17 @@ function formatPayment(payment: any) {
   };
 }
 
+function formatSupportRequest(request: any) {
+  return {
+    id: request.id || '',
+    telegram_id: request.telegram_id || null,
+    category: request.category || 'payment',
+    message: String(request.message || '').slice(0, 1000),
+    status: request.status || 'open',
+    created_at: request.created_at || null
+  };
+}
+
 function byCreatedDesc(a: any, b: any) {
   return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
 }
@@ -457,4 +556,11 @@ function json(data: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
+}
+
+function safeEqual(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let value = 0;
+  for (let index = 0; index < a.length; index += 1) value |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  return value === 0;
 }

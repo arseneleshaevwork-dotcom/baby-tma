@@ -70,6 +70,8 @@ create table if not exists public.notification_deliveries (
   event_date date not null,
   status text not null default 'sent',
   error text,
+  claimed_at timestamptz,
+  attempts integer not null default 0,
   sent_at timestamptz not null default now(),
   unique(baby_id, reminder_type, event_date)
 );
@@ -104,6 +106,59 @@ create table if not exists public.payments (
   raw_payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   paid_at timestamptz
+);
+
+create table if not exists public.schedule_reminders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade,
+  telegram_id bigint not null,
+  chat_id bigint not null,
+  reminder_key text not null,
+  reminder_type text not null,
+  title text not null,
+  message text not null,
+  scheduled_at timestamptz not null,
+  status text not null default 'pending',
+  sent_at timestamptz,
+  error text,
+  claimed_at timestamptz,
+  attempts integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique(telegram_id, reminder_key, scheduled_at)
+);
+
+create table if not exists public.analytics_rate_limits (
+  key_hash text primary key,
+  window_start timestamptz not null default now(),
+  request_count integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.internal_config (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.notification_runs (
+  id uuid primary key default gen_random_uuid(),
+  trigger text not null,
+  dry_run boolean not null default false,
+  planned integer not null default 0,
+  sent integer not null default 0,
+  failed integer not null default 0,
+  completed_at timestamptz not null default now()
+);
+
+create table if not exists public.support_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete set null,
+  telegram_id bigint not null,
+  category text not null default 'payment',
+  message text not null,
+  status text not null default 'open',
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz
 );
 
 create table if not exists public.ai_consents (
@@ -155,6 +210,19 @@ create index if not exists subscriptions_telegram_id_idx
 create index if not exists payments_telegram_id_created_at_idx
   on public.payments (telegram_id, created_at desc);
 
+create unique index if not exists payments_telegram_charge_unique_idx
+  on public.payments (telegram_payment_charge_id)
+  where telegram_payment_charge_id is not null;
+
+create index if not exists schedule_reminders_due_idx
+  on public.schedule_reminders (status, scheduled_at);
+
+create index if not exists notification_runs_completed_idx
+  on public.notification_runs (completed_at desc);
+
+create index if not exists support_requests_status_created_idx
+  on public.support_requests (status, created_at desc);
+
 create index if not exists ai_requests_telegram_created_idx
   on public.ai_requests (telegram_id, created_at desc);
 
@@ -169,6 +237,11 @@ alter table public.notification_settings enable row level security;
 alter table public.notification_deliveries enable row level security;
 alter table public.subscriptions enable row level security;
 alter table public.payments enable row level security;
+alter table public.schedule_reminders enable row level security;
+alter table public.analytics_rate_limits enable row level security;
+alter table public.internal_config enable row level security;
+alter table public.notification_runs enable row level security;
+alter table public.support_requests enable row level security;
 alter table public.ai_consents enable row level security;
 alter table public.ai_requests enable row level security;
 

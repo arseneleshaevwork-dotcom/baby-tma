@@ -1,7 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://arseneleshaevwork-dotcom.github.io',
+  'Vary': 'Origin',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-token, x-cron-token',
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
@@ -16,9 +17,7 @@ Deno.serve(async (req) => {
   const cronToken = Deno.env.get('CRON_TOKEN');
   const providedToken = req.headers.get('x-admin-token') || '';
   const providedCronToken = req.headers.get('x-cron-token') || '';
-  const adminAuthorized = Boolean(adminToken && providedToken === adminToken);
-  const cronAuthorized = Boolean(cronToken && providedCronToken === cronToken);
-  if (!adminAuthorized && !cronAuthorized) return json({ error: 'unauthorized' }, 401);
+  const adminAuthorized = Boolean(adminToken && safeEqual(providedToken, adminToken));
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -27,10 +26,16 @@ Deno.serve(async (req) => {
     return json({ error: 'server_not_configured' }, 500);
   }
 
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const cronAuthorized = Boolean(
+    (cronToken && safeEqual(providedCronToken, cronToken))
+    || (providedCronToken && await verifyDatabaseCronToken(supabase, providedCronToken))
+  );
+  if (!adminAuthorized && !cronAuthorized) return json({ error: 'unauthorized' }, 401);
+
   const body = await req.json().catch(() => ({}));
   const dryRun = Boolean(body?.dry_run);
   const today = dateOnly(body?.date || new Date().toISOString());
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   const scheduled = body?.run_scheduled === false
     ? []
@@ -49,7 +54,7 @@ Deno.serve(async (req) => {
       .limit(5000),
     supabase
       .from('notification_deliveries')
-      .select('baby_id,reminder_type,event_date')
+      .select('baby_id,reminder_type,event_date,status,claimed_at')
       .eq('event_date', today)
       .limit(5000)
   ]);
@@ -59,7 +64,10 @@ Deno.serve(async (req) => {
   if (deliveriesResult.error) return json({ error: 'deliveries_query_failed', details: deliveriesResult.error.message }, 500);
 
   const settings = settingsResult.data || [];
-  const delivered = new Set((deliveriesResult.data || []).map((row: any) => `${row.baby_id}:${row.reminder_type}:${row.event_date}`));
+  const claimTimeout = Date.now() - 15 * 60 * 1000;
+  const delivered = new Set((deliveriesResult.data || [])
+    .filter((row: any) => row.status === 'sent' || (row.status === 'processing' && new Date(row.claimed_at || 0).getTime() >= claimTimeout))
+    .map((row: any) => `${row.baby_id}:${row.reminder_type}:${row.event_date}`));
   const jobs = buildReminderJobs({
     babies: babiesResult.data || [],
     settings,
@@ -69,18 +77,24 @@ Deno.serve(async (req) => {
 
   const sent: any[] = [];
   for (const job of jobs) {
+    let outcome = { ok: true, dry_run: dryRun, error: null as string | null };
     if (!dryRun) {
-      const result = await sendTelegram(botToken, job.chat_id, job.text);
-      await supabase.from('notification_deliveries').insert({
-        user_id: job.user_id,
-        baby_id: job.baby_id,
-        telegram_id: job.telegram_id,
-        chat_id: job.chat_id,
-        reminder_type: job.reminder_type,
-        event_date: job.event_date,
-        status: result.ok ? 'sent' : 'failed',
-        error: result.ok ? null : result.error
+      const { data: deliveryId, error: claimError } = await supabase.rpc('claim_baby_notification', {
+        p_user_id: job.user_id,
+        p_baby_id: job.baby_id,
+        p_telegram_id: job.telegram_id,
+        p_chat_id: job.chat_id,
+        p_reminder_type: job.reminder_type,
+        p_event_date: job.event_date
       });
+      if (claimError || !deliveryId) continue;
+      const result = await sendTelegram(botToken, job.chat_id, job.text);
+      outcome = { ok: result.ok, dry_run: false, error: result.error };
+      await supabase.from('notification_deliveries').update({
+        status: result.ok ? 'sent' : 'failed',
+        error: result.ok ? null : result.error,
+        sent_at: new Date().toISOString()
+      }).eq('id', deliveryId).eq('status', 'processing');
       await supabase.from('events').insert({
         event_name: 'notification_sent',
         user_id: job.user_id,
@@ -98,23 +112,44 @@ Deno.serve(async (req) => {
       name: job.name,
       reminder_type: job.reminder_type,
       event_date: job.event_date,
-      chat_id: job.chat_id
+      chat_id: job.chat_id,
+      ...outcome
     });
   }
 
-  return json({ ok: true, dry_run: dryRun, date: today, planned: jobs.length, sent, scheduled });
+  const milestoneSummary = summarizeResults(sent);
+  const scheduledSummary = summarizeResults(scheduled);
+  await supabase.from('notification_runs').insert({
+    trigger: cronAuthorized ? 'cron' : 'admin',
+    dry_run: dryRun,
+    planned: milestoneSummary.planned + scheduledSummary.planned,
+    sent: milestoneSummary.sent + scheduledSummary.sent,
+    failed: milestoneSummary.failed + scheduledSummary.failed,
+    completed_at: new Date().toISOString()
+  });
+
+  return json({
+    ok: true,
+    dry_run: dryRun,
+    date: today,
+    milestones: milestoneSummary,
+    scheduled: scheduledSummary
+  });
 });
 
 async function processScheduledReminders({ supabase, botToken, dryRun }: any) {
   const now = new Date();
-  const overdue = new Date(now.getTime() - 10 * 60000);
-  const { data: rows, error } = await supabase.from('schedule_reminders')
-    .select('id,user_id,telegram_id,chat_id,reminder_type,title,message,scheduled_at')
-    .eq('status', 'pending')
-    .lte('scheduled_at', now.toISOString())
-    .gte('scheduled_at', overdue.toISOString())
-    .order('scheduled_at', { ascending: true })
-    .limit(500);
+  const overdue = new Date(now.getTime() - 6 * 60 * 60000);
+  const query = dryRun
+    ? supabase.from('schedule_reminders')
+      .select('id,user_id,telegram_id,chat_id,reminder_type,title,message,scheduled_at')
+      .eq('status', 'pending')
+      .lte('scheduled_at', now.toISOString())
+      .gte('scheduled_at', overdue.toISOString())
+      .order('scheduled_at', { ascending: true })
+      .limit(500)
+    : supabase.rpc('claim_due_schedule_reminders', { p_limit: 500 });
+  const { data: rows, error } = await query;
   if (error) return [{ error: error.message }];
 
   const results: any[] = [];
@@ -128,7 +163,7 @@ async function processScheduledReminders({ supabase, botToken, dryRun }: any) {
       status: result.ok ? 'sent' : 'failed',
       sent_at: result.ok ? now.toISOString() : null,
       error: result.ok ? null : result.error
-    }).eq('id', row.id).eq('status', 'pending');
+    }).eq('id', row.id).eq('status', 'processing');
     await supabase.from('events').insert({
       event_name: 'notification_sent',
       user_id: row.user_id,
@@ -139,8 +174,16 @@ async function processScheduledReminders({ supabase, botToken, dryRun }: any) {
   }
 
   await supabase.from('schedule_reminders').update({ status: 'expired' })
-    .eq('status', 'pending').lt('scheduled_at', overdue.toISOString());
+    .in('status', ['pending', 'processing']).lt('scheduled_at', overdue.toISOString());
   return results;
+}
+
+function summarizeResults(items: any[]) {
+  return {
+    planned: items.length,
+    sent: items.filter(item => item.ok === true || item.dry_run === true).length,
+    failed: items.filter(item => item.ok === false || item.error).length
+  };
 }
 
 function buildReminderJobs({ babies, settings, today, delivered }: {
@@ -241,6 +284,25 @@ function parseDateOnly(value: string) {
 function dateOnly(value: string) {
   const date = new Date(value);
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())).toISOString().slice(0, 10);
+}
+
+function safeEqual(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let value = 0;
+  for (let index = 0; index < a.length; index += 1) value |= a.charCodeAt(index) ^ b.charCodeAt(index);
+  return value === 0;
+}
+
+async function verifyDatabaseCronToken(supabase: any, token: string) {
+  const tokenHash = await sha256(token);
+  const { data } = await supabase.from('internal_config')
+    .select('value').eq('key', 'notification_cron_token_hash').maybeSingle();
+  return Boolean(data?.value && safeEqual(tokenHash, data.value));
+}
+
+async function sha256(value: string) {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
+  return [...digest].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function json(data: unknown, status = 200) {

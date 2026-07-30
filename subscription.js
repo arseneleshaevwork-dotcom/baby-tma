@@ -263,12 +263,12 @@ function _renderTrialActive(days) {
       <button class="cta-sub-btn" onclick="handleSubscribe('month');hapticMedium()">
         ⭐ Premium за 299 ⭐ / 30 дней
       </button>
-      <button class="cta-outline-btn" onclick="handleSubscribe('year');hapticLight()">
-        💫 1490 ⭐ / год — экономия 50%
+      <button class="cta-outline-btn" onclick="handleSubscribe('half_year');hapticLight()">
+        💫 1490 ⭐ / 6 месяцев — экономия 17%
       </button>
     </div>
     <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
-      Месячная подписка продлевается автоматически · годовой доступ оплачивается один раз
+      Месячная подписка продлевается автоматически · 6 месяцев оплачиваются один раз<br>Автопродлением можно управлять в настройках подписок Telegram
     </p>
   `;
 }
@@ -298,26 +298,26 @@ function _renderFreePage() {
         <div class="plan-price">299<span> ⭐</span></div>
         <div class="plan-label">на 30 дней</div>
       </div>
-      <div class="plan-card recommended" onclick="handleSubscribe('year');hapticLight()">
+      <div class="plan-card recommended" onclick="handleSubscribe('half_year');hapticLight()">
         <div class="plan-badge">Выгоднее</div>
         <div class="plan-price">1490<span> ⭐</span></div>
-        <div class="plan-label">на 1 год</div>
-        <div class="plan-save">Экономия 50%</div>
+        <div class="plan-label">на 6 месяцев</div>
+        <div class="plan-save">Экономия 17%</div>
       </div>
     </div>
 
     <div class="plan-comparison">${_featuresList(false)}</div>
 
     <div style="padding:0 0 8px">
-      <button class="cta-sub-btn" onclick="handleSubscribe('year');hapticMedium()">
-        💫 Подписаться за 1490 ⭐/год
+      <button class="cta-sub-btn" onclick="handleSubscribe('half_year');hapticMedium()">
+        💫 6 месяцев за 1490 ⭐
       </button>
       <button class="cta-outline-btn" style="margin-top:8px" onclick="handleSubscribe('month');hapticLight()">
         или 299 ⭐ на 30 дней
       </button>
     </div>
     <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
-      Месячная подписка продлевается автоматически · годовой доступ оплачивается один раз
+      Месячная подписка продлевается автоматически · 6 месяцев оплачиваются один раз<br>Автопродлением можно управлять в настройках подписок Telegram
     </p>
   `;
 }

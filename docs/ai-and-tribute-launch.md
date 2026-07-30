@@ -1,4 +1,4 @@
-# AI and Tribute launch checklist
+# AI and subscription launch checklist
 
 ## Current AI pilot
 
@@ -20,35 +20,31 @@ Pilot capacity target: up to 500 registered users, 30-100 daily active users and
 5. Restart `baby-agent.service`, confirm `/health` reports `provider_configured: true`, then test safety, diary and provider-failure fallback.
 6. Watch p95 latency, failures and answer feedback in the admin dashboard for at least one week before raising limits.
 
-## Tribute products
+## Subscription decision
 
-Create two offers:
+Digital Premium access sold inside the Telegram bot or Mini App uses Telegram Stars. This is the Telegram-compliant checkout and does not require a separate YooKassa, YooMoney, Tribute or Lava checkout inside the Mini App.
 
-- Monthly: recurring access, the base displayed price.
-- Six months: one-time or recurring only if Tribute supports the required renewal flow; target a 20% discount versus six monthly payments.
+The product has two offers:
 
-The Mini App must show one paywall with both periods, the exact renewal terms, price, cancellation path and a restore/check-status command. Access is activated from a verified Tribute webhook, never from a browser redirect alone.
+- Monthly: 299 Stars, recurring every 30 days.
+- Six months: 1490 Stars, one-time access for 180 days.
 
-Required server secrets:
+The Mini App shows both periods, exact renewal terms and the access end date. Access is activated only from Telegram's verified payment update. Every recurring charge is stored as a separate payment and is idempotent by Telegram charge ID.
 
-- `TRIBUTE_API_KEY`
-- `TRIBUTE_WEBHOOK_SECRET`
-- product identifiers for monthly and six-month offers
+YooKassa can be evaluated later for a separate public website. It must not replace Stars for digital access sold inside Telegram. Tribute and Lava are not part of the launch payment path.
 
-Webhook acceptance rules:
+Payment acceptance rules:
 
-- verify Tribute's documented HMAC signature against the exact raw request body;
-- reject stale or duplicate events;
+- require Telegram webhook secret validation;
+- reject duplicate charge IDs;
 - map access by verified Telegram ID;
-- store the external event/payment ID for idempotency;
-- activate only paid/active events and revoke only on an explicit expired/refunded/cancelled state;
+- verify invoice owner, currency and amount before checkout;
+- activate only successful Telegram payment updates;
 - keep raw payloads private and redact them from logs.
-
-Do not replace Telegram Stars checkout until the Tribute products, webhook replay tests, refund flow and Mini App policy compliance are verified in production.
 
 ## Partner program
 
-Start with one channel-specific partner link per promoter, 20% commission for six months, and no overlapping native Telegram affiliate commission. Track partner/source, clicks, app opens, completed profiles, trial starts, paid conversions, refunds and net revenue in the admin dashboard. Pay only from verified Tribute conversions after the refund window.
+Partner experiments remain deferred. Attribution by `start_param` and UTM stays enabled so future promoters can be measured without changing the app.
 
 ## Launch gates
 
@@ -57,4 +53,4 @@ Start with one channel-specific partner link per promoter, 20% commission for si
 - Agent failure returns a useful fallback in the Mini App.
 - p95 response time and error rate are visible in admin analytics.
 - Backup, swap, service restart and rollback have been tested.
-- Tribute webhook, cancellation, refund and duplicate-event tests pass before paid traffic.
+- Stars purchase, recurring renewal and duplicate-event tests pass before paid traffic.

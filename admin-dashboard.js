@@ -32,7 +32,7 @@ const { buildUpcomingBabyDates } = typeof require === 'function'
   ? require('./baby-milestones')
   : { buildUpcomingBabyDates: () => [] };
 
-function buildAdminDashboard({ events = [], babies = [], subscriptions = [], payments = [], aiRequests = [], generatedAt, rangeDays = 30, now = new Date() } = {}) {
+function buildAdminDashboard({ events = [], babies = [], subscriptions = [], payments = [], aiRequests = [], notificationSettings = [], notificationDeliveries = [], scheduleReminders = [], notificationRuns = [], supportRequests = [], generatedAt, rangeDays = 30, now = new Date() } = {}) {
   const totals = Object.fromEntries(TRACKED_EVENTS.map(event => [event, 0]));
   const usersByEvent = Object.fromEntries(TRACKED_EVENTS.map(event => [event, new Set()]));
   const userEvents = new Map();
@@ -86,6 +86,8 @@ function buildAdminDashboard({ events = [], babies = [], subscriptions = [], pay
     sources: buildSources(events),
     billing: buildBilling({ subscriptions, payments, now }),
     ai_usage: buildAiUsage(aiRequests),
+    operations: buildOperations({ notificationSettings, notificationDeliveries, scheduleReminders, notificationRuns, now }),
+    support_requests: supportRequests.map(formatSupportRequest),
     subscriptions: subscriptions.map(formatSubscription).sort(byPeriodEndDesc).slice(0, 100),
     payments: payments.map(formatPayment).sort(byPaymentCreatedDesc).slice(0, 100),
     babies: babies.map(formatBaby).sort(byProfileCompleteness),
@@ -141,7 +143,31 @@ function buildBilling({ subscriptions = [], payments = [], now = new Date() } = 
     failed_payments: failedPayments.length,
     pending_payments: pendingPayments.length,
     month_subscriptions: activeSubscriptions.filter(item => item.plan === 'month').length,
-    year_subscriptions: activeSubscriptions.filter(item => item.plan === 'year').length
+    half_year_subscriptions: activeSubscriptions.filter(item => item.plan === 'half_year').length,
+    legacy_year_subscriptions: activeSubscriptions.filter(item => item.plan === 'year').length
+  };
+}
+
+function buildOperations({ notificationSettings = [], notificationDeliveries = [], scheduleReminders = [], notificationRuns = [], now = new Date() } = {}) {
+  const nowMs = new Date(now).getTime();
+  const allDeliveries = [...notificationDeliveries, ...scheduleReminders];
+  const sent = allDeliveries.filter(item => item.status === 'sent');
+  const failed = allDeliveries.filter(item => item.status === 'failed');
+  const pending = scheduleReminders.filter(item => ['pending', 'processing'].includes(item.status));
+  const nextDueAt = pending.map(item => item.scheduled_at).filter(value => new Date(value).getTime() > nowMs).sort()[0] || null;
+  const lastSentAt = sent.map(item => item.sent_at).filter(Boolean).sort().reverse()[0] || null;
+  return {
+    reminders_enabled: notificationSettings.filter(item => item.enabled).length,
+    schedule_enabled: notificationSettings.filter(item => item.enabled && item.schedule_reminders).length,
+    sent: sent.length,
+    failed: failed.length,
+    pending: pending.length,
+    overdue: pending.filter(item => new Date(item.scheduled_at).getTime() <= nowMs).length,
+    next_due_at: nextDueAt,
+    last_sent_at: lastSentAt,
+    last_run_at: notificationRuns[0]?.completed_at || null,
+    last_run_trigger: notificationRuns[0]?.trigger || null,
+    last_run_failed: Number(notificationRuns[0]?.failed || 0)
   };
 }
 
@@ -239,6 +265,17 @@ function formatPayment(payment = {}) {
     status: payment.status || '',
     created_at: payment.created_at || null,
     paid_at: payment.paid_at || null
+  };
+}
+
+function formatSupportRequest(request = {}) {
+  return {
+    id: request.id || '',
+    telegram_id: request.telegram_id || null,
+    category: request.category || 'payment',
+    message: String(request.message || '').slice(0, 1000),
+    status: request.status || 'open',
+    created_at: request.created_at || null
   };
 }
 

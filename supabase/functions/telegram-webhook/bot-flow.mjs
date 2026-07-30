@@ -5,6 +5,20 @@ export function buildBotReply({ text = '', firstName = '', baby = null, miniAppU
   const name = String(firstName || '').trim() || 'мама';
   const reminderConsent = parseReminderConsent(cleanText);
 
+  if (cleanText.toLowerCase().startsWith('/paysupport')) {
+    const details = cleanText.slice('/paysupport'.length).trim().slice(0, 1000);
+    return details.length >= 5 ? {
+      action: 'payment_support',
+      support_message: details,
+      text: 'Обращение по оплате принято. Мы проверим его и ответим вам в этом чате. Не отправляйте данные карты, коды из SMS или пароли.',
+      reply_markup: openAppKeyboard(miniAppUrl)
+    } : {
+      action: 'payment_support_prompt',
+      text: 'Напишите команду /paysupport и после нее кратко опишите проблему, дату и сумму в Stars.\n\nПример: /paysupport оплатил 299 Stars сегодня, Premium не открылся.\n\nНе отправляйте данные карты, коды из SMS или пароли.',
+      reply_markup: openAppKeyboard(miniAppUrl)
+    };
+  }
+
   if (reminderConsent !== null) {
     return {
       action: reminderConsent ? 'enable_reminders' : 'disable_reminders',
@@ -172,7 +186,7 @@ function buildProfileText(baby = {}) {
 }
 
 function buildHelpText() {
-  return `Я помогу с режимом малыша: сон, кормления, дневник, ИИ-подсказки и напоминания.\n\nКоманды:\n/start — начать заново\n/profile — профиль малыша\n/reminders_on — включить напоминания\n/reminders_off — отключить напоминания\n/reset — сбросить профиль малыша\n/help — помощь\n\nМожно просто открыть мини-приложение и собрать режим на сегодня.`;
+  return `Я помогу с режимом малыша: сон, кормления, дневник, ИИ-подсказки и напоминания.\n\nКоманды:\n/start — начать заново\n/profile — профиль малыша\n/reminders_on — включить напоминания\n/reminders_off — отключить напоминания\n/paysupport — помощь с оплатой\n/reset — сбросить профиль малыша\n/help — помощь\n\nМожно просто открыть мини-приложение и собрать режим на сегодня.`;
 }
 
 function parseDateOnly(value) {

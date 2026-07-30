@@ -77,7 +77,7 @@ test('builds admin totals, funnel and baby table from raw analytics rows', () =>
         id: 'p2',
         user_id: 'u2',
         telegram_id: 2,
-        plan: 'year',
+        plan: 'half_year',
         currency: 'XTR',
         total_amount: 1490,
         status: 'created',
@@ -88,6 +88,20 @@ test('builds admin totals, funnel and baby table from raw analytics rows', () =>
       { telegram_id: 1, status: 'completed', model: 'baby-knowledge', mode: 'knowledge', feedback: 'helpful', latency_ms: 1200, input_tokens: 300, output_tokens: 120 },
       { telegram_id: 1, status: 'failed', model: 'gpt-5.6-terra' },
       { telegram_id: 2, status: 'rate_limited', model: 'gpt-5.6-terra' }
+    ],
+    notificationSettings: [
+      { enabled: true, schedule_reminders: true },
+      { enabled: true, schedule_reminders: false }
+    ],
+    notificationDeliveries: [
+      { status: 'sent', sent_at: '2026-06-13T10:00:00.000Z' }
+    ],
+    scheduleReminders: [
+      { status: 'pending', scheduled_at: '2026-06-14T01:00:00.000Z' },
+      { status: 'failed', scheduled_at: '2026-06-13T09:00:00.000Z', error: 'blocked' }
+    ],
+    notificationRuns: [
+      { trigger: 'cron', failed: 0, completed_at: '2026-06-13T23:55:00.000Z' }
     ],
     generatedAt: '2026-06-14T00:00:00.000Z',
     rangeDays: 30,
@@ -123,6 +137,12 @@ test('builds admin totals, funnel and baby table from raw analytics rows', () =>
   assert.strictEqual(dashboard.billing.active_subscriptions, 1);
   assert.strictEqual(dashboard.billing.paid_stars, 299);
   assert.strictEqual(dashboard.billing.pending_payments, 1);
+  assert.strictEqual(dashboard.operations.reminders_enabled, 2);
+  assert.strictEqual(dashboard.operations.schedule_enabled, 1);
+  assert.strictEqual(dashboard.operations.pending, 1);
+  assert.strictEqual(dashboard.operations.failed, 1);
+  assert.strictEqual(dashboard.operations.next_due_at, '2026-06-14T01:00:00.000Z');
+  assert.strictEqual(dashboard.operations.last_run_trigger, 'cron');
   assert.strictEqual(dashboard.subscriptions[0].plan, 'month');
   assert.strictEqual(dashboard.payments[0].status, 'created');
   assert.strictEqual(dashboard.recent_events.length, 10);

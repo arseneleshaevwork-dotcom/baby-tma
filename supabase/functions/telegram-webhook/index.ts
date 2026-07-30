@@ -9,11 +9,10 @@ Deno.serve(async (req) => {
   }
 
   const webhookSecret = Deno.env.get('TELEGRAM_WEBHOOK_SECRET');
-  if (webhookSecret) {
-    const providedSecret = req.headers.get('x-telegram-bot-api-secret-token') || '';
-    if (!timingSafeEqual(providedSecret, webhookSecret)) {
-      return json({ ok: false, error: 'unauthorized' }, 401);
-    }
+  if (!webhookSecret) return json({ ok: false, error: 'webhook_secret_missing' }, 503);
+  const providedSecret = req.headers.get('x-telegram-bot-api-secret-token') || '';
+  if (!timingSafeEqual(providedSecret, webhookSecret)) {
+    return json({ ok: false, error: 'unauthorized' }, 401);
   }
 
   const update = await req.json().catch(() => null);
@@ -115,6 +114,16 @@ Deno.serve(async (req) => {
         .eq('user_id', user.id);
     }
 
+    if (botReply?.action === 'payment_support' && user?.id && botReply?.support_message) {
+      await supabase.from('support_requests').insert({
+        user_id: user.id,
+        telegram_id: from.id,
+        category: 'payment',
+        message: String(botReply.support_message).slice(0, 1000),
+        status: 'open'
+      });
+    }
+
     if ((botReply?.action === 'enable_reminders' || botReply?.action === 'disable_reminders') && user?.id) {
       const enabled = botReply.action === 'enable_reminders';
       await supabase.from('notification_settings').upsert({
@@ -155,7 +164,11 @@ Deno.serve(async (req) => {
       baby_name: botReply?.profile?.name || baby?.name || null,
       baby_birthdate: botReply?.profile?.birthdate || baby?.birthdate || null,
       baby_age_months: botReply?.profile?.age_months ?? baby?.age_months ?? null,
-      payload: { text, action: botReply?.action || 'none' },
+      payload: {
+        action: botReply?.action || 'none',
+        command: text.startsWith('/') ? text.split(/\s+/)[0].slice(0, 40) : null,
+        message_length: text.length
+      },
       language: from.language_code || null
     });
   } else {
@@ -233,7 +246,9 @@ async function verifyPreCheckout(preCheckout: any) {
     .eq('invoice_payload', payload)
     .maybeSingle();
 
-  return payment?.status === 'created'
+  const paymentStatusAllowed = payment?.status === 'created'
+    || (parsePlan(payload) === 'month' && payment?.status === 'paid');
+  return paymentStatusAllowed
     && payment?.currency === preCheckout.currency
     && Number(payment?.total_amount) === Number(preCheckout.total_amount);
 }
@@ -255,19 +270,73 @@ async function handleSuccessfulPayment({ supabase, userId, telegramId, payment }
 
   const plan = parsePlan(payload);
   const now = new Date();
-  const days = plan === 'year' ? 365 : 30;
-  const currentPeriodEnd = new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+  const chargeId = String(payment?.telegram_payment_charge_id || '');
+  if (chargeId) {
+    const { data: duplicate } = await supabase
+      .from('payments')
+      .select('id')
+      .eq('telegram_payment_charge_id', chargeId)
+      .maybeSingle();
+    if (duplicate) {
+      const { data: activeSubscription } = await supabase
+        .from('subscriptions')
+        .select('current_period_end')
+        .eq('telegram_id', telegramId)
+        .maybeSingle();
+      return premiumActivatedReply(activeSubscription?.current_period_end || now.toISOString());
+    }
+  }
 
-  await supabase
+  const { data: invoice } = await supabase
     .from('payments')
-    .update({
+    .select('status,currency,total_amount')
+    .eq('invoice_payload', payload)
+    .maybeSingle();
+  if (!invoice || invoice.currency !== payment.currency || Number(invoice.total_amount) !== Number(payment.total_amount)) {
+    return supportPaymentReply();
+  }
+
+  const { data: currentSubscription } = await supabase
+    .from('subscriptions')
+    .select('current_period_end')
+    .eq('telegram_id', telegramId)
+    .maybeSingle();
+  const days = plan === 'half_year' ? 180 : 30;
+  const telegramExpirationMs = Number(payment?.subscription_expiration_date || 0) * 1000;
+  const currentEndMs = new Date(currentSubscription?.current_period_end || 0).getTime();
+  const extensionStartMs = Math.max(now.getTime(), Number.isFinite(currentEndMs) ? currentEndMs : 0);
+  const currentPeriodEnd = telegramExpirationMs > now.getTime()
+    ? new Date(telegramExpirationMs).toISOString()
+    : new Date(extensionStartMs + days * 24 * 60 * 60 * 1000).toISOString();
+
+  const paymentValues = {
       status: 'paid',
-      telegram_payment_charge_id: payment.telegram_payment_charge_id || null,
+      telegram_payment_charge_id: chargeId || null,
       provider_payment_charge_id: payment.provider_payment_charge_id || null,
       raw_payload: payment,
       paid_at: now.toISOString()
-    })
-    .eq('invoice_payload', payload);
+  };
+  if (invoice.status === 'created') {
+    const { error } = await supabase.from('payments').update(paymentValues).eq('invoice_payload', payload);
+    if (error) return supportPaymentReply();
+  } else {
+    const renewalPayload = `${payload}:renewal:${chargeId || crypto.randomUUID()}`;
+    const { error } = await supabase.from('payments').insert({
+      user_id: userId,
+      telegram_id: telegramId,
+      invoice_payload: renewalPayload,
+      plan,
+      currency: payment.currency,
+      total_amount: payment.total_amount,
+      ...paymentValues
+    });
+    if (error && error.code !== '23505') return supportPaymentReply();
+    if (error?.code === '23505') {
+      const { data: activeSubscription } = await supabase.from('subscriptions')
+        .select('current_period_end').eq('telegram_id', telegramId).maybeSingle();
+      return premiumActivatedReply(activeSubscription?.current_period_end || currentPeriodEnd);
+    }
+  }
 
   await supabase
     .from('subscriptions')
@@ -284,6 +353,10 @@ async function handleSuccessfulPayment({ supabase, userId, telegramId, payment }
       updated_at: now.toISOString()
     }, { onConflict: 'telegram_id' });
 
+  return premiumActivatedReply(currentPeriodEnd);
+}
+
+function premiumActivatedReply(currentPeriodEnd: string) {
   return {
     text: `⭐ Premium активирован.\n\nДоступ открыт до ${formatDate(currentPeriodEnd)}. Откройте мини-приложение — расширенные функции уже доступны.`,
     reply_markup: {
@@ -295,13 +368,25 @@ async function handleSuccessfulPayment({ supabase, userId, telegramId, payment }
   };
 }
 
+function supportPaymentReply() {
+  return {
+    text: 'Платеж получен, но не удалось автоматически обновить подписку. Напишите в поддержку, мы проверим оплату.',
+    reply_markup: {
+      inline_keyboard: [[{
+        text: 'Открыть мини-приложение',
+        web_app: { url: miniAppUrl }
+      }]]
+    }
+  };
+}
+
 function isPremiumPayload(payload: string) {
-  return /^premium:(month|year):\d+:[0-9a-f-]+$/i.test(String(payload || ''));
+  return /^premium:(month|half_year):\d+:[0-9a-f-]+$/i.test(String(payload || ''));
 }
 
 function parsePlan(payload: string) {
-  const match = String(payload || '').match(/^premium:(month|year):/);
-  return match?.[1] === 'year' ? 'year' : 'month';
+  const match = String(payload || '').match(/^premium:(month|half_year):/);
+  return match?.[1] === 'half_year' ? 'half_year' : 'month';
 }
 
 function formatDate(value: string) {

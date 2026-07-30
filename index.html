@@ -9,11 +9,14 @@
 <!-- Critical inline CSS -->
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
-  html,body{height:100%;background:#FFF9F5;color:#3D2C3E;font-family:-apple-system,sans-serif}
+  html,body{height:100%;background:#F6F7F6;color:#24212A;font-family:-apple-system,sans-serif}
 </style>
 
 <!-- Telegram SDK -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<!-- Lucide icon system -->
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
 
 <!-- Google Fonts — Nunito (non-blocking) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,7 +36,7 @@
 })();
 </script>
 
-<link rel="stylesheet" href="style.css?v=20260729-2">
+<link rel="stylesheet" href="style.css?v=20260730-1">
 </head>
 <body data-page="home">
 
@@ -41,33 +44,49 @@
      HEADER
 ═══════════════════════════════════════════════════════ -->
 <div class="app-header">
-  <div class="baby-avatar-wrap" onclick="editBabyPhoto()" style="cursor:pointer">
-    <div class="baby-avatar-emoji" id="babyAvatarEmoji">👶</div>
+  <button class="baby-avatar-wrap" onclick="editBabyPhoto()" aria-label="Изменить фото малыша">
+    <div class="baby-avatar-emoji" id="babyAvatarEmoji">РМ</div>
     <img id="babyAvatarImg" class="baby-avatar" src="" alt="Малыш" style="display:none">
-    <div class="baby-avatar-edit">✏️</div>
+    <span class="baby-avatar-edit"><i data-lucide="camera"></i></span>
+  </button>
+  <div class="app-header-copy">
+    <h1 id="appTitle">Доброе утро</h1>
+    <div class="baby-name" id="babyNameDisplay">Режим Малыша</div>
   </div>
-  <div class="baby-name" id="babyNameDisplay" style="display:none"></div>
-  <h1 id="appTitle">Режим Малыша</h1>
-  <p>Научно обоснованный генератор расписания</p>
-  <p class="medical-note">Не заменяет консультацию врача</p>
   <div class="trial-badge" id="trial-header-badge" style="display:none">🌸 Premium</div>
+  <button class="header-notification" onclick="goPage('profile',document.getElementById('bn-profile'));renderProfilePage();hapticLight()" aria-label="Открыть уведомления и профиль">
+    <i data-lucide="bell"></i>
+  </button>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
      PAGE: HOME
 ═══════════════════════════════════════════════════════ -->
 <div id="page-home" class="page active">
+  <h2 class="screen-title home-screen-title">Сегодня</h2>
   <div class="today-hero-card">
-    <div class="today-kicker">Сегодня</div>
+    <div class="today-hero-top">
+      <div class="today-kicker" id="todayKicker">Следующий шаг</div>
+      <div class="today-confidence" id="todayConfidence">Режим актуален</div>
+    </div>
     <div class="today-title" id="todayMainTitle">Соберите спокойный режим дня</div>
     <div class="today-sub" id="todayMainSub">Возраст, подъем и тип дня уже достаточно, чтобы получить первый план.</div>
     <div class="today-reason" id="todayMainReason" style="display:none"></div>
-    <button class="gen-btn today-primary" id="btn-generate" onclick="handleHomePrimaryAction()">✨ Собрать режим на сегодня</button>
-    <div class="today-actions">
-      <button onclick="goPage('tracker',document.getElementById('bn-tracker'));hapticLight()">😴 Записать сон</button>
-      <button onclick="goPage('chat',document.getElementById('bn-chat'));hapticLight()">💬 Спросить помощника</button>
-    </div>
+    <button class="gen-btn today-primary" id="btn-generate" onclick="handleHomePrimaryAction()"><i data-lucide="calendar-clock"></i><span>Собрать режим на сегодня</span></button>
   </div>
+
+  <section class="home-quick-section" aria-labelledby="homeQuickTitle">
+    <div class="section-heading-row">
+      <h3 id="homeQuickTitle">Быстро записать</h3>
+      <button onclick="goPage('tracker',document.getElementById('bn-tracker'));hapticLight()">Открыть дневник</button>
+    </div>
+    <div class="home-quick-grid">
+      <button onclick="fabToggleSleep();hapticLight()"><i data-lucide="moon"></i><span>Сон</span></button>
+      <button onclick="quickSleepTag('night_wake');hapticLight()"><i data-lucide="alarm-clock"></i><span>Пробуждение</span></button>
+      <button onclick="goPage('tracker',document.getElementById('bn-tracker'));hapticLight()"><i data-lucide="notebook-tabs"></i><span>Дневник</span></button>
+      <button onclick="goPage('chat',document.getElementById('bn-chat'));hapticLight()"><i data-lucide="message-circle"></i><span>Помощник</span></button>
+    </div>
+  </section>
 
   <div class="card baby-event-card" id="babyEventCard" style="display:none">
     <div class="baby-event-icon" id="babyEventIcon">📆</div>
@@ -79,16 +98,28 @@
     <button class="baby-event-btn" id="babyEventBtn" onclick="handleBabyEventAction();hapticLight()">Открыть</button>
   </div>
 
-  <div class="card today-plan-card" id="todayPlanCard" style="display:none">
-    <div class="diary-header">
-      <div class="section-title" style="margin-bottom:0">Ближайшие шаги</div>
-      <button class="export-btn" onclick="goPage('schedule',null);hapticLight()">Весь режим</button>
+  <section class="today-plan-card" id="todayPlanCard" style="display:none">
+    <div class="section-heading-row">
+      <h3>План дня</h3>
+      <button onclick="goPage('schedule',null);hapticLight()">Открыть режим</button>
     </div>
     <div id="todayPlanList"></div>
+  </section>
+
+  <!-- ─── SMART HOME CARD: Что сейчас с малышом ──────────── -->
+  <div class="home-insight-card" id="homeInsightCard" style="display:none">
+    <div class="hic-coach" id="hicCoach"></div>
+    <div class="hic-status" id="hicStatus"></div>
+    <div class="hic-plan" id="hicPlan" style="display:none">
+      <div class="hic-plan-label">План на завтра</div>
+      <div class="hic-plan-body" id="hicPlanBody"></div>
+      <button class="hic-plan-apply" onclick="applyPlanFromHome();hapticSuccess()">Применить к режиму</button>
+    </div>
+    <div class="hic-stats" id="hicStats" style="display:none"></div>
   </div>
 
   <details class="card setup-card">
-    <summary>Настроить режим</summary>
+    <summary><span>Настроить режим</span></summary>
     <div class="form-grid">
       <div class="field">
         <label for="ageMonths">Возраст малыша</label>
@@ -150,24 +181,6 @@
 
     <button class="gen-btn secondary-generate" onclick="generateAndSwitch()">Обновить режим</button>
   </details>
-
-  <!-- ─── SMART HOME CARD: Что сейчас с малышом ──────────── -->
-  <div class="card home-insight-card" id="homeInsightCard" style="display:none">
-    <div class="hic-coach" id="hicCoach"></div>
-
-    <!-- baby status pill -->
-    <div class="hic-status" id="hicStatus"></div>
-
-    <!-- tomorrow plan preview -->
-    <div class="hic-plan" id="hicPlan" style="display:none">
-      <div class="hic-plan-label">📅 План на завтра</div>
-      <div class="hic-plan-body" id="hicPlanBody"></div>
-      <button class="hic-plan-apply" onclick="applyPlanFromHome();hapticSuccess()">Применить к режиму →</button>
-    </div>
-
-    <!-- sleep stats mini row (if 3+ diary days) -->
-    <div class="hic-stats" id="hicStats" style="display:none"></div>
-  </div>
 
   <details class="card more-card">
     <summary>Еще полезное</summary>
@@ -246,17 +259,26 @@
      PAGE: CHAT
 ═══════════════════════════════════════════════════════ -->
 <div id="page-chat" class="page">
-  <div class="card">
-    <div class="section-title chat-page-title">ИИ-помощник</div>
-    <div class="chat-topic-label">По вашему режиму</div>
+  <div class="chat-shell">
+    <div class="chat-page-head">
+      <h2 class="screen-title chat-page-title">Помощник</h2>
+      <span class="chat-limit" id="chatLimitLabel">До 4 вопросов в день</span>
+    </div>
+    <div class="chat-context-strip" id="chatContextStrip" role="status">
+      <i data-lucide="shield-check"></i>
+      <span>Ответ учитывает возраст малыша</span>
+    </div>
+    <div class="chat-topic-label">Что можно спросить</div>
     <div class="chat-quick-actions" id="chatQuickActions"></div>
-    <div class="chat-topic-label">Быстрые темы</div>
-    <div class="chat-topics" id="chatTopics"></div>
+    <details class="chat-more-topics">
+      <summary>Ещё темы</summary>
+      <div class="chat-topics" id="chatTopics"></div>
+    </details>
     <div class="chat-messages" id="chatMessages"></div>
-    <div class="chat-disclaimer">Подсказки помогают с режимом и дневником, но не заменяют врача. При температуре, вялости, проблемах с дыханием или резком ухудшении обращайтесь за медицинской помощью.</div>
+    <div class="chat-disclaimer">Помощник не ставит диагнозы. При резком ухудшении самочувствия обратитесь к врачу.</div>
     <div class="chat-input-row">
-      <input class="chat-input" id="chatInput" placeholder="Задайте вопрос..." onkeydown="chatKeydown(event)">
-      <button class="chat-send" id="btn-chat-send" onclick="chatSend();hapticLight()" aria-label="Отправить">➤</button>
+      <input class="chat-input" id="chatInput" placeholder="Спросить о режиме или дневнике" onkeydown="chatKeydown(event)">
+      <button class="chat-send" id="btn-chat-send" onclick="chatSend();hapticLight()" aria-label="Отправить"><i data-lucide="send"></i></button>
     </div>
   </div>
 </div>
@@ -265,29 +287,46 @@
      PAGE: TRACKER
 ═══════════════════════════════════════════════════════ -->
 <div id="page-tracker" class="page">
-  <div class="card">
+  <div class="tracker-page-head">
+    <h2 class="screen-title">Дневник</h2>
+    <button class="tracker-date-btn" type="button" aria-label="Сегодня"><i data-lucide="calendar-days"></i></button>
+  </div>
+
+  <div class="diary-summary-strip" aria-label="Итоги дневника">
+    <div><strong id="diarySummarySleep">—</strong><span>сон последнего дня</span></div>
+    <div><strong id="diarySummaryWakings">0</strong><span>пробуждений</span></div>
+    <div><strong id="diarySummaryDays">0</strong><span>дней собрано</span></div>
+  </div>
+
+  <section class="tracker-quick-section">
     <div class="diary-header">
-      <div class="section-title" style="margin-bottom:0">📓 Дневник сна</div>
+      <div>
+        <h3>Быстрая запись</h3>
+        <div class="qsc-sub" id="quickSleepStatus">Сон не запущен</div>
+      </div>
       <div class="diary-streak" id="diaryStreak"></div>
     </div>
 
     <div class="quick-sleep-card">
       <div class="qsc-head">
-        <div>
-          <div class="qsc-title">Быстрая запись</div>
-          <div class="qsc-sub" id="quickSleepStatus">Сон не запущен</div>
-        </div>
+        <div class="qsc-title">Таймер сна</div>
         <div class="qsc-timer" id="quickSleepTimer">—</div>
       </div>
       <div class="qsc-actions">
-        <button onclick="startQuickSleep();hapticLight()">😴 Уснул</button>
-        <button onclick="finishQuickSleep();hapticSuccess()">🌤 Проснулся</button>
-        <button onclick="quickSleepTag('night_wake');hapticLight()">🌙 Проснулся ночью</button>
-        <button onclick="quickSleepTag('long_soothe');hapticLight()">⏳ Долго укладывали</button>
+        <button class="qsc-primary" id="qscStartBtn" onclick="startQuickSleep();hapticLight()"><i data-lucide="moon"></i><span>Уснул</span></button>
+        <button id="qscFinishBtn" onclick="finishQuickSleep();hapticSuccess()"><i data-lucide="sunrise"></i><span>Проснулся</span></button>
+      </div>
+      <div class="qsc-tags">
+        <button onclick="quickSleepTag('night_wake');hapticLight()"><i data-lucide="alarm-clock"></i><span>Проснулся ночью</span></button>
+        <button onclick="quickSleepTag('long_soothe');hapticLight()"><i data-lucide="hourglass"></i><span>Долго укладывали</span></button>
       </div>
       <button class="diary-undo-btn" id="undoDiaryBtn" onclick="undoLastDiaryAction();hapticLight()" style="display:none">↶ Отменить последнее действие</button>
     </div>
+  </section>
 
+  <details class="card diary-manual-card">
+    <summary><span>Добавить или исправить день</span><small>Время сна, отметки и заметка</small></summary>
+    <div class="diary-manual-content">
     <div class="tracker-grid">
       <div class="field"><label for="lgWake">🌅 Подъём</label><input type="time" id="lgWake" value="07:00"></div>
       <div class="field"><label for="lgBed">🌙 Укладывание</label><input type="time" id="lgBed" value="19:30"></div>
@@ -323,15 +362,16 @@
     </div>
 
     <button class="save-log-btn" id="btn-save-log" onclick="saveLog();hapticSuccess()">💾 Сохранить день</button>
-  </div>
+    </div>
+  </details>
 
   <div class="card" id="analysisBlock" style="display:none"></div>
 
-  <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div class="section-title" style="margin-bottom:0">📈 История</div>
-      <div style="display:flex;gap:8px">
-        <button class="export-btn" onclick="shareLog()" style="color:var(--clr-primary)">📤 Поделиться</button>
+  <section class="card tracker-history-card">
+    <div class="diary-header tracker-history-head">
+      <h3>История</h3>
+      <div class="tracker-export-actions">
+        <button class="export-btn" onclick="shareLog()" aria-label="Поделиться дневником"><i data-lucide="share-2"></i></button>
         <button class="export-btn" onclick="openPdfReportMenu()">PDF</button>
         <button class="export-btn" onclick="exportLog()">TXT</button>
       </div>
@@ -342,7 +382,7 @@
     </div>
     <div class="chart-box" id="trackerChart" style="display:none;margin-bottom:12px"><canvas id="trackerChartCanvas"></canvas></div>
     <div id="trackerTable"></div>
-  </div>
+  </section>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
@@ -527,16 +567,16 @@
 ═══════════════════════════════════════════════════════ -->
 <nav class="bottom-nav" role="navigation" aria-label="Основная навигация">
   <button class="bnav-item active" id="bn-home" onclick="goPage('home',this)" aria-label="Главная">
-    <span class="icon">🏠</span><span>Сегодня</span>
+    <span class="icon"><i data-lucide="house"></i></span><span>Сегодня</span>
   </button>
   <button class="bnav-item" id="bn-tracker" onclick="goPage('tracker',this)" aria-label="Дневник">
-    <span class="icon">😴</span><span>Дневник</span>
+    <span class="icon"><i data-lucide="notebook-tabs"></i></span><span>Дневник</span>
   </button>
   <button class="bnav-item" id="bn-chat" onclick="goPage('chat',this)" aria-label="Помощник">
-    <span class="icon">💬</span><span>Помощник</span>
+    <span class="icon"><i data-lucide="message-circle"></i></span><span>Помощник</span>
   </button>
   <button class="bnav-item" id="bn-profile" onclick="goPage('profile',this);renderProfilePage()" aria-label="Профиль">
-    <span class="icon">👤</span><span>Профиль</span>
+    <span class="icon"><i data-lucide="user-round"></i></span><span>Профиль</span>
   </button>
 </nav>
 
@@ -546,7 +586,7 @@
 <div id="fabSleepWrap">
   <div id="fabSleepTimer" style="display:none"></div>
   <button id="fabSleepBtn" class="fab-sleep" onclick="fabToggleSleep()" aria-label="Быстрая запись сна">
-    <span id="fabSleepIcon">😴</span>
+    <span id="fabSleepIcon"><i data-lucide="moon"></i></span>
     <span id="fabSleepLabel">Уснул</span>
   </button>
 </div>
@@ -591,17 +631,17 @@
 <script src="analytics-config.js?v=20260724"></script>
 <script src="analytics.js?v=20260724"></script>
 <script src="tma.js?v=20260724"></script>
-<script src="chat.js?v=20260729-2"></script>
+<script src="chat.js?v=20260730-1"></script>
 <script src="sleep-intelligence.js?v=20260729-2"></script>
 <script src="daily-coach.js?v=20260729-2"></script>
 <script src="baby-milestones.js?v=20260724"></script>
-<script src="tracker.js?v=20260729-2"></script>
+<script src="tracker.js?v=20260730-1"></script>
 <script src="articles.js?v=20260729-2"></script>
-<script src="subscription.js?v=20260729-2"></script>
+<script src="subscription.js?v=20260730-1"></script>
 <script src="onboarding.js?v=20260729-1"></script>
 <script src="reminder-planner.js?v=20260724"></script>
 <script src="notifications.js?v=20260729-1"></script>
-<script src="app.js?v=20260729-2"></script>
+<script src="app.js?v=20260730-1"></script>
 <script src="premium.js?v=20260724"></script>
 
 <script>
@@ -612,6 +652,18 @@ var _isLowEnd = (function(){
   return (mem !== undefined && mem <= 2) || (mem === undefined && cores <= 4);
 })();
 if (_isLowEnd) document.documentElement.classList.add('low-end');
+
+function refreshIcons() {
+  if (!window.lucide || typeof window.lucide.createIcons !== 'function') return;
+  window.lucide.createIcons({ attrs: { 'aria-hidden': 'true' } });
+}
+
+function setHomePrimaryAction(label, icon) {
+  var button = document.getElementById('btn-generate');
+  if (!button) return;
+  button.innerHTML = '<i data-lucide="' + icon + '"></i><span>' + label + '</span>';
+  refreshIcons();
+}
 
 // ─── Navigation ──────────────────────────────────────────────────────────────
 function goPage(id, btn) {
@@ -629,12 +681,14 @@ function goPage(id, btn) {
   }
   if (typeof hapticSel === 'function') hapticSel();
   if (id === 'tracker' && typeof renderTracker === 'function') renderTracker();
+  if (id === 'chat' && typeof renderChatContext === 'function') renderChatContext();
   if (id === 'ritual') initRitualPage();
   if (id === 'articles' && typeof renderArticles === 'function') renderArticles();
   if (id === 'schedule' && document.getElementById('schedTitle') && !document.getElementById('schedTitle').textContent) {
     if (typeof showToast === 'function') showToast('Сначала сгенерируйте расписание на главной 👆');
   }
   window.scrollTo({top:0, behavior:'smooth'});
+  requestAnimationFrame(refreshIcons);
 }
 
 // ─── Generate + switch ───────────────────────────────────────────────────────
@@ -652,7 +706,7 @@ function handleHomePrimaryAction() {
 
 function generateAndSwitch() {
   var btn = document.getElementById('btn-generate');
-  if (btn) { btn.classList.add('loading'); btn.disabled = true; btn.textContent = '⏳ Генерирую...'; }
+  if (btn) { btn.classList.add('loading'); btn.disabled = true; setHomePrimaryAction('Генерирую...', 'loader-circle'); }
   requestAnimationFrame(function() {
     try {
       if (typeof generate !== 'function') { if (typeof showToast === 'function') showToast('Ошибка: generate не загружена'); return; }
@@ -679,19 +733,25 @@ function renderTodayPlan() {
   var sub = document.getElementById('todayMainSub');
   var reason = document.getElementById('todayMainReason');
   var btn = document.getElementById('btn-generate');
+  var kicker = document.getElementById('todayKicker');
+  var confidence = document.getElementById('todayConfidence');
   if (!card || !list || !title || !sub || !btn) return;
 
   if (!blocks.length) {
     card.style.display = 'none';
+    if (kicker) kicker.textContent = 'Первый шаг';
+    if (confidence) { confidence.textContent = 'Займёт меньше минуты'; confidence.classList.add('is-neutral'); }
     title.textContent = 'Соберите спокойный режим дня';
     sub.textContent = 'Возраст, подъём и тип дня уже достаточно, чтобы получить первый план.';
     if (reason) reason.style.display = 'none';
     btn.dataset.action = 'generate';
-    btn.textContent = '✨ Собрать режим на сегодня';
+    setHomePrimaryAction('Собрать режим на сегодня', 'calendar-clock');
     renderHomeInsights();
     return;
   }
 
+  if (kicker) kicker.textContent = 'Следующий сон';
+  if (confidence) { confidence.textContent = 'Режим актуален'; confidence.classList.remove('is-neutral'); }
   var sleepStarted = parseInt(localStorage.getItem('babymode_quick_sleep_start') || '0');
   var nextSleep = window.BabyCoach ? BabyCoach.getNextSleep(blocks, new Date()) : null;
   if (sleepStarted) {
@@ -700,7 +760,7 @@ function renderTodayPlan() {
     sub.textContent = 'Сон идёт ' + (window.BabyCoach ? BabyCoach.formatDuration(elapsed) : elapsed + ' мин');
     if (reason) { reason.textContent = 'Когда малыш проснётся, запись сохранится автоматически.'; reason.style.display = 'block'; }
     btn.dataset.action = 'sleep';
-    btn.textContent = '🌤 Проснулся';
+    setHomePrimaryAction('Проснулся', 'sunrise');
   } else if (nextSleep) {
     title.textContent = 'Следующий сон около ' + nextSleep.time;
     sub.textContent = 'Примерно через ' + nextSleep.countdown;
@@ -711,13 +771,13 @@ function renderTodayPlan() {
       reason.style.display = 'block';
     }
     btn.dataset.action = 'sleep';
-    btn.textContent = '😴 Уснул';
+    setHomePrimaryAction('Уснул', 'moon');
   } else {
     title.textContent = 'План на сегодня завершён';
     sub.textContent = 'Можно сохранить итог дня и подготовить режим на завтра.';
     if (reason) reason.style.display = 'none';
     btn.dataset.action = 'generate';
-    btn.textContent = 'Обновить режим';
+    setHomePrimaryAction('Обновить режим', 'refresh-cw');
   }
 
   var nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
@@ -729,13 +789,16 @@ function renderTodayPlan() {
     .slice(0, 4);
 
   list.innerHTML = important.map(function(b) {
+    var icon = b.tag === 'sleep' ? 'moon' : b.tag === 'feed' ? 'milk' : b.tag === 'walk' ? 'trees' : 'clock-3';
     return '<div class="today-step">'
       + '<div class="today-step-time">' + b.time + '</div>'
+      + '<div class="today-step-icon today-step-' + b.tag + '"><i data-lucide="' + icon + '"></i></div>'
       + '<div><strong>' + b.title + '</strong><span>' + b.note + '</span></div>'
       + '</div>';
   }).join('');
   card.style.display = important.length ? 'block' : 'none';
   renderHomeInsights();
+  refreshIcons();
 }
 
 function getTodayScheduleBlocks() {
@@ -816,14 +879,21 @@ function _applyBabyPhoto(b64) {
 function _applyBabyName(name) {
   var el = document.getElementById('babyNameDisplay');
   var title = document.getElementById('appTitle');
-  if (name) {
-    if (el) { el.textContent = name + ''; el.style.display = 'block'; }
-    if (title) title.textContent = 'Режим Малыша';
-    var sc = document.getElementById('shareCardTitle');
-    if (sc) sc.textContent = 'Режим дня — ' + name;
-  } else {
-    if (el) el.style.display = 'none';
+  var fallback = document.getElementById('babyAvatarEmoji');
+  var hour = new Date().getHours();
+  var greeting = hour < 6 ? 'Доброй ночи' : hour < 12 ? 'Доброе утро' : hour < 18 ? 'Добрый день' : 'Добрый вечер';
+  var birthdate = localStorage.getItem('babymode_baby_birthdate') || '';
+  var age = birthdate && window.BabyMilestones
+    ? BabyMilestones.getBabyAgeMonths(birthdate, new Date())
+    : parseInt(localStorage.getItem('babymode_last_age') || '0');
+  if (title) title.textContent = greeting;
+  if (el) {
+    el.textContent = (name || 'Режим Малыша') + (age ? ' · ' + age + ' мес.' : '');
+    el.style.display = 'block';
   }
+  if (fallback && !localStorage.getItem('babymode_photo')) fallback.textContent = name ? name.trim().charAt(0).toUpperCase() : 'РМ';
+  var sc = document.getElementById('shareCardTitle');
+  if (sc && name) sc.textContent = 'Режим дня — ' + name;
 }
 
 // Situation buttons styles (added dynamically)
@@ -1450,11 +1520,11 @@ window.addEventListener('DOMContentLoaded', function() {
   var savedWake  = localStorage.getItem('babymode_wake_time');
   var savedFeed  = localStorage.getItem('babymode_feed_type');
   if (savedPhoto) _applyBabyPhoto(savedPhoto);
-  if (savedName)  _applyBabyName(savedName);
   if (savedBirth && window.BabyMilestones) {
     var age = BabyMilestones.getBabyAgeMonths(savedBirth, new Date());
     if (age !== null) localStorage.setItem('babymode_last_age', String(age));
   }
+  _applyBabyName(savedName || '');
   var ageEl = document.getElementById('ageMonths');
   var wakeEl = document.getElementById('wakeTime');
   var feedEl = document.getElementById('feedType');
@@ -1469,6 +1539,7 @@ window.addEventListener('DOMContentLoaded', function() {
   if (typeof renderTracker === 'function') renderTracker();
   renderProfilePage();
   renderTodayPlan();
+  refreshIcons();
 
   // Sync FAB state on load
   _updateFab();

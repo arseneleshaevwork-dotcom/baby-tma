@@ -111,6 +111,29 @@
       color: var(--danger);
     }
 
+    .admin-tabs {
+      display: flex;
+      gap: 6px;
+      margin: 0 0 16px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+
+    .admin-tab {
+      flex: 0 0 auto;
+      background: #fff;
+      color: var(--muted);
+      border: 1px solid var(--line);
+    }
+
+    .admin-tab.active {
+      background: var(--text);
+      border-color: var(--text);
+      color: #fff;
+    }
+
+    [hidden] { display: none !important; }
+
     .admin-actions { margin-bottom:16px; }
     .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     .action-row { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
@@ -119,6 +142,9 @@
     textarea { width:100%; min-height:88px; resize:vertical; border:1px solid var(--line); border-radius:6px; padding:9px 10px; font:inherit; }
     button.secondary { background:#475569; }
     button.danger { background:#b42318; }
+    button.ghost { background:#fff; color:var(--text); border:1px solid var(--line); }
+    .ops-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+    .table-search { height:32px; width:min(240px, 100%); }
 
     .grid {
       display: grid;
@@ -230,6 +256,7 @@
       .layout { padding: 18px 12px 32px; }
       .metrics { grid-template-columns: 1fr; }
       .controls { display: grid; grid-template-columns: 1fr; }
+      .admin-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); overflow:visible; }
       button, input, select { width: 100%; }
       .card { padding: 12px; overflow-x: auto; }
     }
@@ -253,8 +280,8 @@
           </select>
         </label>
         <label>
-          Admin token
-          <input id="token" type="password" autocomplete="off" placeholder="Вставьте токен">
+          Код доступа
+          <input id="token" type="password" autocomplete="off" placeholder="Вставьте код">
         </label>
         <button id="reload" type="submit">Обновить</button>
       </form>
@@ -262,7 +289,15 @@
 
     <div class="status" id="status"></div>
 
-    <section class="card admin-actions">
+    <nav class="admin-tabs" aria-label="Разделы админки">
+      <button class="admin-tab active" type="button" data-tab="overview">Обзор</button>
+      <button class="admin-tab" type="button" data-tab="users">Пользователи</button>
+      <button class="admin-tab" type="button" data-tab="billing">Оплата</button>
+      <button class="admin-tab" type="button" data-tab="ai">ИИ</button>
+      <button class="admin-tab" type="button" data-tab="system">Система</button>
+    </nav>
+
+    <section class="card admin-actions" data-admin-view="users" hidden>
       <div class="section-title"><h2>Управление пользователем</h2><span class="muted">по Telegram ID</span></div>
       <div class="action-grid">
         <div>
@@ -272,9 +307,11 @@
           </div>
           <div class="action-row" style="margin-top:10px">
             <button type="button" data-admin-action="grant" data-days="30">Premium 30 дней</button>
-            <button type="button" data-admin-action="grant" data-days="365">Premium 1 год</button>
+            <button type="button" data-admin-action="grant" data-days="180">Premium 6 месяцев</button>
             <button class="danger" type="button" data-admin-action="revoke">Отозвать</button>
             <button class="secondary" type="button" data-admin-action="reminders">Включить напоминания</button>
+            <button class="ghost" type="button" data-admin-action="disable-reminders">Отключить</button>
+            <button class="ghost" type="button" data-admin-action="test-reminder">Тест в Telegram</button>
           </div>
         </div>
         <div>
@@ -285,10 +322,10 @@
       <div class="action-result mono" id="manageResult">Выберите пользователя.</div>
     </section>
 
-    <section class="grid metrics" id="metrics"></section>
+    <section class="grid metrics" id="metrics" data-admin-view="overview"></section>
 
     <section class="grid sections">
-      <div class="card">
+      <div class="card" data-admin-view="overview">
         <div class="section-title">
           <h2>Воронка</h2>
           <span class="muted" id="range"></span>
@@ -296,7 +333,7 @@
         <div id="funnel"></div>
       </div>
 
-      <div class="card">
+      <div class="card" data-admin-view="overview">
         <div class="section-title">
           <h2>Потери</h2>
         </div>
@@ -305,7 +342,7 @@
         </table>
       </div>
 
-      <div class="card wide">
+      <div class="card wide" data-admin-view="billing" hidden>
         <div class="section-title">
           <h2>Деньги и подписки</h2>
           <span class="muted">Telegram Stars</span>
@@ -313,7 +350,7 @@
         <div id="billing"></div>
       </div>
 
-      <div class="card wide">
+      <div class="card wide" data-admin-view="ai" hidden>
         <div class="section-title">
           <h2>ИИ-помощник</h2>
           <span class="muted">без текста вопросов</span>
@@ -321,7 +358,7 @@
         <div id="aiUsage"></div>
       </div>
 
-      <div class="card wide">
+      <div class="card wide" data-admin-view="billing" hidden>
         <div class="section-title">
           <h2>Подписки</h2>
           <span class="muted">до 100 строк</span>
@@ -329,7 +366,7 @@
         <div id="subscriptions"></div>
       </div>
 
-      <div class="card wide">
+      <div class="card wide" data-admin-view="billing" hidden>
         <div class="section-title">
           <h2>Платежи</h2>
           <span class="muted">за выбранный период</span>
@@ -337,7 +374,7 @@
         <div id="payments"></div>
       </div>
 
-      <div class="card wide">
+      <div class="card wide" data-admin-view="users" hidden>
         <div class="section-title">
           <h2>Ближайшие даты</h2>
           <span class="muted">45 дней</span>
@@ -345,7 +382,7 @@
         <div id="upcomingDates"></div>
       </div>
 
-      <div class="card wide">
+      <div class="card wide" data-admin-view="overview">
         <div class="section-title">
           <h2>Источники рекламы</h2>
           <span class="muted">UTM / start_param</span>
@@ -353,27 +390,52 @@
         <div id="sources"></div>
       </div>
 
-      <div class="card wide">
+      <div class="card wide" data-admin-view="users" hidden>
         <div class="section-title">
           <h2>Малыши</h2>
-          <span class="muted" id="babyCount"></span>
+          <div><input class="table-search" id="babySearch" type="search" placeholder="Поиск по имени"><span class="muted" id="babyCount"></span></div>
         </div>
         <div id="babies"></div>
       </div>
 
-      <div class="card wide">
+      <div class="card wide" data-admin-view="users" hidden>
+        <div class="section-title">
+          <h2>Поддержка по оплате</h2>
+          <span class="muted">открытые обращения</span>
+        </div>
+        <div id="supportRequests"></div>
+      </div>
+
+      <div class="card wide" data-admin-view="overview">
         <div class="section-title">
           <h2>Последние события</h2>
           <span class="muted">до 100 строк</span>
         </div>
         <div id="events"></div>
       </div>
+
+      <div class="card wide" data-admin-view="system" hidden>
+        <div class="section-title">
+          <h2>Напоминания и доставка</h2>
+          <span class="muted">очередь Telegram</span>
+        </div>
+        <div id="operations"></div>
+        <div class="ops-actions">
+          <button class="ghost" id="checkNotifications" type="button">Проверить очередь</button>
+          <button id="runNotifications" type="button">Отправить готовые сейчас</button>
+          <button class="ghost" id="configureBot" type="button">Обновить команды бота</button>
+        </div>
+        <div class="action-result mono" id="notificationResult">Проверка еще не запускалась.</div>
+      </div>
     </section>
   </main>
 
   <script>
     const ADMIN_ENDPOINT = 'https://jfyprwisnrubhhowipdm.functions.supabase.co/analytics-dashboard';
+    const ADMIN_ACTIONS_ENDPOINT = 'https://jfyprwisnrubhhowipdm.functions.supabase.co/admin-actions';
+    const NOTIFICATIONS_ENDPOINT = 'https://jfyprwisnrubhhowipdm.functions.supabase.co/telegram-notifications';
     const TOKEN_KEY = 'babymode_admin_token';
+    let currentBabies = [];
     const metricLabels = [
       ['bot_start', 'Запустили бот'],
       ['app_open', 'Открыли mini app'],
@@ -421,22 +483,17 @@
       sources: document.getElementById('sources'),
       babies: document.getElementById('babies'),
       babyCount: document.getElementById('babyCount'),
-      events: document.getElementById('events')
+      babySearch: document.getElementById('babySearch'),
+      events: document.getElementById('events'),
+      operations: document.getElementById('operations'),
+      supportRequests: document.getElementById('supportRequests'),
+      notificationResult: document.getElementById('notificationResult')
     };
 
     init();
 
     function init() {
-      const url = new URL(window.location.href);
-      const tokenFromUrl = url.searchParams.get('token');
-      if (tokenFromUrl) {
-        sessionStorage.setItem(TOKEN_KEY, tokenFromUrl);
-        els.token.value = tokenFromUrl;
-        url.searchParams.delete('token');
-        history.replaceState(null, '', url.toString());
-      } else {
-        els.token.value = sessionStorage.getItem(TOKEN_KEY) || '';
-      }
+      els.token.value = sessionStorage.getItem(TOKEN_KEY) || '';
 
       els.form.addEventListener('submit', event => {
         event.preventDefault();
@@ -446,18 +503,34 @@
       document.getElementById('sendUserMessage').addEventListener('click', () => runAdminAction('send_message'));
       document.querySelectorAll('[data-admin-action]').forEach(button => button.addEventListener('click', () => {
         const action = button.dataset.adminAction;
-        runAdminAction(action === 'grant' ? 'grant_premium' : action === 'revoke' ? 'revoke_premium' : 'enable_reminders', Number(button.dataset.days || 0));
+        const actionMap = {
+          grant: 'grant_premium',
+          revoke: 'revoke_premium',
+          reminders: 'enable_reminders',
+          'disable-reminders': 'disable_reminders',
+          'test-reminder': 'send_test_reminder'
+        };
+        runAdminAction(actionMap[action], Number(button.dataset.days || 0));
       }));
+      document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => setActiveTab(button.dataset.tab)));
+      els.babySearch.addEventListener('input', () => renderBabies(currentBabies, els.babySearch.value));
+      document.getElementById('checkNotifications').addEventListener('click', () => runNotificationCheck(true));
+      document.getElementById('runNotifications').addEventListener('click', () => runNotificationCheck(false));
+      document.getElementById('configureBot').addEventListener('click', configureBotCommands);
+      els.supportRequests.addEventListener('click', event => {
+        const button = event.target.closest('[data-resolve-support]');
+        if (button) resolveSupportRequest(button.dataset.resolveSupport);
+      });
 
       if (els.token.value) loadDashboard();
-      else setStatus('Введите admin token и нажмите “Обновить”.');
+      else setStatus('Введите код доступа и нажмите “Обновить”.');
     }
 
     async function loadDashboard() {
       const token = els.token.value.trim();
       const days = els.days.value;
       if (!token) {
-        setStatus('Нужен admin token.', true);
+        setStatus('Нужен код доступа.', true);
         return;
       }
 
@@ -475,7 +548,7 @@
         setStatus('');
       } catch (error) {
         setStatus(error.message === 'unauthorized'
-          ? 'Неверный admin token.'
+          ? 'Неверный код доступа.'
           : `Ошибка загрузки: ${error.message}`, true);
       } finally {
         setLoading(false);
@@ -486,13 +559,13 @@
       const token = els.token.value.trim();
       const telegramId = document.getElementById('manageTelegramId').value.trim();
       const result = document.getElementById('manageResult');
-      if (!token || !/^\d{4,20}$/.test(telegramId)) { result.textContent = 'Укажите admin token и корректный Telegram ID.'; return; }
+      if (!token || !/^\d{4,20}$/.test(telegramId)) { result.textContent = 'Укажите код доступа и корректный Telegram ID.'; return; }
       const payload = { action, telegram_id: Number(telegramId) };
       if (days) payload.days = days;
       if (action === 'send_message') payload.message = document.getElementById('manageMessage').value.trim();
       result.textContent = 'Выполняю...';
       try {
-        const response = await fetch('https://jfyprwisnrubhhowipdm.functions.supabase.co/admin-actions', {
+        const response = await fetch(ADMIN_ACTIONS_ENDPOINT, {
           method:'POST', headers:{ 'content-type':'application/json', 'x-admin-token':token }, body:JSON.stringify(payload)
         });
         const data = await response.json().catch(() => ({}));
@@ -503,11 +576,13 @@
     }
 
     function formatAdminResult(data) {
-      if (data.sent) return 'Сообщение отправлено.';
+      if (data.sent) return data.kind === 'send_test_reminder' ? 'Тестовое напоминание доставлено в Telegram.' : 'Сообщение отправлено.';
       const baby = data.baby ? `${data.baby.name || 'Без имени'}${data.baby.birthdate ? ', ' + data.baby.birthdate : ''}` : 'профиль малыша не заполнен';
       const subscription = data.subscription ? `${data.subscription.status}, до ${formatDateTime(data.subscription.current_period_end)}` : 'нет Premium';
       const reminders = data.notifications?.enabled ? 'включены' : 'выключены';
-      return `Пользователь: ${data.user?.first_name || 'Без имени'} (@${data.user?.username || 'нет'})\nМалыш: ${baby}\nPremium: ${subscription}\nНапоминания: ${reminders}`;
+      const next = data.next_reminder ? `${data.next_reminder.reminder_type}, ${formatDateTime(data.next_reminder.scheduled_at)}` : 'нет в очереди';
+      const last = data.last_delivery ? `${data.last_delivery.status}, ${formatDateTime(data.last_delivery.sent_at)}` : 'еще не отправлялись';
+      return `Пользователь: ${data.user?.first_name || 'Без имени'} (@${data.user?.username || 'нет'})\nМалыш: ${baby}\nPremium: ${subscription}\nНапоминания: ${reminders}\nСледующее: ${next}\nПоследняя доставка: ${last}`;
     }
 
     function renderDashboard(data) {
@@ -518,11 +593,14 @@
       renderDropoffs(data);
       renderBilling(data.billing || {});
       renderAiUsage(data.ai_usage || {});
+      renderOperations(data.operations || {});
+      renderSupportRequests(data.support_requests || []);
       renderSubscriptions(data.subscriptions || []);
       renderPayments(data.payments || []);
       renderUpcomingDates(data.upcoming_dates || []);
       renderSources(data.sources || []);
-      renderBabies(data.babies || []);
+      currentBabies = data.babies || [];
+      renderBabies(currentBabies, els.babySearch.value);
       renderEvents(data.recent_events || []);
     }
 
@@ -569,7 +647,7 @@
 
     function renderBilling(billing) {
       const cards = [
-        ['Активные подписки', number(billing.active_subscriptions), `${number(billing.month_subscriptions)} мес. · ${number(billing.year_subscriptions)} год`],
+        ['Активные подписки', number(billing.active_subscriptions), `${number(billing.month_subscriptions)} мес. · ${number(billing.half_year_subscriptions)} на 6 мес.`],
         ['Оплачено Stars', `${number(billing.paid_stars)} ⭐`, `${number(billing.paid_payments)} успешных платежей`],
         ['Ожидают оплаты', number(billing.pending_payments), 'созданные invoice'],
         ['Ошибки оплаты', number(billing.failed_payments), 'invoice_failed / failed / cancelled']
@@ -612,6 +690,112 @@
           `).join('')}
         </div>
       `;
+    }
+
+    function renderOperations(operations) {
+      const cards = [
+        ['Планировщик', operations.last_run_failed ? 'Ошибка' : 'Работает', `последний запуск: ${formatDateTime(operations.last_run_at)}`],
+        ['Напоминания включены', number(operations.reminders_enabled), `${number(operations.schedule_enabled)} получают события режима`],
+        ['Отправлено', number(operations.sent), `последнее: ${formatDateTime(operations.last_sent_at)}`],
+        ['В очереди', number(operations.pending), `следующее: ${formatDateTime(operations.next_due_at)}`],
+        ['Требуют внимания', number(Number(operations.failed || 0) + Number(operations.overdue || 0)), `${number(operations.failed)} ошибок · ${number(operations.overdue)} просрочено`]
+      ];
+      els.operations.innerHTML = `
+        <div class="grid metrics" style="margin-bottom:0">
+          ${cards.map(([label, value, hint]) => `
+            <article class="card">
+              <div class="metric-label">${escapeHtml(label)}</div>
+              <div class="metric-value">${escapeHtml(value)}</div>
+              <div class="muted">${escapeHtml(hint)}</div>
+            </article>
+          `).join('')}
+        </div>`;
+    }
+
+    function renderSupportRequests(items) {
+      if (!items.length) {
+        els.supportRequests.innerHTML = '<div class="empty">Открытых обращений нет</div>';
+        return;
+      }
+      els.supportRequests.innerHTML = `
+        <table>
+          <thead><tr><th>Создано</th><th>Telegram</th><th>Сообщение</th><th></th></tr></thead>
+          <tbody>${items.map(item => `
+            <tr>
+              <td>${formatDateTime(item.created_at)}</td>
+              <td class="mono">${escapeHtml(String(item.telegram_id || '—'))}</td>
+              <td>${escapeHtml(item.message)}</td>
+              <td><button class="ghost" type="button" data-resolve-support="${escapeHtml(item.id)}">Закрыть</button></td>
+            </tr>`).join('')}</tbody>
+        </table>`;
+    }
+
+    async function resolveSupportRequest(requestId) {
+      const token = els.token.value.trim();
+      if (!token) return;
+      try {
+        const response = await fetch(ADMIN_ACTIONS_ENDPOINT, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-admin-token': token },
+          body: JSON.stringify({ action: 'resolve_support', request_id: requestId })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'request_failed');
+        loadDashboard();
+      } catch (error) {
+        setStatus(`Не удалось закрыть обращение: ${error.message}`, true);
+      }
+    }
+
+    async function configureBotCommands() {
+      const token = els.token.value.trim();
+      if (!token) { els.notificationResult.textContent = 'Нужен код доступа.'; return; }
+      const button = document.getElementById('configureBot');
+      button.disabled = true;
+      try {
+        const response = await fetch(ADMIN_ACTIONS_ENDPOINT, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-admin-token': token },
+          body: JSON.stringify({ action: 'configure_bot_commands' })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'request_failed');
+        els.notificationResult.textContent = 'Команды бота обновлены, включая /paysupport.';
+      } catch (error) {
+        els.notificationResult.textContent = `Ошибка: ${error.message}`;
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function runNotificationCheck(dryRun) {
+      const token = els.token.value.trim();
+      if (!token) { els.notificationResult.textContent = 'Нужен код доступа.'; return; }
+      const button = document.getElementById(dryRun ? 'checkNotifications' : 'runNotifications');
+      button.disabled = true;
+      els.notificationResult.textContent = dryRun ? 'Проверяю очередь...' : 'Отправляю готовые напоминания...';
+      try {
+        const response = await fetch(NOTIFICATIONS_ENDPOINT, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-admin-token': token },
+          body: JSON.stringify({ dry_run: dryRun, run_scheduled: true })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'request_failed');
+        const milestones = data.milestones || {};
+        const scheduled = data.scheduled || {};
+        els.notificationResult.textContent = `${dryRun ? 'Проверка' : 'Запуск'} завершен.\nСобытия режима: ${number(scheduled.planned)} готово, ${number(scheduled.failed)} ошибок.\nДни рождения и возраст: ${number(milestones.planned)} готово, ${number(milestones.failed)} ошибок.`;
+        if (!dryRun) loadDashboard();
+      } catch (error) {
+        els.notificationResult.textContent = `Ошибка: ${error.message}`;
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function setActiveTab(tab) {
+      document.querySelectorAll('[data-tab]').forEach(button => button.classList.toggle('active', button.dataset.tab === tab));
+      document.querySelectorAll('[data-admin-view]').forEach(section => { section.hidden = section.dataset.adminView !== tab; });
     }
 
     function renderSubscriptions(items) {
@@ -709,9 +893,11 @@
       `;
     }
 
-    function renderBabies(babies) {
-      els.babyCount.textContent = `${babies.length} профилей`;
-      if (!babies.length) {
+    function renderBabies(babies, query = '') {
+      const needle = String(query || '').trim().toLocaleLowerCase('ru-RU');
+      const visibleBabies = needle ? babies.filter(baby => String(baby.name || '').toLocaleLowerCase('ru-RU').includes(needle)) : babies;
+      els.babyCount.textContent = ` ${visibleBabies.length} из ${babies.length}`;
+      if (!visibleBabies.length) {
         els.babies.innerHTML = '<div class="empty">Пока нет сохраненных профилей</div>';
         return;
       }
@@ -719,7 +905,7 @@
         <table>
           <thead><tr><th>Имя</th><th>Дата рождения</th><th>Возраст</th><th>Обновлено</th><th>Client</th></tr></thead>
           <tbody>
-            ${babies.map(baby => `
+            ${visibleBabies.map(baby => `
               <tr>
                 <td>${escapeHtml(baby.name)}</td>
                 <td>${escapeHtml(baby.birthdate || 'Не указана')}</td>
@@ -795,7 +981,8 @@
 
     function planLabel(plan) {
       if (plan === 'month') return '30 дней';
-      if (plan === 'year') return '1 год';
+      if (plan === 'half_year') return '6 месяцев';
+      if (plan === 'year') return '1 год (старый тариф)';
       return plan || '—';
     }
 

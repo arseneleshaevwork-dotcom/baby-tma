@@ -251,9 +251,13 @@ function renderQuickSleepControls() {
   renderUndoDiaryButton();
   const status = document.getElementById('quickSleepStatus');
   const timer = document.getElementById('quickSleepTimer');
+  const startButton = document.getElementById('qscStartBtn');
+  const finishButton = document.getElementById('qscFinishBtn');
   if (!status || !timer) return;
 
   const started = parseInt(localStorage.getItem(QUICK_SLEEP_KEY) || '0');
+  if (startButton) startButton.disabled = Boolean(started);
+  if (finishButton) finishButton.disabled = !started;
   if (!started) {
     status.textContent = 'Сон не запущен';
     timer.textContent = '—';
@@ -843,11 +847,26 @@ function _getDiaryLimit() {
   return 7; // free tier: last 7 days only
 }
 
+function renderDiarySummary(logs) {
+  const sorted = (Array.isArray(logs) ? logs : []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const latest = sorted[sorted.length - 1] || null;
+  const sleep = document.getElementById('diarySummarySleep');
+  const wakings = document.getElementById('diarySummaryWakings');
+  const days = document.getElementById('diarySummaryDays');
+  const streak = document.getElementById('diaryStreak');
+  const total = latest ? Math.max(0, Number(latest.nightLen || 0) + Number(latest.dayNaps || 0)) : 0;
+  if (sleep) sleep.textContent = total ? `${Math.floor(total / 60)}ч ${Math.round(total % 60)}м` : '—';
+  if (wakings) wakings.textContent = latest ? String(Math.max(0, Number(latest.nightWakings || 0))) : '0';
+  if (days) days.textContent = String(sorted.length);
+  if (streak) streak.textContent = sorted.length ? `${sorted.length} ${sorted.length === 1 ? 'день' : sorted.length < 5 ? 'дня' : 'дней'}` : 'Первая запись';
+}
+
 function renderTracker() {
   renderTagButtons();
   renderQuickSleepControls();
 
   const logs = getLogs();
+  renderDiarySummary(logs);
   hydrateTodayLog(logs);
   const now  = new Date();
   const diaryLimit = _getDiaryLimit();
@@ -910,14 +929,13 @@ function renderTracker() {
   const topTagInfo = topTag ? SLEEP_TAGS.find(t => t.id === topTag[0]) : null;
 
   let html = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+    <div class="tracker-averages">
       <div class="stat-card"><div class="val">${(avgNight/60).toFixed(1)}ч</div><div class="lbl">Ср. ночной сон</div></div>
       <div class="stat-card"><div class="val">${(avgDay/60).toFixed(1)}ч</div><div class="lbl">Ср. дневной сон</div></div>
     </div>
     ${normStatus ? renderNormStatus(normStatus) : ''}
     ${topTagInfo ? `<div class="top-tag-row"><span>Частая проблема:</span><span class="top-tag-badge">${topTagInfo.label}</span></div>` : ''}
-    <table class="log-table">
-      <tr><th>Дата</th><th>Подъём</th><th>Дн. сон</th><th>Укладывание</th><th>Теги</th></tr>
+    <div class="diary-history-list">
   `;
   for (const l of [...filtered].reverse()) {
     const d = new Date(l.date).toLocaleDateString('ru',{day:'numeric',month:'short'});
@@ -925,15 +943,15 @@ function renderTracker() {
       const t = SLEEP_TAGS.find(t => t.id === id);
       return t ? `<span class="log-tag">${t.label.split(' ')[0]}</span>` : '';
     }).join('');
-    html += `<tr>
-      <td>${d}</td>
-      <td>${l.wake}</td>
-      <td>${l.dayNaps ? Math.floor(l.dayNaps/60)+'ч '+(l.dayNaps%60)+'м' : '—'}</td>
-      <td>${l.bed}</td>
-      <td style="font-size:.75rem">${tags || l.mood}</td>
-    </tr>`;
+    const totalSleep = Math.max(0, Number(l.nightLen || 0) + Number(l.dayNaps || 0));
+    html += `<article class="diary-history-row">
+      <time>${d}</time>
+      <span class="diary-history-icon"><i data-lucide="moon"></i></span>
+      <div><strong>${l.wake} — ${l.bed}</strong><span>Дневной сон: ${l.dayNaps ? Math.floor(l.dayNaps/60)+'ч '+(l.dayNaps%60)+'м' : 'нет данных'}${tags ? ' · ' + tags : ''}</span></div>
+      <b>${totalSleep ? (totalSleep / 60).toFixed(1) + 'ч' : '—'}</b>
+    </article>`;
   }
-  html += '</table>';
+  html += '</div>';
 
   // Show limit banner if free user has more logs than shown
   if (diaryLimit !== Infinity && logs.length > diaryLimit) {
@@ -950,6 +968,7 @@ function renderTracker() {
 
   const table = document.getElementById('trackerTable');
   if (table) table.innerHTML = html;
+  if (typeof refreshIcons === 'function') refreshIcons();
 
   // Run analysis on full logs (not limited view)
   if (logs.length >= 3) analyzeAndSuggest(logs);

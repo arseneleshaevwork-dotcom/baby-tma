@@ -12,8 +12,7 @@ import {
 const AGENT_NAME = 'baby-agent';
 const ALLOWED_ORIGINS = new Set([
   'https://arseneleshaevwork-dotcom.github.io',
-  'http://localhost:8000',
-  'http://127.0.0.1:8000'
+  'https://thanhtrucbc12-oss.github.io'
 ]);
 
 Deno.serve(async req => {
@@ -21,7 +20,7 @@ Deno.serve(async req => {
   const corsHeaders = buildCorsHeaders(origin);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405, corsHeaders);
-  if (origin && !ALLOWED_ORIGINS.has(origin)) return json({ ok: false, error: 'origin_not_allowed' }, 403, corsHeaders);
+  if (origin && !isAllowedOrigin(origin)) return json({ ok: false, error: 'origin_not_allowed' }, 403, corsHeaders);
 
   const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -183,11 +182,15 @@ async function updateRequest(supabase: any, id: string | undefined, values: Reco
 
 function buildCorsHeaders(origin: string) {
   return {
-    'Access-Control-Allow-Origin': ALLOWED_ORIGINS.has(origin) ? origin : 'https://arseneleshaevwork-dotcom.github.io',
+    'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : 'https://arseneleshaevwork-dotcom.github.io',
     'Vary': 'Origin',
     'Access-Control-Allow-Headers': 'content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };
+}
+
+function isAllowedOrigin(origin: string) {
+  return ALLOWED_ORIGINS.has(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 
 function json(data: unknown, status: number, headers: Record<string, string>) {
