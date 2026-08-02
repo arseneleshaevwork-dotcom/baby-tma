@@ -31,6 +31,7 @@ Deno.serve(async (req) => {
           { command: 'profile', description: 'Профиль малыша' },
           { command: 'reminders_on', description: 'Включить напоминания' },
           { command: 'reminders_off', description: 'Отключить напоминания' },
+          { command: 'terms', description: 'Условия Premium и оплаты' },
           { command: 'paysupport', description: 'Помощь с оплатой' },
           { command: 'help', description: 'Все возможности бота' }
         ]
@@ -63,11 +64,32 @@ Deno.serve(async (req) => {
     const startMs = Math.max(Date.now(), Number.isFinite(currentEnd) ? currentEnd : 0);
     const end = new Date(startMs + days * 86400000).toISOString();
     await supabase.from('subscriptions').upsert({
-      user_id: user.id, telegram_id: telegramId, plan: days >= 180 ? 'half_year' : 'month', status: 'active', source: 'admin',
+      user_id: user.id, telegram_id: telegramId, plan: days >= 90 ? 'quarter' : 'month', status: 'active', source: 'admin',
       current_period_start: new Date().toISOString(), current_period_end: end, updated_at: new Date().toISOString()
     }, { onConflict: 'telegram_id' });
   } else if (action === 'revoke_premium') {
     await supabase.from('subscriptions').update({ status: 'revoked', current_period_end: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('telegram_id', telegramId);
+    await supabase.from('billing_agreements').update({
+      status: 'cancelled', cancel_at_period_end: true, updated_at: new Date().toISOString()
+    }).eq('telegram_id', telegramId).eq('provider', 'yookassa');
+  } else if (action === 'cancel_billing') {
+    await supabase.from('billing_agreements').update({
+      status: 'cancelled', cancel_at_period_end: true, updated_at: new Date().toISOString()
+    }).eq('telegram_id', telegramId).eq('provider', 'yookassa');
+    await supabase.from('subscriptions').update({
+      cancel_at_period_end: true, next_billing_at: null, updated_at: new Date().toISOString()
+    }).eq('telegram_id', telegramId).eq('source', 'yookassa');
+  } else if (action === 'resume_billing') {
+    const { data: agreement } = await supabase.from('billing_agreements')
+      .select('current_period_end').eq('telegram_id', telegramId).eq('provider', 'yookassa').maybeSingle();
+    if (!agreement || new Date(agreement.current_period_end).getTime() <= Date.now()) return json({ error: 'billing_period_expired' }, 409);
+    await supabase.from('billing_agreements').update({
+      status: 'active', cancel_at_period_end: false, next_charge_at: agreement.current_period_end,
+      retry_count: 0, last_error: null, updated_at: new Date().toISOString()
+    }).eq('telegram_id', telegramId).eq('provider', 'yookassa');
+    await supabase.from('subscriptions').update({
+      cancel_at_period_end: false, next_billing_at: agreement.current_period_end, last_error: null, updated_at: new Date().toISOString()
+    }).eq('telegram_id', telegramId).eq('source', 'yookassa');
   } else if (action === 'enable_reminders') {
     await supabase.from('notification_settings').upsert({
       user_id: user.id, telegram_id: telegramId, chat_id: telegramId, enabled: true,
@@ -93,14 +115,15 @@ Deno.serve(async (req) => {
     return json({ error: 'unknown_action' }, 400);
   }
 
-  const [{ data: baby }, { data: subscription }, { data: notifications }, { data: lastDelivery }, { data: nextReminder }] = await Promise.all([
+  const [{ data: baby }, { data: subscription }, { data: billing }, { data: notifications }, { data: lastDelivery }, { data: nextReminder }] = await Promise.all([
     supabase.from('babies').select('name,birthdate,age_months,updated_at').eq('user_id', user.id).maybeSingle(),
-    supabase.from('subscriptions').select('plan,status,source,current_period_end').eq('telegram_id', telegramId).maybeSingle(),
+    supabase.from('subscriptions').select('plan,status,source,current_period_end,cancel_at_period_end,next_billing_at,last_error').eq('telegram_id', telegramId).maybeSingle(),
+    supabase.from('billing_agreements').select('provider,plan,status,current_period_end,next_charge_at,cancel_at_period_end,retry_count,last_error').eq('telegram_id', telegramId).eq('provider', 'yookassa').maybeSingle(),
     supabase.from('notification_settings').select('enabled,birthday_reminders,age_milestones,schedule_reminders').eq('telegram_id', telegramId).maybeSingle(),
     supabase.from('notification_deliveries').select('status,reminder_type,sent_at,error').eq('telegram_id', telegramId).order('sent_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('schedule_reminders').select('status,reminder_type,scheduled_at,error').eq('telegram_id', telegramId).in('status', ['pending', 'processing']).order('scheduled_at', { ascending: true }).limit(1).maybeSingle()
   ]);
-  return json({ ok: true, user, baby, subscription, notifications, last_delivery: lastDelivery, next_reminder: nextReminder });
+  return json({ ok: true, user, baby, subscription, billing, notifications, last_delivery: lastDelivery, next_reminder: nextReminder });
 });
 
 function safeEqual(a: string, b: string) { if (a.length !== b.length) return false; let value = 0; for (let i = 0; i < a.length; i++) value |= a.charCodeAt(i) ^ b.charCodeAt(i); return value === 0; }

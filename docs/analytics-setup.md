@@ -18,6 +18,12 @@ https://jfyprwisnrubhhowipdm.functions.supabase.co/telegram-webhook
 https://jfyprwisnrubhhowipdm.functions.supabase.co/analytics-dashboard
 https://jfyprwisnrubhhowipdm.functions.supabase.co/create-stars-invoice
 https://jfyprwisnrubhhowipdm.functions.supabase.co/subscription-status
+https://jfyprwisnrubhhowipdm.functions.supabase.co/web-auth
+https://jfyprwisnrubhhowipdm.functions.supabase.co/sync-data
+https://jfyprwisnrubhhowipdm.functions.supabase.co/create-yookassa-payment
+https://jfyprwisnrubhhowipdm.functions.supabase.co/yookassa-webhook
+https://jfyprwisnrubhhowipdm.functions.supabase.co/yookassa-renewals
+https://jfyprwisnrubhhowipdm.functions.supabase.co/billing-subscription
 ```
 
 1. Create a Supabase project.
@@ -34,6 +40,8 @@ window.BABY_ANALYTICS_ENDPOINT = 'https://<project-ref>.functions.supabase.co/an
 window.BABY_CREATE_STARS_INVOICE_ENDPOINT = 'https://<project-ref>.functions.supabase.co/create-stars-invoice';
 window.BABY_SUBSCRIPTION_STATUS_ENDPOINT = 'https://<project-ref>.functions.supabase.co/subscription-status';
 ```
+
+The committed production config also contains the web login, sync and YooKassa endpoints. The public Telegram client ID is the numeric bot ID, not the bot token.
 
 ## Admin dashboard
 
@@ -92,6 +100,31 @@ Premium payments use Telegram Stars:
 6. The Mini App calls `subscription-status` to refresh access.
 
 Client-side `localStorage` is treated only as a cache. Paid access must be verified through `subscription-status`.
+
+## Website login, sync and YooKassa
+
+The standalone site signs users in through Telegram Login, creates an opaque web session, and synchronizes profile, diary and settings by verified Telegram ID. Set these secrets before enabling web checkout:
+
+```bash
+supabase secrets set \
+  TELEGRAM_LOGIN_CLIENT_ID='8999375510' \
+  YOOKASSA_SHOP_ID='<shop_id>' \
+  YOOKASSA_SECRET_KEY='<secret_key>' \
+  BILLING_ENCRYPTION_KEY='<random_secret_at_least_32_chars>' \
+  WEB_APP_URL='https://arseneleshaevwork-dotcom.github.io/baby-tma/' \
+  APP_ORIGINS='https://arseneleshaevwork-dotcom.github.io' \
+  --project-ref jfyprwisnrubhhowipdm
+```
+
+In YooKassa configure the notification URL:
+
+```text
+https://jfyprwisnrubhhowipdm.functions.supabase.co/yookassa-webhook
+```
+
+Enable events `payment.succeeded`, `payment.canceled` and `refund.succeeded`. The first successful checkout saves the provider payment-method identifier; hourly Supabase cron renews active agreements when due. The user can disable or resume renewal from the Premium page without losing the already-paid period.
+
+Before production, register `https://arseneleshaevwork-dotcom.github.io` and the Baby TMA page in the bot's Telegram Login allowed URLs, and complete YooKassa receipt and legal seller settings.
 
 ## Core events
 

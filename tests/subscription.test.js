@@ -109,7 +109,7 @@ test('subscribe in Telegram opens Stars invoice from backend', async () => {
   });
   loadSubscription(context);
 
-  await context.handleSubscribe('half_year');
+  await context.handleSubscribe('quarter');
 
   assert.strictEqual(context.openedInvoice, 'https://t.me/invoice/test');
   assert.notStrictEqual(store.get('babymode_premium'), '1');

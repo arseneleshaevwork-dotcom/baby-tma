@@ -23,3 +23,21 @@ verify_jwt = false
 
 [functions.ai-assistant]
 verify_jwt = false
+
+[functions.web-auth]
+verify_jwt = false
+
+[functions.sync-data]
+verify_jwt = false
+
+[functions.create-yookassa-payment]
+verify_jwt = false
+
+[functions.yookassa-webhook]
+verify_jwt = false
+
+[functions.billing-subscription]
+verify_jwt = false
+
+[functions.yookassa-renewals]
+verify_jwt = false

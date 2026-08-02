@@ -23,7 +23,32 @@ const SLEEP_TAGS = [
 function getLogs() {
   try { return JSON.parse(localStorage.getItem(TRACKER_KEY) || '[]'); } catch(e) { return []; }
 }
-function saveLogs(logs) { localStorage.setItem(TRACKER_KEY, JSON.stringify(logs)); }
+function saveLogs(logs) {
+  const next = Array.isArray(logs) ? logs : [];
+  let previous = [];
+  try { previous = JSON.parse(localStorage.getItem(TRACKER_KEY) || '[]'); } catch (_) {}
+  const previousByDate = new Map(previous.filter(item => item?.date).map(item => [item.date, item]));
+  const now = new Date().toISOString();
+  next.forEach(log => {
+    if (!log?.date) return;
+    const before = previousByDate.get(log.date);
+    const changed = stableDiaryValue(log) !== stableDiaryValue(before);
+    log._updatedAt = changed ? now : (log._updatedAt || before?._updatedAt || now);
+  });
+  const nextDates = new Set(next.map(item => item?.date).filter(Boolean));
+  const deleted = previous.filter(item => item?.date && !nextDates.has(item.date))
+    .map(item => ({ date: item.date, _updatedAt: now }));
+  localStorage.setItem(TRACKER_KEY, JSON.stringify(next));
+  if (deleted.length && window.BabyCloudSync) BabyCloudSync.recordDeletedDates(deleted);
+  if (window.BabyCloudSync) BabyCloudSync.schedule();
+}
+
+function stableDiaryValue(log) {
+  if (!log || typeof log !== 'object') return '';
+  const copy = { ...log };
+  delete copy._updatedAt;
+  try { return JSON.stringify(copy); } catch (_) { return ''; }
+}
 
 function rememberDiaryMutation(logs, label) {
   localStorage.setItem(LAST_DIARY_MUTATION_KEY, JSON.stringify({

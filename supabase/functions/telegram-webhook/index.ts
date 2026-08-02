@@ -301,7 +301,7 @@ async function handleSuccessfulPayment({ supabase, userId, telegramId, payment }
     .select('current_period_end')
     .eq('telegram_id', telegramId)
     .maybeSingle();
-  const days = plan === 'half_year' ? 180 : 30;
+  const days = plan === 'half_year' ? 180 : plan === 'quarter' ? 90 : 30;
   const telegramExpirationMs = Number(payment?.subscription_expiration_date || 0) * 1000;
   const currentEndMs = new Date(currentSubscription?.current_period_end || 0).getTime();
   const extensionStartMs = Math.max(now.getTime(), Number.isFinite(currentEndMs) ? currentEndMs : 0);
@@ -348,10 +348,19 @@ async function handleSuccessfulPayment({ supabase, userId, telegramId, payment }
       source: 'telegram_stars',
       current_period_start: now.toISOString(),
       current_period_end: currentPeriodEnd,
+      cancel_at_period_end: false,
+      next_billing_at: plan === 'month' ? currentPeriodEnd : null,
+      last_payment_at: now.toISOString(),
+      payment_method_type: 'telegram_stars',
+      last_error: null,
       last_invoice_payload: payload,
       last_telegram_payment_charge_id: payment.telegram_payment_charge_id || null,
       updated_at: now.toISOString()
     }, { onConflict: 'telegram_id' });
+
+  await supabase.from('billing_agreements').update({
+    status: 'cancelled', cancel_at_period_end: true, updated_at: now.toISOString()
+  }).eq('provider', 'yookassa').eq('telegram_id', telegramId);
 
   return premiumActivatedReply(currentPeriodEnd);
 }
@@ -381,12 +390,12 @@ function supportPaymentReply() {
 }
 
 function isPremiumPayload(payload: string) {
-  return /^premium:(month|half_year):\d+:[0-9a-f-]+$/i.test(String(payload || ''));
+  return /^premium:(month|quarter|half_year):\d+:[0-9a-f-]+$/i.test(String(payload || ''));
 }
 
 function parsePlan(payload: string) {
-  const match = String(payload || '').match(/^premium:(month|half_year):/);
-  return match?.[1] === 'half_year' ? 'half_year' : 'month';
+  const match = String(payload || '').match(/^premium:(month|quarter|half_year):/);
+  return match?.[1] === 'quarter' ? 'quarter' : match?.[1] === 'half_year' ? 'half_year' : 'month';
 }
 
 function formatDate(value: string) {

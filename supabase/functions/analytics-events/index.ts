@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { authenticateAppRequest } from '../_shared/auth.ts';
 
 const PROD_ORIGIN = 'https://arseneleshaevwork-dotcom.github.io';
 const ALLOWED_EVENTS = new Set([
@@ -8,7 +9,8 @@ const ALLOWED_EVENTS = new Set([
   'age_article_opened', 'ai_opened', 'ai_consent_granted', 'ai_consent_declined', 'ai_consent_revoked',
   'ai_question_sent', 'ai_answer_received', 'ai_answer_failed', 'ai_feedback', 'premium_opened',
   'trial_started', 'subscribe_clicked', 'premium_paid', 'personal_plan_ready', 'next_sleep_started',
-  'backup_exported', 'backup_imported'
+  'backup_exported', 'backup_imported', 'cloud_sync', 'pwa_installed', 'checkout_opened',
+  'subscription_cancelled', 'subscription_resumed'
 ]);
 
 Deno.serve(async (req) => {
@@ -46,8 +48,15 @@ Deno.serve(async (req) => {
   if (!withinQuota) return json({ error: 'rate_limit' }, 429, corsHeaders);
 
   const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN') || '';
-  const auth = botToken ? await verifyTelegramInitData(String(body?.init_data || ''), botToken) : { ok: false };
-  const verifiedTelegramUser = auth.ok ? auth.user : null;
+  const auth = botToken && (body?.init_data || req.headers.get('authorization'))
+    ? await authenticateAppRequest({ req, body, supabase, botToken })
+    : { ok: false };
+  const verifiedTelegramUser = auth.ok ? {
+    id: auth.telegramId,
+    username: auth.user?.username || '',
+    first_name: auth.user?.first_name || '',
+    language_code: auth.user?.language_code || ''
+  } : null;
   let inserted = 0;
 
   for (const event of events) {
@@ -171,7 +180,7 @@ function buildCorsHeaders(origin: string) {
   return {
     'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : PROD_ORIGIN,
     'Vary': 'Origin',
-    'Access-Control-Allow-Headers': 'content-type',
+    'Access-Control-Allow-Headers': 'authorization, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };
 }

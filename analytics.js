@@ -81,9 +81,12 @@ function createAnalytics(env = {}) {
     if (!queue.length) return true;
 
     try {
+      const headers = typeof window !== 'undefined' && window.BabyAccount
+        ? window.BabyAccount.authHeaders({ 'Content-Type': 'application/json' })
+        : { 'Content-Type': 'application/json' };
       const response = await fetcher(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ events: queue, init_data: getTelegramInitData(telegram) })
       });
 

@@ -76,7 +76,9 @@ Deno.serve(async (req) => {
     notificationDeliveriesResult,
     scheduleRemindersResult,
     notificationRunsResult,
-    supportRequestsResult
+    supportRequestsResult,
+    billingAgreementsResult,
+    billingEventsResult
   ] = await Promise.all([
     supabase
       .from('events')
@@ -91,12 +93,12 @@ Deno.serve(async (req) => {
       .limit(1000),
     supabase
       .from('subscriptions')
-      .select('id,user_id,telegram_id,plan,status,source,current_period_end,created_at,updated_at')
+      .select('id,user_id,telegram_id,plan,status,source,current_period_end,cancel_at_period_end,next_billing_at,last_error,created_at,updated_at')
       .order('updated_at', { ascending: false })
       .limit(1000),
     supabase
       .from('payments')
-      .select('id,user_id,telegram_id,plan,currency,total_amount,status,created_at,paid_at')
+      .select('id,user_id,telegram_id,plan,currency,total_amount,status,provider,error_code,created_at,paid_at')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(1000),
@@ -132,7 +134,18 @@ Deno.serve(async (req) => {
       .select('id,telegram_id,category,message,status,created_at')
       .eq('status', 'open')
       .order('created_at', { ascending: false })
-      .limit(100)
+      .limit(100),
+    supabase
+      .from('billing_agreements')
+      .select('telegram_id,provider,plan,status,next_charge_at,current_period_end,cancel_at_period_end,retry_count,last_error,updated_at')
+      .order('updated_at', { ascending: false })
+      .limit(1000),
+    supabase
+      .from('billing_events')
+      .select('provider,event_type,status,error,created_at,processed_at')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(1000)
   ]);
 
   if (eventsResult.error) return json({ error: 'events_query_failed', details: eventsResult.error.message }, 500);
@@ -145,6 +158,8 @@ Deno.serve(async (req) => {
   if (scheduleRemindersResult.error) return json({ error: 'schedule_reminders_query_failed', details: scheduleRemindersResult.error.message }, 500);
   if (notificationRunsResult.error) return json({ error: 'notification_runs_query_failed', details: notificationRunsResult.error.message }, 500);
   if (supportRequestsResult.error) return json({ error: 'support_requests_query_failed', details: supportRequestsResult.error.message }, 500);
+  if (billingAgreementsResult.error) return json({ error: 'billing_agreements_query_failed', details: billingAgreementsResult.error.message }, 500);
+  if (billingEventsResult.error) return json({ error: 'billing_events_query_failed', details: billingEventsResult.error.message }, 500);
 
   return json(buildDashboard({
     events: eventsResult.data || [],
@@ -157,16 +172,20 @@ Deno.serve(async (req) => {
     scheduleReminders: scheduleRemindersResult.data || [],
     notificationRuns: notificationRunsResult.data || [],
     supportRequests: supportRequestsResult.data || [],
+    billingAgreements: billingAgreementsResult.data || [],
+    billingEvents: billingEventsResult.data || [],
     rangeDays,
     generatedAt: new Date().toISOString()
   }));
 });
 
-function buildDashboard({ events, babies, subscriptions = [], payments = [], aiRequests = [], notificationSettings = [], notificationDeliveries = [], scheduleReminders = [], notificationRuns = [], supportRequests = [], rangeDays, generatedAt }: {
+function buildDashboard({ events, babies, subscriptions = [], payments = [], billingAgreements = [], billingEvents = [], aiRequests = [], notificationSettings = [], notificationDeliveries = [], scheduleReminders = [], notificationRuns = [], supportRequests = [], rangeDays, generatedAt }: {
   events: any[];
   babies: any[];
   subscriptions?: any[];
   payments?: any[];
+  billingAgreements?: any[];
+  billingEvents?: any[];
   aiRequests?: any[];
   notificationSettings?: any[];
   notificationDeliveries?: any[];
@@ -225,7 +244,7 @@ function buildDashboard({ events, babies, subscriptions = [], payments = [], aiR
     opened_and_left: openedAndLeft,
     bot_started_not_opened: botStartedNotOpened,
     sources: buildSources(events),
-    billing: buildBilling({ subscriptions, payments }),
+    billing: buildBilling({ subscriptions, payments, billingAgreements, billingEvents }),
     ai_usage: buildAiUsage(aiRequests),
     operations: buildOperations({ notificationSettings, notificationDeliveries, scheduleReminders, notificationRuns, generatedAt }),
     support_requests: supportRequests.map(formatSupportRequest),
@@ -267,7 +286,7 @@ function percentile95(values: number[]) {
   return values[Math.min(values.length - 1, Math.ceil(values.length * 0.95) - 1)];
 }
 
-function buildBilling({ subscriptions = [], payments = [] }: { subscriptions?: any[]; payments?: any[] } = {}) {
+function buildBilling({ subscriptions = [], payments = [], billingAgreements = [], billingEvents = [] }: { subscriptions?: any[]; payments?: any[]; billingAgreements?: any[]; billingEvents?: any[] } = {}) {
   const now = Date.now();
   const activeSubscriptions = subscriptions.filter(item =>
     item.status === 'active' && item.current_period_end && new Date(item.current_period_end).getTime() > now
@@ -275,16 +294,24 @@ function buildBilling({ subscriptions = [], payments = [] }: { subscriptions?: a
   const paidPayments = payments.filter(item => item.status === 'paid');
   const failedPayments = payments.filter(item => ['invoice_failed', 'failed', 'cancelled'].includes(item.status));
   const pendingPayments = payments.filter(item => item.status === 'created');
-  const paidStars = paidPayments.reduce((sum, item) => sum + Number(item.total_amount || 0), 0);
+  const paidStars = paidPayments.filter(item => item.currency === 'XTR').reduce((sum, item) => sum + Number(item.total_amount || 0), 0);
+  const paidRublesMinor = paidPayments.filter(item => item.currency === 'RUB').reduce((sum, item) => sum + Number(item.total_amount || 0), 0);
 
   return {
     active_subscriptions: activeSubscriptions.length,
     paid_payments: paidPayments.length,
     paid_stars: paidStars,
+    paid_rubles: Math.round(paidRublesMinor) / 100,
+    stars_payments: paidPayments.filter(item => item.provider === 'telegram_stars' || item.currency === 'XTR').length,
+    yookassa_payments: paidPayments.filter(item => item.provider === 'yookassa').length,
+    web_autorenew_active: billingAgreements.filter(item => item.provider === 'yookassa' && item.status === 'active' && !item.cancel_at_period_end).length,
+    web_past_due: billingAgreements.filter(item => item.provider === 'yookassa' && item.status === 'past_due').length,
+    billing_event_errors: billingEvents.filter(item => item.status === 'failed').length,
     failed_payments: failedPayments.length,
     pending_payments: pendingPayments.length,
     month_subscriptions: activeSubscriptions.filter(item => item.plan === 'month').length,
-    half_year_subscriptions: activeSubscriptions.filter(item => item.plan === 'half_year').length,
+    quarter_subscriptions: activeSubscriptions.filter(item => item.plan === 'quarter').length,
+    legacy_half_year_subscriptions: activeSubscriptions.filter(item => item.plan === 'half_year').length,
     legacy_year_subscriptions: activeSubscriptions.filter(item => item.plan === 'year').length
   };
 }
@@ -458,6 +485,9 @@ function formatSubscription(subscription: any) {
     status: subscription.status || '',
     source: subscription.source || '',
     current_period_end: subscription.current_period_end || null,
+    cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
+    next_billing_at: subscription.next_billing_at || null,
+    last_error: subscription.last_error || null,
     updated_at: subscription.updated_at || subscription.created_at || null
   };
 }
@@ -471,6 +501,8 @@ function formatPayment(payment: any) {
     currency: payment.currency || '',
     total_amount: Number(payment.total_amount || 0),
     status: payment.status || '',
+    provider: payment.provider || (payment.currency === 'XTR' ? 'telegram_stars' : ''),
+    error_code: payment.error_code || '',
     created_at: payment.created_at || null,
     paid_at: payment.paid_at || null
   };

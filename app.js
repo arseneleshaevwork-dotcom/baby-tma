@@ -253,6 +253,7 @@ function persistTodaySchedule(blocks){
       age_months:_age,
       blocks:safeBlocks
     }));
+    if (window.BabyCloudSync) BabyCloudSync.markSettingsChanged();
   } catch(e) {}
 }
 
@@ -406,6 +407,7 @@ function generate(){
   const planBuffer=Number.isFinite(window._appliedPlanBuffer)?window._appliedPlanBuffer:0;
   _p=getProfile(_age); _blockShifts={}; _bufferMin=planBuffer;
   localStorage.setItem('babymode_last_age', String(_age));
+  if (window.BabyCloudSync) BabyCloudSync.markSettingsChanged();
   document.getElementById('bufferSlider').value=String(planBuffer);
   document.getElementById('bufferVal').textContent=planBuffer+' мин';
   delete window._appliedPlanBuffer;

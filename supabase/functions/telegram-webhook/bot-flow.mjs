@@ -19,6 +19,14 @@ export function buildBotReply({ text = '', firstName = '', baby = null, miniAppU
     };
   }
 
+  if (cleanText === '/terms') {
+    return {
+      action: 'terms',
+      text: 'Условия Premium: внутри Telegram оплата проходит в Stars. В веб-версии доступны карта и СБП через ЮKassa. Автопродление можно отключить в профиле, доступ сохранится до конца оплаченного периода. Для вопросов по оплате используйте /paysupport.',
+      reply_markup: termsKeyboard(miniAppUrl)
+    };
+  }
+
   if (reminderConsent !== null) {
     return {
       action: reminderConsent ? 'enable_reminders' : 'disable_reminders',
@@ -186,7 +194,7 @@ function buildProfileText(baby = {}) {
 }
 
 function buildHelpText() {
-  return `Я помогу с режимом малыша: сон, кормления, дневник, ИИ-подсказки и напоминания.\n\nКоманды:\n/start — начать заново\n/profile — профиль малыша\n/reminders_on — включить напоминания\n/reminders_off — отключить напоминания\n/paysupport — помощь с оплатой\n/reset — сбросить профиль малыша\n/help — помощь\n\nМожно просто открыть мини-приложение и собрать режим на сегодня.`;
+  return `Я помогу с режимом малыша: сон, кормления, дневник, ИИ-подсказки и напоминания.\n\nКоманды:\n/start — начать заново\n/profile — профиль малыша\n/reminders_on — включить напоминания\n/reminders_off — отключить напоминания\n/terms — условия Premium\n/paysupport — помощь с оплатой\n/reset — сбросить профиль малыша\n/help — помощь\n\nМожно просто открыть мини-приложение и собрать режим на сегодня.`;
 }
 
 function parseDateOnly(value) {
@@ -229,6 +237,19 @@ function profileKeyboard(miniAppUrl) {
     inline_keyboard: [
       [{ text: 'Открыть мини-приложение', web_app: { url: miniAppUrl } }],
       [{ text: 'Сбросить профиль', callback_data: '/reset' }]
+    ]
+  };
+}
+
+function termsKeyboard(miniAppUrl) {
+  let termsUrl = miniAppUrl;
+  try {
+    termsUrl = new URL('terms.html', miniAppUrl).toString();
+  } catch (_) {}
+  return {
+    inline_keyboard: [
+      [{ text: 'Открыть условия', url: termsUrl }],
+      [{ text: 'Открыть мини-приложение', web_app: { url: miniAppUrl } }]
     ]
   };
 }

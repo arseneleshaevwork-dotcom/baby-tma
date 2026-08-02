@@ -13,10 +13,10 @@ const PLANS = {
     stars: 299,
     days: 30
   },
-  half_year: {
-    label: 'Premium на 6 месяцев',
-    stars: 1490,
-    days: 180
+  quarter: {
+    label: 'Premium на 3 месяца',
+    stars: 769,
+    days: 90
   }
 } as const;
 

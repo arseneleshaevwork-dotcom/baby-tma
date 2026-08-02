@@ -236,6 +236,7 @@ function _escapeHtml(value) {
 
 function setNotificationPreference(value) {
   localStorage.setItem(NOTIF_KEY, value);
+  if (window.BabyCloudSync) BabyCloudSync.markSettingsChanged();
   if (!window.BabyAnalytics) return;
 
   const enabled = value === 'tg' || value === 'pending';

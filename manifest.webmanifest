@@ -1,0 +1,21 @@
+{
+  "id": "/baby-tma/",
+  "name": "Режим Малыша",
+  "short_name": "Режим Малыша",
+  "description": "Дневник сна, персональный режим и помощник для родителей",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F6F7F6",
+  "theme_color": "#5B5863",
+  "icons": [
+    {
+      "src": "promo.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

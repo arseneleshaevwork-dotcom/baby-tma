@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Режим Малыша — Умный режим дня для малыша</title>
 <meta name="description" content="Научно обоснованный генератор режима дня для малыша. Дневник сна, консультант и ритуал засыпания для молодых мам.">
+<meta name="theme-color" content="#5B5863">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest?v=20260802-1">
+<link rel="apple-touch-icon" href="promo.png">
 
 <!-- Critical inline CSS -->
 <style>
@@ -14,13 +19,14 @@
 
 <!-- Telegram SDK -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://oauth.telegram.org/js/telegram-login.js?22"></script>
 
 <!-- Lucide icon system -->
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
 
 <!-- Google Fonts — Nunito (non-blocking) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 
 <!-- Chart.js -->
 <script>
@@ -36,9 +42,25 @@
 })();
 </script>
 
-<link rel="stylesheet" href="style.css?v=20260730-1">
+<link rel="stylesheet" href="style.css?v=20260802-1">
 </head>
 <body data-page="home">
+
+<div id="webAuthGate" class="web-auth-gate" hidden>
+  <div class="web-auth-panel">
+    <img src="promo.png" alt="Режим Малыша" class="web-auth-logo">
+    <div class="web-auth-copy">
+      <h1>Режим Малыша</h1>
+      <p>Ваш режим, дневник и Premium на любом устройстве</p>
+    </div>
+    <button id="webTelegramLoginBtn" class="web-telegram-login" onclick="BabyAccount.login()">
+      <i data-lucide="send"></i><span>Войти через Telegram</span>
+    </button>
+    <div id="webAuthMessage" class="web-auth-message" role="status" aria-live="polite"></div>
+    <small>Без отдельного пароля. Мы получим только имя, Telegram ID и фото профиля.</small>
+    <a href="privacy.html" target="_blank" rel="noopener">Конфиденциальность</a>
+  </div>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════
      HEADER
@@ -549,6 +571,7 @@
     <button class="save-log-btn" onclick="saveProfileSettings();hapticSuccess()">Сохранить</button>
   </div>
   <div class="profile-menu">
+    <button id="profileAccountRow" style="display:none" onclick="BabyAccount.logout();hapticLight()"><span>◉</span><div><strong>Аккаунт Telegram</strong><small id="profileAccountStatus">Проверяем вход</small></div><b>Выйти</b></button>
     <button onclick="goPage('premium',null);renderPremiumPage();hapticLight()"><span>⭐</span><div><strong>Premium</strong><small id="profilePremiumStatus">Проверяем статус</small></div><b>›</b></button>
     <button onclick="goPage('articles',null);hapticLight()"><span>📚</span><div><strong>База знаний</strong><small>Сон, кормление и развитие</small></div><b>›</b></button>
     <button onclick="goPage('ritual',null);hapticLight()"><span>🌙</span><div><strong>Ритуал сна</strong><small>Таймер и спокойные звуки</small></div><b>›</b></button>
@@ -556,8 +579,10 @@
     <button onclick="manageAiConsent();hapticLight()"><span>✨</span><div><strong>ИИ и данные</strong><small id="profileAiStatus">Спросим согласие перед первым вопросом</small></div><b>›</b></button>
     <button onclick="exportAllData();hapticLight()"><span>📥</span><div><strong>Скачать мои данные</strong><small>Профиль, дневник и настройки</small></div><b>›</b></button>
     <button onclick="importBackupData();hapticLight()"><span>↥</span><div><strong>Восстановить резервную копию</strong><small id="profileBackupStatus">Импортировать сохранённый JSON-файл</small></div><b>›</b></button>
+    <button id="profileInstallRow" style="display:none" onclick="BabyPWA.install();hapticLight()"><span>＋</span><div><strong>Добавить на главный экран</strong><small>Открывать как обычное приложение</small></div><b>›</b></button>
     <button onclick="openSupport();hapticLight()"><span>💬</span><div><strong>Поддержка</strong><small>Написать в Telegram</small></div><b>›</b></button>
     <button onclick="window.open('privacy.html','_blank','noopener');hapticLight()"><span>🔐</span><div><strong>Конфиденциальность</strong><small>Как хранятся и используются данные</small></div><b>›</b></button>
+    <button onclick="window.open('terms.html','_blank','noopener');hapticLight()"><span>§</span><div><strong>Условия подписки</strong><small>Оплата, автопродление и отмена</small></div><b>›</b></button>
     <button class="danger-row" onclick="confirmDeleteLocalData();hapticLight()"><span>🗑</span><div><strong>Удалить данные с устройства</strong><small>Очистить профиль и дневник</small></div><b>›</b></button>
   </div>
 </div>
@@ -628,16 +653,19 @@
 </div>
 
 <!-- Scripts -->
-<script src="analytics-config.js?v=20260724"></script>
-<script src="analytics.js?v=20260724"></script>
-<script src="tma.js?v=20260724"></script>
+<script src="analytics-config.js?v=20260802-1"></script>
+<script src="analytics.js?v=20260802-1"></script>
+<script src="tma.js?v=20260802-1"></script>
+<script src="web-account.js?v=20260802-1"></script>
+<script src="cloud-sync.js?v=20260802-1"></script>
+<script src="pwa.js?v=20260802-1"></script>
 <script src="chat.js?v=20260730-1"></script>
 <script src="sleep-intelligence.js?v=20260729-2"></script>
 <script src="daily-coach.js?v=20260729-2"></script>
 <script src="baby-milestones.js?v=20260724"></script>
 <script src="tracker.js?v=20260730-1"></script>
 <script src="articles.js?v=20260729-2"></script>
-<script src="subscription.js?v=20260730-1"></script>
+<script src="subscription.js?v=20260802-1"></script>
 <script src="onboarding.js?v=20260729-1"></script>
 <script src="reminder-planner.js?v=20260724"></script>
 <script src="notifications.js?v=20260729-1"></script>
@@ -1104,6 +1132,10 @@ function doShareSchedule() {
 // ─── Home Insights: Smart card on home page ──────────────────────────────────
 function _onAgeChange(val) {
   localStorage.setItem('babymode_last_age', String(val));
+  if (window.BabyCloudSync) {
+    BabyCloudSync.markProfileChanged();
+    BabyCloudSync.markSettingsChanged();
+  }
   renderHomeInsights();
   renderBabyEventCard();
 }
@@ -1395,6 +1427,10 @@ function saveProfileSettings() {
   }
   renderProfilePage();
   renderBabyEventCard();
+  if (window.BabyCloudSync) {
+    BabyCloudSync.markProfileChanged();
+    BabyCloudSync.markSettingsChanged();
+  }
   showToast('Профиль сохранён');
 }
 
@@ -1444,6 +1480,11 @@ function importBackupData() {
         if (['breast','formula','mixed','solids'].includes(settings.feed_type)) localStorage.setItem('babymode_feed_type', settings.feed_type);
         localStorage.setItem('babymode_last_backup_restore', new Date().toISOString());
         if (window.BabyAnalytics) BabyAnalytics.track('backup_imported', { diary_days: diary.length });
+        if (window.BabyCloudSync) {
+          BabyCloudSync.markProfileChanged();
+          BabyCloudSync.markSettingsChanged();
+          BabyCloudSync.schedule(100);
+        }
         renderProfilePage();
         if (typeof renderTracker === 'function') renderTracker();
         renderTodayPlan();
@@ -1506,6 +1547,8 @@ function confirmDeleteLocalData() {
 
 // ─── DOMContentLoaded init ───────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', function() {
+  if (window.BabyAccount) BabyAccount.init();
+  if (window.BabyPWA) BabyPWA.init();
   if (window.BabyAnalytics) BabyAnalytics.track('app_open');
 
   if (typeof tmaInit === 'function') tmaInit();
@@ -1546,6 +1589,12 @@ window.addEventListener('DOMContentLoaded', function() {
 
   // Render home cards
   setTimeout(function(){ renderHomeInsights(); renderBabyEventCard(); }, 200);
+
+  window.addEventListener('baby-account-ready', function(event) {
+    if (!event.detail || !event.detail.authenticated) return;
+    if (typeof SUB !== 'undefined') SUB.refreshPremiumStatus();
+    if (window.BabyCloudSync) BabyCloudSync.syncNow();
+  }, { once:true });
 
   // Start onboarding only once on this device.
   var hasLaunched = localStorage.getItem('babymode_launched');

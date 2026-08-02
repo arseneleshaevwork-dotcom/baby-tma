@@ -32,7 +32,7 @@ const { buildUpcomingBabyDates } = typeof require === 'function'
   ? require('./baby-milestones')
   : { buildUpcomingBabyDates: () => [] };
 
-function buildAdminDashboard({ events = [], babies = [], subscriptions = [], payments = [], aiRequests = [], notificationSettings = [], notificationDeliveries = [], scheduleReminders = [], notificationRuns = [], supportRequests = [], generatedAt, rangeDays = 30, now = new Date() } = {}) {
+function buildAdminDashboard({ events = [], babies = [], subscriptions = [], payments = [], billingAgreements = [], billingEvents = [], aiRequests = [], notificationSettings = [], notificationDeliveries = [], scheduleReminders = [], notificationRuns = [], supportRequests = [], generatedAt, rangeDays = 30, now = new Date() } = {}) {
   const totals = Object.fromEntries(TRACKED_EVENTS.map(event => [event, 0]));
   const usersByEvent = Object.fromEntries(TRACKED_EVENTS.map(event => [event, new Set()]));
   const userEvents = new Map();
@@ -84,7 +84,7 @@ function buildAdminDashboard({ events = [], babies = [], subscriptions = [], pay
     opened_and_left: openedAndLeft,
     bot_started_not_opened: botStartedNotOpened,
     sources: buildSources(events),
-    billing: buildBilling({ subscriptions, payments, now }),
+    billing: buildBilling({ subscriptions, payments, billingAgreements, billingEvents, now }),
     ai_usage: buildAiUsage(aiRequests),
     operations: buildOperations({ notificationSettings, notificationDeliveries, scheduleReminders, notificationRuns, now }),
     support_requests: supportRequests.map(formatSupportRequest),
@@ -126,7 +126,7 @@ function percentile95(values) {
   return values[Math.min(values.length - 1, Math.ceil(values.length * 0.95) - 1)];
 }
 
-function buildBilling({ subscriptions = [], payments = [], now = new Date() } = {}) {
+function buildBilling({ subscriptions = [], payments = [], billingAgreements = [], billingEvents = [], now = new Date() } = {}) {
   const nowMs = new Date(now).getTime();
   const activeSubscriptions = subscriptions.filter(item =>
     item.status === 'active' && item.current_period_end && new Date(item.current_period_end).getTime() > nowMs
@@ -134,16 +134,24 @@ function buildBilling({ subscriptions = [], payments = [], now = new Date() } = 
   const paidPayments = payments.filter(item => item.status === 'paid');
   const failedPayments = payments.filter(item => ['invoice_failed', 'failed', 'cancelled'].includes(item.status));
   const pendingPayments = payments.filter(item => item.status === 'created');
-  const paidStars = paidPayments.reduce((sum, item) => sum + Number(item.total_amount || 0), 0);
+  const paidStars = paidPayments.filter(item => item.currency === 'XTR').reduce((sum, item) => sum + Number(item.total_amount || 0), 0);
+  const paidRublesMinor = paidPayments.filter(item => item.currency === 'RUB').reduce((sum, item) => sum + Number(item.total_amount || 0), 0);
 
   return {
     active_subscriptions: activeSubscriptions.length,
     paid_payments: paidPayments.length,
     paid_stars: paidStars,
+    paid_rubles: Math.round(paidRublesMinor) / 100,
+    stars_payments: paidPayments.filter(item => item.provider === 'telegram_stars' || item.currency === 'XTR').length,
+    yookassa_payments: paidPayments.filter(item => item.provider === 'yookassa').length,
+    web_autorenew_active: billingAgreements.filter(item => item.provider === 'yookassa' && item.status === 'active' && !item.cancel_at_period_end).length,
+    web_past_due: billingAgreements.filter(item => item.provider === 'yookassa' && item.status === 'past_due').length,
+    billing_event_errors: billingEvents.filter(item => item.status === 'failed').length,
     failed_payments: failedPayments.length,
     pending_payments: pendingPayments.length,
     month_subscriptions: activeSubscriptions.filter(item => item.plan === 'month').length,
-    half_year_subscriptions: activeSubscriptions.filter(item => item.plan === 'half_year').length,
+    quarter_subscriptions: activeSubscriptions.filter(item => item.plan === 'quarter').length,
+    legacy_half_year_subscriptions: activeSubscriptions.filter(item => item.plan === 'half_year').length,
     legacy_year_subscriptions: activeSubscriptions.filter(item => item.plan === 'year').length
   };
 }
@@ -250,6 +258,9 @@ function formatSubscription(subscription = {}) {
     status: subscription.status || '',
     source: subscription.source || '',
     current_period_end: subscription.current_period_end || null,
+    cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
+    next_billing_at: subscription.next_billing_at || null,
+    last_error: subscription.last_error || null,
     updated_at: subscription.updated_at || subscription.created_at || null
   };
 }
@@ -263,6 +274,8 @@ function formatPayment(payment = {}) {
     currency: payment.currency || '',
     total_amount: Number(payment.total_amount || 0),
     status: payment.status || '',
+    provider: payment.provider || (payment.currency === 'XTR' ? 'telegram_stars' : ''),
+    error_code: payment.error_code || '',
     created_at: payment.created_at || null,
     paid_at: payment.paid_at || null
   };

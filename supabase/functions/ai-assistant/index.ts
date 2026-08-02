@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { authenticateAppRequest } from '../_shared/auth.ts';
 import {
   AI_CONSENT_VERSION,
   FREE_DAILY_LIMIT,
@@ -32,18 +33,11 @@ Deno.serve(async req => {
   }
 
   const body = await req.json().catch(() => ({}));
-  const auth = await verifyTelegramInitData(String(body?.initData || ''), botToken);
-  if (!auth.ok || !auth.user?.id) return json({ ok: false, error: 'telegram_auth_failed' }, 401, corsHeaders);
-
-  const telegramId = Number(auth.user.id);
   const supabase = createClient(supabaseUrl, serviceRoleKey);
-  const { data: user } = await supabase.from('users').upsert({
-    telegram_id: telegramId,
-    username: auth.user.username || null,
-    first_name: auth.user.first_name || null,
-    language_code: auth.user.language_code || null,
-    last_seen_at: new Date().toISOString()
-  }, { onConflict: 'telegram_id' }).select('id').single();
+  const auth = await authenticateAppRequest({ req, body, supabase, botToken });
+  if (!auth.ok) return json({ ok: false, error: auth.error || 'auth_failed' }, 401, corsHeaders);
+  const telegramId = Number(auth.telegramId);
+  const user = auth.user;
 
   if (body?.action === 'revoke_consent') {
     await supabase.from('ai_consents').upsert({
@@ -184,7 +178,7 @@ function buildCorsHeaders(origin: string) {
   return {
     'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : 'https://arseneleshaevwork-dotcom.github.io',
     'Vary': 'Origin',
-    'Access-Control-Allow-Headers': 'content-type',
+    'Access-Control-Allow-Headers': 'authorization, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };
 }

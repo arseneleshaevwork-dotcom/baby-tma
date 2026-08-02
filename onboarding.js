@@ -233,6 +233,10 @@ function saveOnboardingProfile() {
   }
   if (name && typeof _applyBabyName === 'function') _applyBabyName(name);
   if (typeof renderBabyEventCard === 'function') renderBabyEventCard();
+  if (window.BabyCloudSync) {
+    BabyCloudSync.markProfileChanged();
+    BabyCloudSync.markSettingsChanged();
+  }
 }
 
 function saveOnboardingReminderConsent() {
@@ -243,6 +247,7 @@ function saveOnboardingReminderConsent() {
   } else {
     localStorage.setItem('babymode_notif_enabled', enabled ? 'pending' : 'no');
   }
+  if (window.BabyCloudSync) BabyCloudSync.markSettingsChanged();
 }
 
 function _nearestAgeOption(ageMonths) {

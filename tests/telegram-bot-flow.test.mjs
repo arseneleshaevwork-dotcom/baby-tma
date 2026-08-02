@@ -123,8 +123,23 @@ test('shows bot help with commands', () => {
   assert.equal(reply.action, 'help');
   assert.match(reply.text, /\/profile/);
   assert.match(reply.text, /\/reminders_on/);
+  assert.match(reply.text, /\/terms/);
   assert.match(reply.text, /\/paysupport/);
   assert.match(reply.text, /\/reset/);
+});
+
+test('shows premium terms and the public terms page', () => {
+  const reply = buildBotReply({
+    text: '/terms',
+    firstName: 'Анна',
+    baby: { name: 'Миша' },
+    miniAppUrl: 'https://example.test/baby-tma/'
+  });
+
+  assert.equal(reply.action, 'terms');
+  assert.match(reply.text, /Stars/);
+  assert.match(reply.text, /ЮKassa/);
+  assert.equal(reply.reply_markup.inline_keyboard[0][0].url, 'https://example.test/baby-tma/terms.html');
 });
 
 test('creates a payment support request without asking for card data', () => {

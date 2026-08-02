@@ -22,16 +22,21 @@ Pilot capacity target: up to 500 registered users, 30-100 daily active users and
 
 ## Subscription decision
 
-Digital Premium access sold inside the Telegram bot or Mini App uses Telegram Stars. This is the Telegram-compliant checkout and does not require a separate YooKassa, YooMoney, Tribute or Lava checkout inside the Mini App.
+The launch uses one Premium entitlement with two compliant checkout paths:
 
-The product has two offers:
+- Inside the Telegram bot and Mini App: Telegram Stars only.
+- On the independent website/PWA: YooKassa checkout with cards and SBP.
 
-- Monthly: 299 Stars, recurring every 30 days.
-- Six months: 1490 Stars, one-time access for 180 days.
+The offers are:
 
-The Mini App shows both periods, exact renewal terms and the access end date. Access is activated only from Telegram's verified payment update. Every recurring charge is stored as a separate payment and is idempotent by Telegram charge ID.
+- Web monthly: 349 RUB, recurring every month.
+- Web quarter: 899 RUB, recurring every three calendar months.
+- Telegram monthly: 299 Stars, recurring every 30 days.
+- Telegram quarter: 769 Stars, one-time access for 90 days.
 
-YooKassa can be evaluated later for a separate public website. It must not replace Stars for digital access sold inside Telegram. Tribute and Lava are not part of the launch payment path.
+The quarter offer in Stars is intentionally one-time because Telegram recurring subscriptions currently use a 30-day period. The UI states renewal terms before checkout. A user who signs into the website with Telegram receives the same profile, diary, settings and Premium entitlement on both surfaces.
+
+Tribute and Lava remain outside the launch payment path. They add another entitlement source without improving the main customer journey. YooKassa is the primary web provider because the checkout supports Russian cards and SBP while the product keeps control of customer identity, renewal state, receipts and support.
 
 Payment acceptance rules:
 
@@ -41,6 +46,11 @@ Payment acceptance rules:
 - verify invoice owner, currency and amount before checkout;
 - activate only successful Telegram payment updates;
 - keep raw payloads private and redact them from logs.
+- verify each YooKassa webhook by fetching the payment or refund from YooKassa API;
+- use idempotence keys for every YooKassa payment and renewal;
+- encrypt saved YooKassa payment-method identifiers at rest;
+- keep Premium active after cancellation until the paid period ends;
+- retry failed web renewals with limits and make errors visible in admin.
 
 ## Partner program
 
@@ -53,4 +63,4 @@ Partner experiments remain deferred. Attribution by `start_param` and UTM stays 
 - Agent failure returns a useful fallback in the Mini App.
 - p95 response time and error rate are visible in admin analytics.
 - Backup, swap, service restart and rollback have been tested.
-- Stars purchase, recurring renewal and duplicate-event tests pass before paid traffic.
+- Stars and YooKassa purchase, renewal, cancellation, refund and duplicate-event tests pass before paid traffic.

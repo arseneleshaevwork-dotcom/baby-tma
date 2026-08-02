@@ -29,6 +29,11 @@ const SUB = (() => {
   let _trialActive = false;
   let _trialDaysLeft = 0;
   let _premiumUntil = null;
+  let _source = null;
+  let _plan = null;
+  let _cancelAtPeriodEnd = false;
+  let _nextBillingAt = null;
+  let _trialUsed = false;
 
   function init() {
     _loadCachedPremium();
@@ -48,16 +53,19 @@ const SUB = (() => {
     if (localStorage.getItem(KEY_TRIAL_DATE)) return false;
     const initData = _getTelegramInitData();
     const endpoint = window.BABY_SUBSCRIPTION_STATUS_ENDPOINT;
-    if (!initData || !endpoint) {
-      showToast('Пробный период активируется внутри Telegram.');
+    const canUseServer = window.BabyAccount ? BabyAccount.canUseServer() : Boolean(initData);
+    if (!canUseServer || !endpoint) {
+      showToast('Войдите через Telegram, чтобы активировать пробный период.');
       return false;
     }
     try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData, start_trial: true })
-      });
+      const response = window.BabyAccount
+        ? await BabyAccount.request(endpoint, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: { start_trial: true }
+        })
+        : await fetch(endpoint, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData, start_trial: true })
+        });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.active || data.status !== 'trial') {
         showToast(data.error === 'trial_already_used' ? 'Пробный период уже был использован.' : 'Не удалось активировать пробный период.');
@@ -82,8 +90,13 @@ const SUB = (() => {
   function _applyServerPremium(subscription) {
     const active = Boolean(subscription && subscription.active && subscription.current_period_end);
     const isTrial = active && subscription.status === 'trial';
+    _trialUsed = Boolean(subscription?.trial_used || isTrial || localStorage.getItem(KEY_TRIAL_DATE));
     _isPremium = active && !isTrial;
     _premiumUntil = active ? subscription.current_period_end : null;
+    _source = active ? subscription.source || null : null;
+    _plan = active ? subscription.plan || null : null;
+    _cancelAtPeriodEnd = active ? Boolean(subscription.cancel_at_period_end) : false;
+    _nextBillingAt = active ? subscription.next_billing_at || null : null;
     localStorage.setItem(KEY_PREMIUM, active ? '1' : '0');
     if (_premiumUntil) localStorage.setItem(KEY_PREMIUM_UNTIL, _premiumUntil);
     else localStorage.removeItem(KEY_PREMIUM_UNTIL);
@@ -111,6 +124,11 @@ const SUB = (() => {
   function isPremium()   { return _isPremium; }
   function isTrialActive() { return _trialActive; }
   function getPlanLimits() { return { ...PLAN_LIMITS }; }
+  function getSource() { return _source; }
+  function getPlan() { return _plan; }
+  function isCancelling() { return _cancelAtPeriodEnd; }
+  function getNextBillingAt() { return _nextBillingAt; }
+  function hasUsedTrial() { return _trialUsed; }
 
   // Show paywall if feature is locked
   function requirePremium(featureName, callback) {
@@ -166,15 +184,15 @@ const SUB = (() => {
   }
 
   async function refreshPremiumStatus() {
-    const initData = _getTelegramInitData();
     const endpoint = window.BABY_SUBSCRIPTION_STATUS_ENDPOINT;
-    if (!initData || !endpoint) return false;
+    const canUseServer = window.BabyAccount ? BabyAccount.canUseServer() : Boolean(_getTelegramInitData());
+    if (!canUseServer || !endpoint) return false;
     try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData })
-      });
+      const response = window.BabyAccount
+        ? await BabyAccount.request(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: {} })
+        : await fetch(endpoint, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: _getTelegramInitData() })
+        });
       if (!response.ok) return false;
       const data = await response.json();
       _applyServerPremium(data);
@@ -207,8 +225,12 @@ const SUB = (() => {
     }
   }
 
-  return { init, startTrial, refreshPremiumStatus, can, getStatus, getDaysLeft, getPremiumUntil, isPremium, isTrialActive, getPlanLimits, requirePremium };
+  return {
+    init, startTrial, refreshPremiumStatus, can, getStatus, getDaysLeft, getPremiumUntil,
+    isPremium, isTrialActive, getPlanLimits, getSource, getPlan, isCancelling, getNextBillingAt, hasUsedTrial, requirePremium
+  };
 })();
+window.SUB = SUB;
 
 // ─── Premium Page Renderer ───────────────────────────────────────────────────
 function initPremium() {
@@ -234,6 +256,16 @@ function renderPremiumPage() {
 function _renderPremiumActive() {
   const until = SUB.getPremiumUntil();
   const untilText = until ? `Доступ открыт до ${new Date(until).toLocaleDateString('ru-RU')}` : 'Все функции разблокированы';
+  const isWeb = _isWebBillingMode();
+  const source = SUB.getSource();
+  const cancelling = SUB.isCancelling();
+  const manage = isWeb && source === 'yookassa' ? `
+    <div class="billing-manage">
+      <p>${cancelling ? 'Автопродление отключено. Premium продолжит работать до указанной даты.' : 'Следующее списание произойдёт в конце оплаченного периода.'}</p>
+      <button class="cta-outline-btn" onclick="${cancelling ? 'resumeWebSubscription' : 'cancelWebSubscription'}();hapticLight()">
+        ${cancelling ? 'Возобновить автопродление' : 'Отключить автопродление'}
+      </button>
+    </div>` : '';
   return `
     <div class="premium-active-card">
       <div class="premium-crown">👑</div>
@@ -241,10 +273,12 @@ function _renderPremiumActive() {
       <div class="premium-active-sub">${untilText}</div>
     </div>
     <div class="plan-comparison">${_featuresList(true)}</div>
+    ${manage}
   `;
 }
 
 function _renderTrialActive(days) {
+  const web = _isWebBillingMode();
   return `
     <div class="sub-hero">
       <span class="sub-hero-emoji">🌸</span>
@@ -259,22 +293,13 @@ function _renderTrialActive(days) {
       </div>
     </div>
     <div class="plan-comparison">${_featuresList(true)}</div>
-    <div style="padding:0 0 8px">
-      <button class="cta-sub-btn" onclick="handleSubscribe('month');hapticMedium()">
-        ⭐ Premium за 299 ⭐ / 30 дней
-      </button>
-      <button class="cta-outline-btn" onclick="handleSubscribe('half_year');hapticLight()">
-        💫 1490 ⭐ / 6 месяцев — экономия 17%
-      </button>
-    </div>
-    <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
-      Месячная подписка продлевается автоматически · 6 месяцев оплачиваются один раз<br>Автопродлением можно управлять в настройках подписок Telegram
-    </p>
+    ${_renderCheckoutActions(web)}
   `;
 }
 
 function _renderFreePage() {
-  const trialStarted = !!localStorage.getItem('babymode_trial_start');
+  const trialStarted = SUB.hasUsedTrial();
+  const web = _isWebBillingMode();
   return `
     <div class="sub-hero">
       <span class="sub-hero-emoji">✨</span>
@@ -295,31 +320,61 @@ function _renderFreePage() {
 
     <div class="plans-row">
       <div class="plan-card" onclick="handleSubscribe('month');hapticLight()">
-        <div class="plan-price">299<span> ⭐</span></div>
-        <div class="plan-label">на 30 дней</div>
+        <div class="plan-price">${web ? '349<span> ₽</span>' : '299<span> ⭐</span>'}</div>
+        <div class="plan-label">на 1 месяц</div>
       </div>
-      <div class="plan-card recommended" onclick="handleSubscribe('half_year');hapticLight()">
+      <div class="plan-card recommended" onclick="handleSubscribe('quarter');hapticLight()">
         <div class="plan-badge">Выгоднее</div>
-        <div class="plan-price">1490<span> ⭐</span></div>
-        <div class="plan-label">на 6 месяцев</div>
-        <div class="plan-save">Экономия 17%</div>
+        <div class="plan-price">${web ? '899<span> ₽</span>' : '769<span> ⭐</span>'}</div>
+        <div class="plan-label">на 3 месяца</div>
+        <div class="plan-save">Экономия 14%</div>
       </div>
     </div>
 
     <div class="plan-comparison">${_featuresList(false)}</div>
 
+    ${_renderCheckoutActions(web)}
+  `;
+}
+
+function _renderCheckoutActions(web) {
+  const consent = web ? `
+    <label class="web-billing-consent">
+      <input id="webBillingConsent" type="checkbox" onchange="renderPremiumPage()" ${_webBillingConsentChecked() ? 'checked' : ''}>
+      <span>Соглашаюсь с <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">условиями подписки</a> и автоматическим списанием 899 ₽ каждые 3 месяца или 349 ₽ ежемесячно до отмены.</span>
+    </label>` : '';
+  const disabled = web && !_webBillingConsentChecked() ? 'disabled' : '';
+  return `
+    ${consent}
     <div style="padding:0 0 8px">
-      <button class="cta-sub-btn" onclick="handleSubscribe('half_year');hapticMedium()">
-        💫 6 месяцев за 1490 ⭐
+      <button class="cta-sub-btn" ${disabled} onclick="handleSubscribe('quarter');hapticMedium()">
+        ${web ? '3 месяца за 899 ₽' : '3 месяца за 769 ⭐'}
       </button>
-      <button class="cta-outline-btn" style="margin-top:8px" onclick="handleSubscribe('month');hapticLight()">
-        или 299 ⭐ на 30 дней
+      <button class="cta-outline-btn" ${disabled} style="margin-top:8px" onclick="handleSubscribe('month');hapticLight()">
+        ${web ? '1 месяц за 349 ₽' : 'или 299 ⭐ на 30 дней'}
       </button>
     </div>
     <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
-      Месячная подписка продлевается автоматически · 6 месяцев оплачиваются один раз<br>Автопродлением можно управлять в настройках подписок Telegram
+      ${web
+        ? 'Карта, СБП и банковские приложения · автопродление можно отключить здесь'
+        : 'Месячная подписка продлевается автоматически · 3 месяца оплачиваются один раз<br>Автопродлением можно управлять в настройках подписок Telegram'}
     </p>
+    <div class="billing-provider-note"><span>🔒</span><span>${web ? 'Безопасная оплата через ЮKassa' : 'Оплата внутри Telegram Stars'}</span></div>
   `;
+}
+
+function _isWebBillingMode() {
+  return Boolean(window.BabyAccount && !BabyAccount.isMiniApp());
+}
+
+function _webBillingConsentChecked() {
+  const checkbox = document.getElementById('webBillingConsent');
+  return checkbox ? checkbox.checked : sessionStorage.getItem('babymode_billing_consent') === '1';
+}
+
+function rememberWebBillingConsent() {
+  const checkbox = document.getElementById('webBillingConsent');
+  sessionStorage.setItem('babymode_billing_consent', checkbox?.checked ? '1' : '0');
 }
 
 function _featuresList(unlocked) {
@@ -378,6 +433,42 @@ async function handleStartTrial() {
 async function handleSubscribe(plan) {
   if (window.BabyAnalytics) BabyAnalytics.track('subscribe_clicked', { plan });
 
+  if (_isWebBillingMode()) {
+    rememberWebBillingConsent();
+    if (!window.BabyAccount?.isAuthenticated()) {
+      await window.BabyAccount?.login();
+      return;
+    }
+    if (!_webBillingConsentChecked()) {
+      showToast('Подтвердите условия подписки и автопродление.');
+      return;
+    }
+    const endpoint = window.BABY_CREATE_YOOKASSA_PAYMENT_ENDPOINT;
+    if (!endpoint) { showToast('Веб-оплата пока не настроена.'); return; }
+    try {
+      showToast('Открываем безопасную оплату...');
+      const response = await BabyAccount.request(endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: { plan, terms_accepted: true, recurring_accepted: true }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !/^https:\/\//.test(String(data.confirmation_url || ''))) {
+        const message = data.error === 'payments_not_configured'
+          ? 'Оплата скоро будет доступна.'
+          : data.error === 'payment_already_in_progress'
+            ? 'Сначала завершите уже открытую оплату или попробуйте через 30 минут.'
+            : 'Не удалось открыть оплату. Попробуйте ещё раз.';
+        showToast(message);
+        return;
+      }
+      if (window.BabyAnalytics) BabyAnalytics.track('checkout_opened', { plan, provider: 'yookassa' });
+      window.location.assign(data.confirmation_url);
+    } catch (_) {
+      showToast('Оплата временно недоступна. Попробуйте позже.');
+    }
+    return;
+  }
+
   const initData = _getTelegramInitData();
   const endpoint = window.BABY_CREATE_STARS_INVOICE_ENDPOINT;
   if (!initData || !endpoint) {
@@ -413,6 +504,30 @@ async function handleSubscribe(plan) {
     }
   } catch(e) {
     showToast('Оплата временно недоступна. Попробуйте позже.');
+  }
+}
+
+async function cancelWebSubscription() {
+  await _manageWebSubscription('cancel');
+}
+
+async function resumeWebSubscription() {
+  await _manageWebSubscription('resume');
+}
+
+async function _manageWebSubscription(action) {
+  if (!_isWebBillingMode() || !BabyAccount.isAuthenticated()) return;
+  try {
+    const response = await BabyAccount.request(window.BABY_BILLING_SUBSCRIPTION_ENDPOINT, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: { action }
+    });
+    if (!response.ok) throw new Error('billing_manage_failed');
+    await SUB.refreshPremiumStatus();
+    renderPremiumPage();
+    showToast(action === 'cancel' ? 'Автопродление отключено' : 'Автопродление включено');
+    if (window.BabyAnalytics) BabyAnalytics.track(action === 'cancel' ? 'subscription_cancelled' : 'subscription_resumed', { provider: 'yookassa' });
+  } catch (_) {
+    showToast('Не удалось изменить подписку. Напишите в поддержку.');
   }
 }
 

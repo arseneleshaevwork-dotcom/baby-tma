@@ -307,8 +307,10 @@
           </div>
           <div class="action-row" style="margin-top:10px">
             <button type="button" data-admin-action="grant" data-days="30">Premium 30 дней</button>
-            <button type="button" data-admin-action="grant" data-days="180">Premium 6 месяцев</button>
+            <button type="button" data-admin-action="grant" data-days="90">Premium 3 месяца</button>
             <button class="danger" type="button" data-admin-action="revoke">Отозвать</button>
+            <button class="ghost" type="button" data-admin-action="cancel-billing">Отключить автопродление</button>
+            <button class="ghost" type="button" data-admin-action="resume-billing">Вернуть автопродление</button>
             <button class="secondary" type="button" data-admin-action="reminders">Включить напоминания</button>
             <button class="ghost" type="button" data-admin-action="disable-reminders">Отключить</button>
             <button class="ghost" type="button" data-admin-action="test-reminder">Тест в Telegram</button>
@@ -506,6 +508,8 @@
         const actionMap = {
           grant: 'grant_premium',
           revoke: 'revoke_premium',
+          'cancel-billing': 'cancel_billing',
+          'resume-billing': 'resume_billing',
           reminders: 'enable_reminders',
           'disable-reminders': 'disable_reminders',
           'test-reminder': 'send_test_reminder'
@@ -647,10 +651,12 @@
 
     function renderBilling(billing) {
       const cards = [
-        ['Активные подписки', number(billing.active_subscriptions), `${number(billing.month_subscriptions)} мес. · ${number(billing.half_year_subscriptions)} на 6 мес.`],
-        ['Оплачено Stars', `${number(billing.paid_stars)} ⭐`, `${number(billing.paid_payments)} успешных платежей`],
+        ['Активные подписки', number(billing.active_subscriptions), `${number(billing.month_subscriptions)} на месяц · ${number(billing.quarter_subscriptions)} на 3 мес.`],
+        ['Оплачено Stars', `${number(billing.paid_stars)} ⭐`, `${number(billing.stars_payments)} успешных платежей`],
+        ['Выручка веб', `${number(billing.paid_rubles)} ₽`, `${number(billing.yookassa_payments)} платежей ЮKassa`],
+        ['Автопродления веб', number(billing.web_autorenew_active), `${number(billing.web_past_due)} требуют оплаты`],
         ['Ожидают оплаты', number(billing.pending_payments), 'созданные invoice'],
-        ['Ошибки оплаты', number(billing.failed_payments), 'invoice_failed / failed / cancelled']
+        ['Ошибки оплаты', number(billing.failed_payments), `${number(billing.billing_event_errors)} ошибок webhook`]
       ];
       els.billing.innerHTML = `
         <div class="grid metrics" style="margin-bottom:0">
@@ -829,13 +835,14 @@
       }
       els.payments.innerHTML = `
         <table>
-          <thead><tr><th>Статус</th><th>План</th><th>Сумма</th><th>Telegram</th><th>Создан</th><th>Оплачен</th></tr></thead>
+          <thead><tr><th>Статус</th><th>План</th><th>Провайдер</th><th>Сумма</th><th>Telegram</th><th>Создан</th><th>Оплачен</th></tr></thead>
           <tbody>
             ${items.map(item => `
               <tr>
                 <td>${statusBadge(item.status, paymentTone(item.status))}</td>
                 <td>${escapeHtml(planLabel(item.plan))}</td>
-                <td>${number(item.total_amount)} ${escapeHtml(item.currency || '')}</td>
+                <td>${escapeHtml(item.provider || '—')}</td>
+                <td>${formatPaymentAmount(item)}</td>
                 <td class="mono">${escapeHtml(shortId(item.telegram_id || item.user_id || ''))}</td>
                 <td>${formatDateTime(item.created_at)}</td>
                 <td>${formatDateTime(item.paid_at)}</td>
@@ -962,6 +969,11 @@
       return Number(value || 0).toLocaleString('ru-RU');
     }
 
+    function formatPaymentAmount(item) {
+      if (item.currency === 'RUB') return `${number(Number(item.total_amount || 0) / 100)} ₽`;
+      return `${number(item.total_amount)} ${escapeHtml(item.currency || '')}`;
+    }
+
     function shortId(value) {
       const text = String(value || '');
       return text.length > 18 ? `${text.slice(0, 9)}...${text.slice(-6)}` : text || '—';
@@ -981,7 +993,8 @@
 
     function planLabel(plan) {
       if (plan === 'month') return '30 дней';
-      if (plan === 'half_year') return '6 месяцев';
+      if (plan === 'quarter') return '3 месяца';
+      if (plan === 'half_year') return '6 месяцев (архив)';
       if (plan === 'year') return '1 год (старый тариф)';
       return plan || '—';
     }

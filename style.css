@@ -67,6 +67,104 @@
   --shadow-btn-gold: 0 5px 14px rgba(160,100,33,0.18);
 }
 
+/* Web account and install surface */
+.web-auth-gate {
+  position:fixed;
+  inset:0;
+  z-index:12000;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  background:#F6F7F6;
+  overflow:auto;
+}
+.web-auth-gate[hidden] { display:none; }
+.web-auth-panel {
+  width:min(100%, 380px);
+  display:grid;
+  justify-items:center;
+  gap:16px;
+  padding:28px 24px;
+  background:#fff;
+  border:1px solid #E5E4E8;
+  border-radius:8px;
+  box-shadow:0 16px 40px rgba(36,33,42,.12);
+  text-align:center;
+}
+.web-auth-logo {
+  width:88px;
+  height:88px;
+  object-fit:cover;
+  border-radius:22px;
+}
+.web-auth-copy { display:grid; gap:6px; }
+.web-auth-copy h1 { font-size:1.45rem; line-height:1.2; color:#24212A; letter-spacing:0; }
+.web-auth-copy p { max-width:280px; font-size:.86rem; line-height:1.5; color:#6D6973; font-weight:600; }
+.web-telegram-login {
+  width:100%;
+  min-height:50px;
+  border:0;
+  border-radius:8px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:9px;
+  padding:12px 18px;
+  background:#2AABEE;
+  color:#fff;
+  font:800 .92rem 'Nunito',sans-serif;
+  cursor:pointer;
+}
+.web-telegram-login svg { width:19px; height:19px; }
+.web-telegram-login:disabled { opacity:.65; cursor:wait; }
+.web-auth-message { min-height:20px; color:#A04545; font-size:.76rem; font-weight:700; }
+.web-auth-panel small { color:#7B7780; font-size:.7rem; line-height:1.45; }
+.web-auth-panel a { color:#4B6B66; font-size:.75rem; font-weight:800; }
+body.web-auth-pending { overflow:hidden; }
+.profile-menu button > b { white-space:nowrap; font-size:.72rem; }
+
+.web-billing-consent {
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  margin:14px 0;
+  padding:12px;
+  border:1px solid var(--border-soft);
+  border-radius:8px;
+  background:#fff;
+  color:var(--text-mid);
+  font-size:.74rem;
+  line-height:1.45;
+  font-weight:600;
+}
+.web-billing-consent input { width:20px; height:20px; flex:0 0 20px; margin-top:1px; accent-color:var(--clr-primary); }
+.web-billing-consent a { color:var(--clr-primary); font-weight:800; }
+.billing-provider-note {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  margin-top:10px;
+  color:var(--text-hint);
+  font-size:.7rem;
+  font-weight:700;
+}
+.billing-provider-note svg { width:14px; height:14px; }
+.billing-manage {
+  margin-top:14px;
+  padding:14px;
+  border-top:1px solid var(--border-soft);
+  display:grid;
+  gap:9px;
+}
+.billing-manage p { color:var(--text-hint); font-size:.76rem; line-height:1.45; }
+
+@media (min-width:760px) {
+  body.is-web-app { max-width:680px; margin:0 auto; border-left:1px solid var(--border-soft); border-right:1px solid var(--border-soft); }
+  body.is-web-app .app-header,
+  body.is-web-app .bottom-nav { max-width:678px; left:50%; transform:translateX(-50%); }
+}
+
 /* ═══════════════════════════════════════════════════════
    BASE
 ═══════════════════════════════════════════════════════ */

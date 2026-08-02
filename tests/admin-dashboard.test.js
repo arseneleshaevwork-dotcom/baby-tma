@@ -77,9 +77,9 @@ test('builds admin totals, funnel and baby table from raw analytics rows', () =>
         id: 'p2',
         user_id: 'u2',
         telegram_id: 2,
-        plan: 'half_year',
+        plan: 'quarter',
         currency: 'XTR',
-        total_amount: 1490,
+        total_amount: 769,
         status: 'created',
         created_at: '2026-06-11T10:00:00.000Z'
       }

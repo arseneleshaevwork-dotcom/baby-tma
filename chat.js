@@ -215,6 +215,22 @@ function _getAiTelegramInitData() {
   catch (_) { return ''; }
 }
 
+function _canUseOnlineAi() {
+  return Boolean(window.BABY_AI_ENDPOINT) && (window.BabyAccount ? BabyAccount.canUseServer() : Boolean(_getAiTelegramInitData()));
+}
+
+function _requestAi(body, options) {
+  const config = {
+    method: 'POST',
+    signal: options?.signal,
+    headers: { 'Content-Type': 'application/json' },
+    body
+  };
+  return window.BabyAccount
+    ? BabyAccount.request(window.BABY_AI_ENDPOINT || '', config)
+    : fetch(window.BABY_AI_ENDPOINT || '', { ...config, body: JSON.stringify(body) });
+}
+
 function buildAiDiary(logs, now = new Date()) {
   const cutoff = new Date(now.getTime() - 13 * 86400000);
   cutoff.setHours(0, 0, 0, 0);
@@ -259,6 +275,7 @@ function requestAiConsent() {
 
 function acceptAiConsent() {
   localStorage.setItem(AI_CONSENT_KEY, 'granted');
+  if (window.BabyCloudSync) BabyCloudSync.markSettingsChanged();
   if (window.BabyAnalytics) BabyAnalytics.track('ai_consent_granted', { version: '2026-07-24-v1' });
   finishAiConsent(true);
 }
@@ -279,15 +296,12 @@ function finishAiConsent(granted) {
 
 async function revokeAiConsent() {
   localStorage.removeItem(AI_CONSENT_KEY);
+  if (window.BabyCloudSync) BabyCloudSync.markSettingsChanged();
   const endpoint = window.BABY_AI_ENDPOINT || '';
   const initData = _getAiTelegramInitData();
-  if (endpoint && initData) {
+  if (endpoint && _canUseOnlineAi()) {
     try {
-      await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData, action: 'revoke_consent' })
-      });
+      await _requestAi({ initData, action: 'revoke_consent' });
     } catch (_) {}
   }
   if (window.BabyAnalytics) BabyAnalytics.track('ai_consent_revoked');
@@ -316,7 +330,7 @@ async function chatSend() {
   inp.value = '';
   const initData = _getAiTelegramInitData();
   const endpoint = window.BABY_AI_ENDPOINT || '';
-  if (!initData || !endpoint) {
+  if (!_canUseOnlineAi() || !endpoint) {
     setTimeout(() => addMsg(findAnswer(q), 'bot'), 300);
     return;
   }
@@ -334,12 +348,7 @@ async function chatSend() {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildAiPayload(q))
-    });
+    const response = await _requestAi(buildAiPayload(q), { signal: controller.signal });
     clearTimeout(timeout);
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.answer) throw Object.assign(new Error(data.error || 'request_failed'), { code: data.error, limit: data.limit });
@@ -410,11 +419,7 @@ async function sendAiFeedback(requestId, rating, button) {
   if (!group || !/^[0-9a-f-]{36}$/i.test(String(requestId || '')) || !['helpful', 'not_helpful'].includes(rating)) return;
   group.querySelectorAll('button').forEach(item => { item.disabled = true; });
   try {
-    const response = await fetch(window.BABY_AI_ENDPOINT || '', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ initData: _getAiTelegramInitData(), action: 'feedback', requestId, rating })
-    });
+    const response = await _requestAi({ initData: _getAiTelegramInitData(), action: 'feedback', requestId, rating });
     if (!response.ok) throw new Error('feedback_failed');
     group.innerHTML = '<span>Спасибо, это поможет улучшить ответы.</span>';
     if (window.BabyAnalytics) BabyAnalytics.track('ai_feedback', { rating });
