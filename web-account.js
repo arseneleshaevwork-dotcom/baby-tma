@@ -7,6 +7,8 @@
   let authenticated = false;
   let user = null;
   let initPromise = null;
+  let loginSdkPromise = null;
+  let previousFocus = null;
 
   function isMiniApp() {
     try { return Boolean(global.Telegram?.WebApp?.initData); }
@@ -47,6 +49,7 @@
   function init() {
     if (initPromise) return initPromise;
     initPromise = (async function() {
+      await global.BABY_TELEGRAM_SDK_READY;
       mode = isMiniApp() ? 'mini_app' : 'web';
       document.body.classList.toggle('is-web-app', mode === 'web');
       if (mode === 'mini_app') {
@@ -55,7 +58,6 @@
         dispatchReady();
         return true;
       }
-      document.body.classList.add('web-auth-pending');
       const token = getSessionToken();
       if (token) {
         try {
@@ -75,7 +77,7 @@
         } catch (_) {}
         clearSession();
       }
-      showGate();
+      hideGate();
       dispatchReady();
       return false;
     })();
@@ -87,9 +89,12 @@
     if (button) button.disabled = true;
     setGateMessage('Открываем Telegram...');
     try {
-      const nonceResponse = await fetch(global.BABY_WEB_AUTH_ENDPOINT, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'nonce' })
-      });
+      const [nonceResponse] = await Promise.all([
+        fetch(global.BABY_WEB_AUTH_ENDPOINT, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'nonce' })
+        }),
+        ensureTelegramLoginSdk()
+      ]);
       const nonceData = await nonceResponse.json().catch(() => ({}));
       if (!nonceResponse.ok || !nonceData.nonce) throw new Error('nonce_failed');
       const loginApi = global.Telegram?.Login;
@@ -135,7 +140,9 @@
     clearSession();
     authenticated = false;
     user = null;
-    showGate();
+    hideGate();
+    renderAccount();
+    global.dispatchEvent(new CustomEvent('baby-account-logged-out', { detail: { mode } }));
   }
 
   function clearSession() {
@@ -145,16 +152,36 @@
     } catch (_) {}
   }
 
-  function showGate() {
-    document.body.classList.add('web-auth-pending');
+  function requestLogin(reason) {
+    if (canUseServer()) return true;
+    showGate(reason);
+    if (global.BabyAnalytics) global.BabyAnalytics.track('web_login_prompted', { reason: String(reason || 'sync').slice(0, 40) });
+    return false;
+  }
+
+  function showGate(reason) {
+    if (mode !== 'web') return;
+    previousFocus = document.activeElement;
+    document.body.classList.add('web-auth-modal-open');
     const gate = document.getElementById('webAuthGate');
     if (gate) gate.hidden = false;
+    const reasonElement = document.getElementById('webAuthReason');
+    if (reasonElement) reasonElement.textContent = reason || 'Войдите, чтобы синхронизировать дневник и продолжить на любом устройстве.';
+    setGateMessage('');
+    if (typeof global.refreshIcons === 'function') global.refreshIcons();
+    setTimeout(() => document.getElementById('webTelegramLoginBtn')?.focus(), 0);
   }
 
   function hideGate() {
-    document.body.classList.remove('web-auth-pending');
+    document.body.classList.remove('web-auth-modal-open');
     const gate = document.getElementById('webAuthGate');
     if (gate) gate.hidden = true;
+    if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+    previousFocus = null;
+  }
+
+  function closeLoginPrompt() {
+    if (!authenticated) hideGate();
   }
 
   function setGateMessage(message) {
@@ -165,10 +192,48 @@
   function renderAccount() {
     const status = document.getElementById('profileAccountStatus');
     const row = document.getElementById('profileAccountRow');
+    const action = document.getElementById('profileAccountAction');
     if (status) status.textContent = mode === 'mini_app'
       ? 'Вход выполнен через Mini App'
-      : authenticated ? `Telegram${user?.username ? ': @' + user.username : ''}` : 'Требуется вход';
+      : authenticated ? `Telegram${user?.username ? ': @' + user.username : ''}` : 'Данные только на этом устройстве';
+    if (action) action.textContent = authenticated ? 'Выйти' : 'Войти';
     if (row) row.style.display = mode === 'web' ? 'grid' : 'none';
+  }
+
+  function handleProfileAction() {
+    if (authenticated) return logout();
+    requestLogin('Войдите, чтобы сохранить профиль и дневник в облаке и открыть их на другом устройстве.');
+  }
+
+  function canUseServer() {
+    return isMiniApp() || authenticated;
+  }
+
+  function ensureTelegramLoginSdk() {
+    if (global.Telegram?.Login?.auth) return Promise.resolve(global.Telegram.Login);
+    if (loginSdkPromise) return loginSdkPromise;
+    loginSdkPromise = new Promise((resolve, reject) => {
+      const existing = document.getElementById('telegramLoginSdk');
+      const script = existing || document.createElement('script');
+      const timeout = setTimeout(() => reject(new Error('telegram_login_timeout')), 10000);
+      script.id = 'telegramLoginSdk';
+      script.src = 'https://oauth.telegram.org/js/telegram-login.js?22';
+      script.async = true;
+      script.onload = () => {
+        clearTimeout(timeout);
+        if (global.Telegram?.Login?.auth) resolve(global.Telegram.Login);
+        else reject(new Error('telegram_login_unavailable'));
+      };
+      script.onerror = () => {
+        clearTimeout(timeout);
+        reject(new Error('telegram_login_unavailable'));
+      };
+      if (!existing) document.head.appendChild(script);
+    }).catch(error => {
+      loginSdkPromise = null;
+      throw error;
+    });
+    return loginSdkPromise;
   }
 
   function applyServerBaby(baby) {
@@ -185,9 +250,14 @@
 
   global.BabyAccount = {
     init, login, logout, request, authBody, authHeaders, isMiniApp,
+    requestLogin, closeLoginPrompt, handleProfileAction,
     isAuthenticated: () => authenticated,
-    canUseServer: () => isMiniApp() || authenticated,
+    canUseServer,
     getMode: () => mode,
     getUser: () => user
   };
+
+  global.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !document.getElementById('webAuthGate')?.hidden) closeLoginPrompt();
+  });
 })(window);

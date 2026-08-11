@@ -724,7 +724,7 @@ function drawPdfReportPage(model, rows, page, pages) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#3d2c3e';
   ctx.font = '800 54px Arial, sans-serif';
-  ctx.fillText('Режим малыша', 84, 105);
+  ctx.fillText('Малыш в ритме', 84, 105);
   ctx.fillStyle = '#8d758f';
   ctx.font = '28px Arial, sans-serif';
   const child = model.babyName ? `${model.babyName}${model.age ? ` · ${model.age} мес.` : ''}` : (model.age ? `${model.age} мес.` : 'Дневник сна');
@@ -918,6 +918,9 @@ function renderTracker() {
   const nightData= filtered.map(l => +(l.nightLen/60).toFixed(1));
 
   const canvas = document.getElementById('trackerChartCanvas');
+  if (canvas && typeof Chart === 'undefined' && typeof ensureChartLibrary === 'function') {
+    ensureChartLibrary().then(renderTracker).catch(function(){});
+  }
   if (canvas && typeof Chart !== 'undefined') {
     if (trackerChartInst) trackerChartInst.destroy();
     trackerChartInst = new Chart(canvas, {

@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Режим Малыша — Умный режим дня для малыша</title>
-<meta name="description" content="Научно обоснованный генератор режима дня для малыша. Дневник сна, консультант и ритуал засыпания для молодых мам.">
+<title>Малыш в ритме — режим дня, сон и дневник малыша</title>
+<meta name="description" content="Малыш в ритме помогает собрать режим дня, вести дневник сна и получать персональные подсказки для родителей малышей.">
 <meta name="theme-color" content="#5B5863">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="manifest" href="manifest.webmanifest?v=20260802-1">
+<link rel="manifest" href="manifest.webmanifest?v=20260811-1">
 <link rel="apple-touch-icon" href="promo.png">
 
 <!-- Critical inline CSS -->
@@ -17,9 +17,23 @@
   html,body{height:100%;background:#F6F7F6;color:#24212A;font-family:-apple-system,sans-serif}
 </style>
 
-<!-- Telegram SDK -->
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://oauth.telegram.org/js/telegram-login.js?22"></script>
+<!-- Telegram SDK is only needed inside the Mini App. -->
+<script>
+window.BABY_TELEGRAM_SDK_READY = (function() {
+  var launchData = window.location.search + window.location.hash;
+  var insideTelegram = Boolean(window.TelegramWebviewProxy)
+    || /(?:^|[?&#])tgWebApp(?:Data|Version)=/.test(launchData);
+  if (!insideTelegram) return Promise.resolve(false);
+  return new Promise(function(resolve) {
+    var script = document.createElement('script');
+    script.src = 'https://telegram.org/js/telegram-web-app.js';
+    script.async = true;
+    script.onload = function() { resolve(true); };
+    script.onerror = function() { resolve(false); };
+    document.head.appendChild(script);
+  });
+})();
+</script>
 
 <!-- Lucide icon system -->
 <script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
@@ -28,37 +42,26 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 
-<!-- Chart.js -->
-<script>
-(function(){
-  var s=document.createElement('script');
-  s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
-  s.async=true;
-  s.onerror=function(){
-    window.Chart=function(){return{destroy:function(){},update:function(){}};};
-    window.Chart.prototype={};
-  };
-  document.head.appendChild(s);
-})();
-</script>
-
-<link rel="stylesheet" href="style.css?v=20260802-1">
+<link rel="stylesheet" href="style.css?v=20260811-1">
 </head>
 <body data-page="home">
 
 <div id="webAuthGate" class="web-auth-gate" hidden>
-  <div class="web-auth-panel">
-    <img src="promo.png" alt="Режим Малыша" class="web-auth-logo">
+  <button class="web-auth-backdrop" type="button" onclick="BabyAccount.closeLoginPrompt()" aria-label="Закрыть окно входа"></button>
+  <div class="web-auth-panel" role="dialog" aria-modal="true" aria-labelledby="webAuthTitle">
+    <button class="web-auth-close" type="button" onclick="BabyAccount.closeLoginPrompt()" aria-label="Продолжить без входа"><i data-lucide="x"></i></button>
+    <div class="web-auth-logo" aria-hidden="true">МР</div>
     <div class="web-auth-copy">
-      <h1>Режим Малыша</h1>
-      <p>Ваш режим, дневник и Premium на любом устройстве</p>
+      <h1 id="webAuthTitle">Сохранить в Telegram</h1>
+      <p id="webAuthReason">Войдите, чтобы синхронизировать дневник и продолжить на любом устройстве.</p>
     </div>
     <button id="webTelegramLoginBtn" class="web-telegram-login" onclick="BabyAccount.login()">
       <i data-lucide="send"></i><span>Войти через Telegram</span>
     </button>
     <div id="webAuthMessage" class="web-auth-message" role="status" aria-live="polite"></div>
-    <small>Без отдельного пароля. Мы получим только имя, Telegram ID и фото профиля.</small>
-    <a href="privacy.html" target="_blank" rel="noopener">Конфиденциальность</a>
+    <button class="web-auth-later" type="button" onclick="BabyAccount.closeLoginPrompt()">Продолжить без входа</button>
+    <small>Локальные данные останутся на этом устройстве. Для входа мы получим только имя, Telegram ID и фото профиля.</small>
+    <a href="privacy.html" target="_blank" rel="noopener">Как мы защищаем данные</a>
   </div>
 </div>
 
@@ -73,7 +76,7 @@
   </button>
   <div class="app-header-copy">
     <h1 id="appTitle">Доброе утро</h1>
-    <div class="baby-name" id="babyNameDisplay">Режим Малыша</div>
+    <div class="baby-name" id="babyNameDisplay">Малыш в ритме</div>
   </div>
   <div class="trial-badge" id="trial-header-badge" style="display:none">🌸 Premium</div>
   <button class="header-notification" onclick="goPage('profile',document.getElementById('bn-profile'));renderProfilePage();hapticLight()" aria-label="Открыть уведомления и профиль">
@@ -571,7 +574,7 @@
     <button class="save-log-btn" onclick="saveProfileSettings();hapticSuccess()">Сохранить</button>
   </div>
   <div class="profile-menu">
-    <button id="profileAccountRow" style="display:none" onclick="BabyAccount.logout();hapticLight()"><span>◉</span><div><strong>Аккаунт Telegram</strong><small id="profileAccountStatus">Проверяем вход</small></div><b>Выйти</b></button>
+    <button id="profileAccountRow" style="display:none" onclick="BabyAccount.handleProfileAction();hapticLight()"><span>◉</span><div><strong>Синхронизация</strong><small id="profileAccountStatus">Данные на этом устройстве</small></div><b id="profileAccountAction">Войти</b></button>
     <button onclick="goPage('premium',null);renderPremiumPage();hapticLight()"><span>⭐</span><div><strong>Premium</strong><small id="profilePremiumStatus">Проверяем статус</small></div><b>›</b></button>
     <button onclick="goPage('articles',null);hapticLight()"><span>📚</span><div><strong>База знаний</strong><small>Сон, кормление и развитие</small></div><b>›</b></button>
     <button onclick="goPage('ritual',null);hapticLight()"><span>🌙</span><div><strong>Ритуал сна</strong><small>Таймер и спокойные звуки</small></div><b>›</b></button>
@@ -628,7 +631,7 @@
     <div class="share-card-preview" id="shareCardPreview">
       <div class="baby-avatar-emoji" style="width:48px;height:48px;font-size:28px;margin:0 auto 8px" id="shareCardAvatar">👶</div>
       <div class="share-title" id="shareCardTitle">Режим дня малыша</div>
-      <div class="share-sub" id="shareCardSub">Сгенерировано в Режим Малыша</div>
+      <div class="share-sub" id="shareCardSub">Сгенерировано в «Малыш в ритме»</div>
     </div>
     <button class="share-btn" onclick="doShareSchedule();hapticMedium()">📤 Отправить в Telegram</button>
     <button class="cta-outline-btn" style="margin-top:8px" onclick="closeShareModal();hapticLight()">Закрыть</button>
@@ -653,24 +656,24 @@
 </div>
 
 <!-- Scripts -->
-<script src="analytics-config.js?v=20260802-1"></script>
-<script src="analytics.js?v=20260802-1"></script>
-<script src="tma.js?v=20260802-1"></script>
-<script src="web-account.js?v=20260802-1"></script>
-<script src="cloud-sync.js?v=20260802-1"></script>
-<script src="pwa.js?v=20260802-1"></script>
-<script src="chat.js?v=20260730-1"></script>
-<script src="sleep-intelligence.js?v=20260729-2"></script>
-<script src="daily-coach.js?v=20260729-2"></script>
-<script src="baby-milestones.js?v=20260724"></script>
-<script src="tracker.js?v=20260730-1"></script>
-<script src="articles.js?v=20260729-2"></script>
-<script src="subscription.js?v=20260802-1"></script>
-<script src="onboarding.js?v=20260729-1"></script>
-<script src="reminder-planner.js?v=20260724"></script>
-<script src="notifications.js?v=20260729-1"></script>
-<script src="app.js?v=20260730-1"></script>
-<script src="premium.js?v=20260724"></script>
+<script src="analytics-config.js?v=20260811-1"></script>
+<script src="analytics.js?v=20260811-1"></script>
+<script src="tma.js?v=20260811-1"></script>
+<script src="web-account.js?v=20260811-1"></script>
+<script src="cloud-sync.js?v=20260811-1"></script>
+<script src="pwa.js?v=20260811-1"></script>
+<script src="chat.js?v=20260811-1"></script>
+<script src="sleep-intelligence.js?v=20260811-1"></script>
+<script src="daily-coach.js?v=20260811-1"></script>
+<script src="baby-milestones.js?v=20260811-1"></script>
+<script src="tracker.js?v=20260811-1"></script>
+<script src="articles.js?v=20260811-1"></script>
+<script src="subscription.js?v=20260811-1"></script>
+<script src="onboarding.js?v=20260811-1"></script>
+<script src="reminder-planner.js?v=20260811-1"></script>
+<script src="notifications.js?v=20260811-1"></script>
+<script src="app.js?v=20260811-1"></script>
+<script src="premium.js?v=20260811-1"></script>
 
 <script>
 // ─── Low-end device detection ────────────────────────────────────────────────
@@ -684,6 +687,24 @@ if (_isLowEnd) document.documentElement.classList.add('low-end');
 function refreshIcons() {
   if (!window.lucide || typeof window.lucide.createIcons !== 'function') return;
   window.lucide.createIcons({ attrs: { 'aria-hidden': 'true' } });
+}
+
+var _chartLibraryPromise = null;
+function ensureChartLibrary() {
+  if (window.Chart) return Promise.resolve(window.Chart);
+  if (_chartLibraryPromise) return _chartLibraryPromise;
+  _chartLibraryPromise = new Promise(function(resolve, reject) {
+    var script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    script.async = true;
+    script.onload = function() { resolve(window.Chart); };
+    script.onerror = function() { reject(new Error('chart_load_failed')); };
+    document.head.appendChild(script);
+  }).catch(function(error) {
+    _chartLibraryPromise = null;
+    throw error;
+  });
+  return _chartLibraryPromise;
 }
 
 function setHomePrimaryAction(label, icon) {
@@ -916,7 +937,7 @@ function _applyBabyName(name) {
     : parseInt(localStorage.getItem('babymode_last_age') || '0');
   if (title) title.textContent = greeting;
   if (el) {
-    el.textContent = (name || 'Режим Малыша') + (age ? ' · ' + age + ' мес.' : '');
+    el.textContent = (name || 'Малыш в ритме') + (age ? ' · ' + age + ' мес.' : '');
     el.style.display = 'block';
   }
   if (fallback && !localStorage.getItem('babymode_photo')) fallback.textContent = name ? name.trim().charAt(0).toUpperCase() : 'РМ';
@@ -1114,7 +1135,7 @@ function doShareSchedule() {
   var name = localStorage.getItem('babymode_baby_name') || 'малыша';
   var text = '👶 Режим дня ' + name + '\n\n';
   blocks.slice(0, 8).forEach(function(b) { text += b.time + ' — ' + b.title + '\n'; });
-  text += '\n🔗 Режим Малыша';
+  text += '\n🔗 Малыш в ритме';
 
   if (window.Telegram && Telegram.WebApp && Telegram.WebApp.switchInlineQuery) {
     Telegram.WebApp.switchInlineQuery(text);

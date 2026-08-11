@@ -4,7 +4,9 @@
 
   function init() {
     if ('serviceWorker' in navigator && location.protocol === 'https:') {
-      navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+      const register = () => navigator.serviceWorker.register('./service-worker.js').catch(() => {});
+      if ('requestIdleCallback' in global) global.requestIdleCallback(register, { timeout: 2500 });
+      else global.setTimeout(register, 1200);
     }
     global.addEventListener('beforeinstallprompt', event => {
       event.preventDefault();

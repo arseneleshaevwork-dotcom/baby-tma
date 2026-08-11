@@ -326,6 +326,10 @@ async function chatSend() {
   const q = inp.value.trim();
   if (!q || _chatBusy) return;
   if (q.length > 1500) { if (typeof showToast === 'function') showToast('Сократите вопрос до 1500 символов'); return; }
+  if (window.BabyAccount && !BabyAccount.isMiniApp() && !BabyAccount.isAuthenticated()) {
+    BabyAccount.requestLogin('Войдите, чтобы задать вопрос ИИ-помощнику и сохранить историю ответов на ваших устройствах.');
+    return;
+  }
   addMsg(q, 'user');
   inp.value = '';
   const initData = _getAiTelegramInitData();

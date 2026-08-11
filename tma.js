@@ -1,7 +1,9 @@
 // ─── Telegram Mini App SDK integration ──────────────────────────────────────
-const TG = window.Telegram?.WebApp;
+let TG = null;
 
-function tmaInit() {
+async function tmaInit() {
+  await window.BABY_TELEGRAM_SDK_READY;
+  TG = window.Telegram?.WebApp || null;
   if (!TG) return; // Running outside Telegram — still works as web app
   TG.ready();
   TG.expand(); // Expand to full height

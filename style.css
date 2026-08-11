@@ -1,6 +1,4 @@
-/* Режим Малыша v3 — calm, focused mobile system */
-
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
+/* Малыш в ритме v3 - calm, focused mobile system */
 
 :root {
   /* === WARM PASTEL PALETTE === */
@@ -75,27 +73,56 @@
   display:grid;
   place-items:center;
   padding:24px;
-  background:#F6F7F6;
   overflow:auto;
 }
 .web-auth-gate[hidden] { display:none; }
+.web-auth-backdrop {
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  border:0;
+  background:rgba(36,33,42,.42);
+  backdrop-filter:blur(4px);
+}
 .web-auth-panel {
+  position:relative;
+  z-index:1;
   width:min(100%, 380px);
   display:grid;
   justify-items:center;
-  gap:16px;
-  padding:28px 24px;
+  gap:14px;
+  padding:28px 24px 22px;
   background:#fff;
   border:1px solid #E5E4E8;
   border-radius:8px;
   box-shadow:0 16px 40px rgba(36,33,42,.12);
   text-align:center;
 }
+.web-auth-close {
+  position:absolute;
+  top:8px;
+  right:8px;
+  width:44px;
+  height:44px;
+  display:grid;
+  place-items:center;
+  border:0;
+  background:transparent;
+  color:#6D6973;
+  cursor:pointer;
+}
+.web-auth-close svg { width:20px; height:20px; }
 .web-auth-logo {
-  width:88px;
-  height:88px;
-  object-fit:cover;
-  border-radius:22px;
+  width:68px;
+  height:68px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:#EEF0FA;
+  border:1px solid #D8DCEC;
+  color:#4F5F9E;
+  font:900 1.12rem 'Nunito',sans-serif;
 }
 .web-auth-copy { display:grid; gap:6px; }
 .web-auth-copy h1 { font-size:1.45rem; line-height:1.2; color:#24212A; letter-spacing:0; }
@@ -117,10 +144,19 @@
 }
 .web-telegram-login svg { width:19px; height:19px; }
 .web-telegram-login:disabled { opacity:.65; cursor:wait; }
-.web-auth-message { min-height:20px; color:#A04545; font-size:.76rem; font-weight:700; }
+.web-auth-message { min-height:0; color:#A04545; font-size:.76rem; font-weight:700; }
+.web-auth-message:not(:empty) { min-height:20px; }
+.web-auth-later {
+  min-height:44px;
+  border:0;
+  background:transparent;
+  color:#5F5A65;
+  font:800 .82rem 'Nunito',sans-serif;
+  cursor:pointer;
+}
 .web-auth-panel small { color:#7B7780; font-size:.7rem; line-height:1.45; }
 .web-auth-panel a { color:#4B6B66; font-size:.75rem; font-weight:800; }
-body.web-auth-pending { overflow:hidden; }
+body.web-auth-modal-open { overflow:hidden; }
 .profile-menu button > b { white-space:nowrap; font-size:.72rem; }
 
 .web-billing-consent {

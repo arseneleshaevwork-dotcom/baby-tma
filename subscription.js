@@ -55,7 +55,11 @@ const SUB = (() => {
     const endpoint = window.BABY_SUBSCRIPTION_STATUS_ENDPOINT;
     const canUseServer = window.BabyAccount ? BabyAccount.canUseServer() : Boolean(initData);
     if (!canUseServer || !endpoint) {
-      showToast('Войдите через Telegram, чтобы активировать пробный период.');
+      if (window.BabyAccount && !BabyAccount.isMiniApp()) {
+        BabyAccount.requestLogin('Войдите, чтобы активировать пробный Premium и использовать его на любом устройстве.');
+      } else {
+        showToast('Войдите через Telegram, чтобы активировать пробный период.');
+      }
       return false;
     }
     try {
@@ -303,7 +307,7 @@ function _renderFreePage() {
   return `
     <div class="sub-hero">
       <span class="sub-hero-emoji">✨</span>
-      <h2>Режим Малыша Premium</h2>
+      <h2>Малыш в ритме Premium</h2>
       <p>Базовый режим остаётся бесплатным. Premium добавляет глубокий анализ и автоматизацию.</p>
     </div>
 
@@ -436,7 +440,7 @@ async function handleSubscribe(plan) {
   if (_isWebBillingMode()) {
     rememberWebBillingConsent();
     if (!window.BabyAccount?.isAuthenticated()) {
-      await window.BabyAccount?.login();
+      window.BabyAccount?.requestLogin('Войдите через Telegram, чтобы привязать оплату к вашему аккаунту и открыть Premium во всех версиях.');
       return;
     }
     if (!_webBillingConsentChecked()) {

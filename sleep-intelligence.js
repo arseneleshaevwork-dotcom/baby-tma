@@ -378,7 +378,7 @@ function buildFamilyReport(summary, plan, context = {}) {
     + `${schedule}\n\n`
     + `Что важно:\n${rules}\n\n`
     + `${audienceBlock}\n\n`
-    + `Сгенерировано в «Режим Малыша»`;
+    + `Сгенерировано в «Малыш в ритме»`;
 }
 
 function getAudienceReportBlock(audience, plan) {

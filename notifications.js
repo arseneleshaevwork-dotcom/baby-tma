@@ -153,6 +153,10 @@ function toggleNotifications() {
     _renderReminderList([]);
     if (typeof showToast === 'function') showToast('🔕 Напоминания отключены');
   } else {
+    if (window.BabyAccount && !BabyAccount.isMiniApp() && !BabyAccount.isAuthenticated()) {
+      BabyAccount.requestLogin('Войдите, чтобы получать напоминания о режиме и важных событиях в Telegram.');
+      return;
+    }
     if (typeof SUB !== 'undefined' && !SUB.can('notifications')) {
       SUB.requirePremium('notifications', function(){});
       return;

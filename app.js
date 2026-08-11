@@ -221,18 +221,11 @@ function renderSchedule(blocks,daySegs,p){
     setTimeout(() => el.classList.add('counting'), i * 80);
   });
 
-  // Stats charts — only if Chart.js loaded
+  // Charts are loaded only when a generated schedule needs them.
   if (typeof Chart !== 'undefined') {
     renderStatCharts(p,daySegs);
-  } else {
-    // Retry once Chart.js loads async
-    var _chartRetry = setInterval(function(){
-      if (typeof Chart !== 'undefined') {
-        clearInterval(_chartRetry);
-        renderStatCharts(p,daySegs);
-      }
-    }, 200);
-    setTimeout(function(){ clearInterval(_chartRetry); }, 5000);
+  } else if (typeof ensureChartLibrary === 'function') {
+    ensureChartLibrary().then(function(){ renderStatCharts(p,daySegs); }).catch(function(){});
   }
 }
 
