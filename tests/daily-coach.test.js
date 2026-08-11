@@ -28,6 +28,7 @@ test('finds the next sleep and preparation countdown', () => {
   assert.equal(next.minutesUntil, 90);
   assert.equal(next.countdown, '1 ч 30 мин');
   assert.equal(next.preparation, '1 ч 20 мин');
+  assert.equal(next.prepareTime, '10:20');
 });
 
 test('creates a useful morning and weekly summary', () => {
@@ -43,6 +44,16 @@ test('creates a useful morning and weekly summary', () => {
   assert.equal(weekly.days, 3);
   assert.ok(weekly.focus);
   assert.ok(weekly.reason);
+});
+
+test('turns difficult settling into one cautious daily insight', () => {
+  const morning = BabyCoach.buildMorningSummary([
+    { date: '2026-07-29', nightLen: 540, dayNaps: 150, tags: ['long_soothe'] }
+  ], 6, SleepIntel);
+
+  assert.equal(morning.status, 'overtired');
+  assert.match(morning.title, /перегул/i);
+  assert.match(morning.action, /10–15 минут раньше/);
 });
 
 test('selects an age-specific learning path', () => {

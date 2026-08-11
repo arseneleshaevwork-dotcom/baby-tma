@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { findAnswer, buildAiDiary, formatAiAnswer } = require('../chat');
+const { findAnswer, buildAiDiary, formatAiAnswer, getSuggestedNextStep } = require('../chat');
 
 global.localStorage = {
   getItem(key) {
@@ -23,6 +23,7 @@ function test(name, fn) {
 test('answers common sleep phrasing instead of generic fallback', () => {
   const answer = findAnswer('ребенок плохо спит ночью и часто просыпается');
   assert.match(answer, /Ночные пробуждения|сон/i);
+  assert.match(answer, /chat-next-step/);
   assert.doesNotMatch(answer, /Не нашла точного ответа/);
 });
 
@@ -76,10 +77,22 @@ test('free AI payload omits diary while premium includes it', () => {
 });
 
 test('online AI answer escapes content and adds feedback only for a valid request id', () => {
-  const html = formatAiAnswer('<script>alert(1)</script>', [{ label: 'Источник', url: 'https://example.com' }], '123e4567-e89b-12d3-a456-426614174000');
+  const html = formatAiAnswer('<script>alert(1)</script>', [{ label: 'Источник', url: 'https://example.com' }], '123e4567-e89b-12d3-a456-426614174000', 'как улучшить сон');
   assert.ok(!html.includes('<script>'));
   assert.match(html, /&lt;script&gt;/);
+  assert.match(html, /chat-next-step/);
   assert.match(html, /chat-feedback/);
   assert.match(html, /noopener noreferrer/);
   assert.ok(!formatAiAnswer('Ответ', [], 'bad-id').includes('chat-feedback'));
+});
+
+test('keeps one explicit next step from the AI response', () => {
+  const html = formatAiAnswer('Короткий ответ.\n\nСледующий шаг: Запишите следующий сон.', [], '', 'сон');
+  assert.strictEqual((html.match(/chat-next-step/g) || []).length, 1);
+  assert.match(html, /Запишите следующий сон/);
+});
+
+test('selects a concrete next step from the question topic', () => {
+  assert.match(getSuggestedNextStep('Малыш долго засыпает', ''), /10–15 минут/);
+  assert.match(getSuggestedNextStep('Малыш синеет и не дышит', ''), /112/);
 });

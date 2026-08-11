@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#5B5863">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="manifest" href="manifest.webmanifest?v=20260811-1">
+<link rel="manifest" href="manifest.webmanifest?v=20260811-2">
 <link rel="apple-touch-icon" href="promo.png">
 
 <!-- Critical inline CSS -->
@@ -42,7 +42,7 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 
-<link rel="stylesheet" href="style.css?v=20260811-1">
+<link rel="stylesheet" href="style.css?v=20260811-2">
 </head>
 <body data-page="home">
 
@@ -131,17 +131,28 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
     <div id="todayPlanList"></div>
   </section>
 
-  <!-- ─── SMART HOME CARD: Что сейчас с малышом ──────────── -->
-  <div class="home-insight-card" id="homeInsightCard" style="display:none">
-    <div class="hic-coach" id="hicCoach"></div>
-    <div class="hic-status" id="hicStatus"></div>
-    <div class="hic-plan" id="hicPlan" style="display:none">
-      <div class="hic-plan-label">План на завтра</div>
-      <div class="hic-plan-body" id="hicPlanBody"></div>
-      <button class="hic-plan-apply" onclick="applyPlanFromHome();hapticSuccess()">Применить к режиму</button>
+  <section class="home-insight-card" id="homeInsightCard" style="display:none" aria-labelledby="homeInsightTitle">
+    <div class="home-insight-head">
+      <div>
+        <span id="homeInsightBasis">По возрасту и режиму</span>
+        <h3 id="homeInsightTitle">Инсайт дня</h3>
+      </div>
+      <span class="home-insight-badge" id="homeInsightBadge">Собираем данные</span>
     </div>
-    <div class="hic-stats" id="hicStats" style="display:none"></div>
-  </div>
+    <div class="hic-coach" id="hicCoach"></div>
+    <details class="home-insight-details" id="homeInsightDetails">
+      <summary><span>Почему так и что дальше</span><i data-lucide="chevron-down"></i></summary>
+      <div class="home-insight-details-body">
+        <div class="hic-stats" id="hicStats" style="display:none"></div>
+        <div class="hic-status" id="hicStatus"></div>
+        <div class="hic-plan" id="hicPlan" style="display:none">
+          <div class="hic-plan-label">План на завтра</div>
+          <div class="hic-plan-body" id="hicPlanBody"></div>
+          <button class="hic-plan-apply" onclick="applyPlanFromHome();hapticSuccess()">Применить к режиму</button>
+        </div>
+      </div>
+    </details>
+  </section>
 
   <details class="card setup-card">
     <summary><span>Настроить режим</span></summary>
@@ -192,17 +203,22 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
       </div>
     </div>
 
-    <!-- Ситуация дня (Premium) -->
-    <div style="margin-bottom:12px">
-      <label style="display:block;font-size:.68rem;font-weight:800;color:var(--clr-primary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Ситуация дня</label>
-      <div style="display:flex;gap:7px;flex-wrap:wrap">
-        <button class="situation-btn active" id="sit-normal" onclick="selectSituation('normal',this)">😊 Обычный</button>
-        <button class="situation-btn" id="sit-sick" onclick="selectSituation('sick',this)" title="Premium">🤒 Болезнь ⭐</button>
-        <button class="situation-btn" id="sit-travel" onclick="selectSituation('travel',this)" title="Premium">✈️ Поездка ⭐</button>
-        <button class="situation-btn" id="sit-heat" onclick="selectSituation('heat',this)" title="Premium">☀️ Жара ⭐</button>
-        <button class="situation-btn" id="sit-guests" onclick="selectSituation('guests',this)" title="Premium">👨‍👩‍👧 Гости ⭐</button>
+    <details class="advanced-settings">
+      <summary>
+        <span><i data-lucide="sliders-horizontal"></i>Точная настройка</span>
+        <small>Ситуация дня</small>
+      </summary>
+      <div class="advanced-settings-body">
+        <div class="advanced-settings-label">Ситуация дня</div>
+        <div class="situation-options">
+          <button class="situation-btn active" id="sit-normal" onclick="selectSituation('normal',this)">Обычный</button>
+          <button class="situation-btn" id="sit-sick" onclick="selectSituation('sick',this)" title="Premium">Болезнь ⭐</button>
+          <button class="situation-btn" id="sit-travel" onclick="selectSituation('travel',this)" title="Premium">Поездка ⭐</button>
+          <button class="situation-btn" id="sit-heat" onclick="selectSituation('heat',this)" title="Premium">Жара ⭐</button>
+          <button class="situation-btn" id="sit-guests" onclick="selectSituation('guests',this)" title="Premium">Гости ⭐</button>
+        </div>
       </div>
-    </div>
+    </details>
 
     <button class="gen-btn secondary-generate" onclick="generateAndSwitch()">Обновить режим</button>
   </details>
@@ -237,12 +253,19 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
 ═══════════════════════════════════════════════════════ -->
 <div id="page-schedule" class="page">
   <div class="card">
-    <div class="flex-bar">
-      <label>⏱ Буфер</label>
-      <input type="range" id="bufferSlider" min="0" max="30" step="10" value="0" oninput="onBuffer(this.value)">
-      <span class="flex-val" id="bufferVal">0 мин</span>
-      <button class="flex-reset" onclick="resetSchedule()">↺</button>
-    </div>
+    <details class="schedule-adjustments" id="scheduleAdjustments" ontoggle="toggleScheduleAdvanced(this.open)">
+      <summary>
+        <span><i data-lucide="sliders-horizontal"></i>Точная настройка</span>
+        <small>Буфер и сдвиг снов</small>
+      </summary>
+      <div class="flex-bar">
+        <label for="bufferSlider">Буфер</label>
+        <input type="range" id="bufferSlider" min="0" max="30" step="10" value="0" oninput="onBuffer(this.value)">
+        <span class="flex-val" id="bufferVal">0 мин</span>
+        <button class="flex-reset" onclick="resetSchedule()" aria-label="Сбросить точную настройку"><i data-lucide="rotate-ccw"></i></button>
+      </div>
+      <p>Кнопки сдвига на 15 минут появились рядом с дневными снами.</p>
+    </details>
     <div class="sched-head">
       <div><h2 id="schedTitle"></h2><p id="schedSubtitle"></p></div>
       <div class="badge" id="schedBadge"></div>
@@ -656,24 +679,24 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
 </div>
 
 <!-- Scripts -->
-<script src="analytics-config.js?v=20260811-1"></script>
-<script src="analytics.js?v=20260811-1"></script>
-<script src="tma.js?v=20260811-1"></script>
-<script src="web-account.js?v=20260811-1"></script>
-<script src="cloud-sync.js?v=20260811-1"></script>
-<script src="pwa.js?v=20260811-1"></script>
-<script src="chat.js?v=20260811-1"></script>
-<script src="sleep-intelligence.js?v=20260811-1"></script>
-<script src="daily-coach.js?v=20260811-1"></script>
-<script src="baby-milestones.js?v=20260811-1"></script>
-<script src="tracker.js?v=20260811-1"></script>
-<script src="articles.js?v=20260811-1"></script>
-<script src="subscription.js?v=20260811-1"></script>
-<script src="onboarding.js?v=20260811-1"></script>
-<script src="reminder-planner.js?v=20260811-1"></script>
-<script src="notifications.js?v=20260811-1"></script>
-<script src="app.js?v=20260811-1"></script>
-<script src="premium.js?v=20260811-1"></script>
+<script src="analytics-config.js?v=20260811-2"></script>
+<script src="analytics.js?v=20260811-2"></script>
+<script src="tma.js?v=20260811-2"></script>
+<script src="web-account.js?v=20260811-2"></script>
+<script src="cloud-sync.js?v=20260811-2"></script>
+<script src="pwa.js?v=20260811-2"></script>
+<script src="chat.js?v=20260811-2"></script>
+<script src="sleep-intelligence.js?v=20260811-2"></script>
+<script src="daily-coach.js?v=20260811-2"></script>
+<script src="baby-milestones.js?v=20260811-2"></script>
+<script src="tracker.js?v=20260811-2"></script>
+<script src="articles.js?v=20260811-2"></script>
+<script src="subscription.js?v=20260811-2"></script>
+<script src="onboarding.js?v=20260811-2"></script>
+<script src="reminder-planner.js?v=20260811-2"></script>
+<script src="notifications.js?v=20260811-2"></script>
+<script src="app.js?v=20260811-2"></script>
+<script src="premium.js?v=20260811-2"></script>
 
 <script>
 // ─── Low-end device detection ────────────────────────────────────────────────
@@ -753,6 +776,12 @@ function handleHomePrimaryAction() {
   generateAndSwitch();
 }
 
+function toggleScheduleAdvanced(open) {
+  document.body.classList.toggle('schedule-adjustments-open', Boolean(open));
+  if (window.BabyAnalytics && open) BabyAnalytics.track('schedule_advanced_opened');
+  requestAnimationFrame(refreshIcons);
+}
+
 function generateAndSwitch() {
   var btn = document.getElementById('btn-generate');
   if (btn) { btn.classList.add('loading'); btn.disabled = true; setHomePrimaryAction('Генерирую...', 'loader-circle'); }
@@ -799,11 +828,18 @@ function renderTodayPlan() {
     return;
   }
 
-  if (kicker) kicker.textContent = 'Следующий сон';
-  if (confidence) { confidence.textContent = 'Режим актуален'; confidence.classList.remove('is-neutral'); }
+  var homeLogs = typeof getLogs === 'function' ? getLogs() : [];
+  var learning = window.BabyCoach ? BabyCoach.getLearningProgress(homeLogs) : { ready: false };
+  if (kicker) kicker.textContent = 'Окно сна';
+  if (confidence) {
+    confidence.textContent = learning.ready ? 'Учитывает дневник' : 'По возрасту и подъёму';
+    confidence.classList.remove('is-neutral');
+  }
   var sleepStarted = parseInt(localStorage.getItem('babymode_quick_sleep_start') || '0');
   var nextSleep = window.BabyCoach ? BabyCoach.getNextSleep(blocks, new Date()) : null;
   if (sleepStarted) {
+    if (kicker) kicker.textContent = 'Сон сейчас';
+    if (confidence) confidence.textContent = 'Таймер включён';
     var elapsed = Math.max(0, Math.round((Date.now() - sleepStarted) / 60000));
     title.textContent = 'Малыш сейчас спит';
     sub.textContent = 'Сон идёт ' + (window.BabyCoach ? BabyCoach.formatDuration(elapsed) : elapsed + ' мин');
@@ -811,17 +847,22 @@ function renderTodayPlan() {
     btn.dataset.action = 'sleep';
     setHomePrimaryAction('Проснулся', 'sunrise');
   } else if (nextSleep) {
-    title.textContent = 'Следующий сон около ' + nextSleep.time;
-    sub.textContent = 'Примерно через ' + nextSleep.countdown;
+    title.textContent = 'Сон около ' + nextSleep.time;
+    sub.textContent = 'Через ' + nextSleep.countdown + ' · ритуал с ' + nextSleep.prepareTime;
     if (reason) {
+      var basis = learning.ready
+        ? 'Ориентир учитывает режим и последние записи дневника.'
+        : 'Ориентир рассчитан по возрасту, подъёму и плану дня.';
       reason.textContent = nextSleep.minutesUntil > 10
-        ? 'Подготовку лучше начать через ' + nextSleep.preparation + '. ' + nextSleep.note
-        : 'Пора приглушить свет и начать привычный ритуал. ' + nextSleep.note;
+        ? basis + (nextSleep.note ? ' ' + nextSleep.note : '')
+        : 'Пора приглушить свет и начать привычный ритуал.' + (nextSleep.note ? ' ' + nextSleep.note : '');
       reason.style.display = 'block';
     }
     btn.dataset.action = 'sleep';
     setHomePrimaryAction('Уснул', 'moon');
   } else {
+    if (kicker) kicker.textContent = 'День завершён';
+    if (confidence) { confidence.textContent = 'Можно подвести итог'; confidence.classList.add('is-neutral'); }
     title.textContent = 'План на сегодня завершён';
     sub.textContent = 'Можно сохранить итог дня и подготовить режим на завтра.';
     if (reason) reason.style.display = 'none';
@@ -1206,20 +1247,30 @@ function renderHomeInsights() {
   card.style.display = 'block';
   const logs = typeof getLogs === 'function' ? getLogs() : [];
   const coachEl = document.getElementById('hicCoach');
+  const badgeEl = document.getElementById('homeInsightBadge');
+  const basisEl = document.getElementById('homeInsightBasis');
   const planEl = document.getElementById('hicPlan');
   const statsEl = document.getElementById('hicStats');
   if (planEl) planEl.style.display = 'none';
   if (statsEl) { statsEl.style.display = 'none'; statsEl.innerHTML = ''; }
   window._homePlan = null;
 
+  const setInsightBadge = (label, tone) => {
+    if (!badgeEl) return;
+    badgeEl.textContent = label;
+    badgeEl.className = `home-insight-badge is-${tone || 'learning'}`;
+  };
+
   if (coachEl && window.BabyCoach) {
     const progress = BabyCoach.getLearningProgress(logs);
+    if (basisEl) basisEl.textContent = progress.ready ? 'По режиму и дневнику' : 'По возрасту и режиму';
     if (!progress.ready) {
+      setInsightBadge('Собираем данные', 'learning');
       coachEl.innerHTML = `
         <div class="coach-learning">
-          <div class="coach-learning-head"><strong>Собираем ваш режим</strong><span>${progress.completed}/${progress.required} дней</span></div>
+          <div class="coach-learning-head"><strong>Нужно ещё немного данных</strong><span>${progress.completed}/${progress.required} дней</span></div>
           <div class="coach-progress"><span style="width:${progress.percent}%"></span></div>
-          <p>Ещё ${progress.remaining} ${progress.remaining === 1 ? 'день' : 'дня'} записей, и приложение начнёт замечать закономерности сна.</p>
+          <p>Ещё ${progress.remaining} ${progress.remaining === 1 ? 'день' : 'дня'} записей, и здесь появится персональный вывод на сегодня.</p>
           <button onclick="goPage('tracker',document.getElementById('bn-tracker'));hapticLight()">Добавить день в дневник</button>
         </div>`;
     } else {
@@ -1229,15 +1280,28 @@ function renderHomeInsights() {
         localStorage.setItem('babymode_personal_plan_ready_v1', new Date().toISOString());
         if (window.BabyAnalytics) BabyAnalytics.track('personal_plan_ready', { diary_days: progress.totalDays });
       }
+      if (premium && morning) {
+        const labels = {
+          balanced: ['В норме', 'ok'],
+          overtired: ['Возможен перегул', 'attention'],
+          sleep_debt: ['Есть недосып', 'attention'],
+          unstable: ['Нестабильно', 'attention'],
+          extra_sleep: ['Больше сна', 'info']
+        };
+        const badge = labels[morning.status] || labels.balanced;
+        setInsightBadge(badge[0], badge[1]);
+      } else {
+        setInsightBadge('Готов разбор', 'premium');
+      }
       coachEl.innerHTML = premium && morning ? `
         <div class="coach-summary coach-${morning.tone}">
-          <div class="coach-summary-kicker">Вывод по последней записи</div>
+          <div class="coach-summary-kicker">Главное на сегодня</div>
           <strong>${morning.title}</strong>
           <div class="coach-summary-stats">${morning.stats} · ${morning.reason}</div>
           <p>${morning.action}</p>
         </div>` : `
         <div class="coach-summary coach-ready">
-          <div class="coach-summary-kicker">Режим изучен</div>
+          <div class="coach-summary-kicker">Данные собраны</div>
           <strong>Закономерность найдена</strong>
           <p>По ${progress.totalDays} дням уже можно объяснить изменения сна и собрать следующий шаг.</p>
           <button onclick="goPage('premium',null);renderPremiumPage();hapticLight()">Показать персональный разбор</button>

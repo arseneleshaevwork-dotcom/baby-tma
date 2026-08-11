@@ -189,8 +189,8 @@ function renderSchedule(blocks,daySegs,p){
             ${statusDot}
             ${b.tag==='sleep'&&b.title.includes('Дневной')?
               `<div class="shift-btns">
-                <button class="shift-btn" onclick="shiftNap(${napIdx-1},-15)" title="Сдвинуть на 15 мин раньше">−</button>
-                <button class="shift-btn" onclick="shiftNap(${napIdx-1},+15)" title="Сдвинуть на 15 мин позже">+</button>
+                <button class="shift-btn" onclick="shiftNap(${napIdx-1},-15)" title="Сдвинуть на 15 мин раньше" aria-label="Сдвинуть дневной сон на 15 минут раньше">−</button>
+                <button class="shift-btn" onclick="shiftNap(${napIdx-1},+15)" title="Сдвинуть на 15 мин позже" aria-label="Сдвинуть дневной сон на 15 минут позже">+</button>
               </div>`:''}
           </div>
         </div>

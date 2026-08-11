@@ -35,6 +35,7 @@ const BabyCoach = (() => {
     const prepareAt = new Date(next.at.getTime() - 10 * 60000);
     return {
       time: String(next.block.time || ''),
+      prepareTime: formatClock(prepareAt),
       title: String(next.block.title || 'Сон'),
       note: String(next.block.note || ''),
       at: next.at.toISOString(),
@@ -56,16 +57,33 @@ const BabyCoach = (() => {
     const delta = Math.round(total - norms.totalMin);
     const wakingCount = Math.max(0, Number(latest.nightWakings) || 0);
     const tag = Array.isArray(latest.tags) ? latest.tags[0] : null;
+    const tags = Array.isArray(latest.tags) ? latest.tags : [];
+    const trend = typeof sleepIntel.summarizeSleepLogs === 'function'
+      ? sleepIntel.summarizeSleepLogs(recent, age).trend
+      : 'flat';
 
     let tone = 'ok';
+    let status = 'balanced';
     let title = 'Сон близок к возрастному ориентиру';
     let action = 'Сохраняйте привычные подъём и вечерний ритуал.';
-    if (delta < -45) {
+    if (delta < 0 && tags.some(value => ['long_soothe', 'cry_sleep'].includes(value))) {
       tone = 'attention';
+      status = 'overtired';
+      title = 'Возможен перегул';
+      action = 'Сегодня начните следующее укладывание на 10–15 минут раньше и отметьте результат.';
+    } else if (delta < -45) {
+      tone = 'attention';
+      status = 'sleep_debt';
       title = 'Сегодня стоит беречь сон';
       action = 'Сделайте день спокойнее и начните вечерний ритуал на 15 минут раньше.';
+    } else if (trend === 'worse') {
+      tone = 'attention';
+      status = 'unstable';
+      title = 'Режим стал менее стабильным';
+      action = 'Не меняйте весь день: сохраните подъём и скорректируйте только следующее окно сна.';
     } else if (delta > 60) {
       tone = 'info';
+      status = 'extra_sleep';
       title = 'Сна получилось больше обычного';
       action = 'Ориентируйтесь на самочувствие и не сдвигайте ночь резко.';
     }
@@ -75,6 +93,7 @@ const BabyCoach = (() => {
     if (tag) reasons.push(tagLabel(tag));
     return {
       tone,
+      status,
       title,
       date: latest.date,
       nightMin: night,
@@ -168,6 +187,10 @@ const BabyCoach = (() => {
 
   function formatHours(minutes) {
     return `${(Math.max(0, Number(minutes) || 0) / 60).toFixed(1)} ч`;
+  }
+
+  function formatClock(date) {
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   }
 
   function tagLabel(tag) {

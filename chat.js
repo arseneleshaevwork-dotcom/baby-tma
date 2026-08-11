@@ -152,6 +152,7 @@ function findAnswer(q) {
   const baseAnswer = best && bestScore >= 4
     ? (best.id === 'urgent' ? best.answer : _injectAgeContext(best.answer, age))
     : buildFallbackAnswer(q, age, name);
+  const answerWithStep = appendNextStepHtml(baseAnswer, q);
 
   // v2: prepend personal diary context if premium and 3+ days
   const canPersonalize = typeof SUB === 'undefined' || SUB.can('aiAnalysis');
@@ -175,11 +176,39 @@ function findAnswer(q) {
         </div>
       </div>`;
 
-      return personalBlock + baseAnswer;
+      return personalBlock + answerWithStep;
     }
   }
 
-  return baseAnswer;
+  return answerWithStep;
+}
+
+function getSuggestedNextStep(question, answer = '') {
+  const normalizedQuestion = normalizeQuestion(question);
+  const text = normalizeQuestion(`${question} ${answer}`);
+  if (/(не дыш|задыха|синеет|судорог|без созн|скорую|срочно|112)/.test(normalizedQuestion)) {
+    return 'Позвоните в скорую помощь или 112 сейчас и следуйте указаниям диспетчера.';
+  }
+  if (/(корм|груд|смес|бутыл|не ест|аппетит)/.test(text)) {
+    return 'На ближайшем кормлении спокойно предложите привычный объём без давления и отметьте самочувствие малыша.';
+  }
+  if (/(плач|крич|колик|беспоко)/.test(text)) {
+    return 'Сейчас по очереди проверьте голод, подгузник, температуру, усталость и признаки боли.';
+  }
+  if (/(сон|спит|засып|просып|режим|окно|бодрств)/.test(text)) {
+    return 'Сегодня измените только одно окно сна на 10–15 минут и запишите результат в дневник.';
+  }
+  return 'Добавьте возраст малыша и последние события сна или кормления, чтобы получить более точный план.';
+}
+
+function nextStepBlock(step) {
+  return `<div class="chat-next-step"><strong>Следующий шаг</strong><span>${escapeHtml(step)}</span></div>`;
+}
+
+function appendNextStepHtml(answer, question) {
+  const html = String(answer || '');
+  if (/chat-next-step|следующий шаг\s*:/i.test(html)) return html;
+  return html + nextStepBlock(getSuggestedNextStep(question, html.replace(/<[^>]*>/g, ' ')));
 }
 
 function normalizeQuestion(value) {
@@ -357,7 +386,7 @@ async function chatSend() {
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.answer) throw Object.assign(new Error(data.error || 'request_failed'), { code: data.error, limit: data.limit });
     typing?.remove();
-    addMsg(formatAiAnswer(data.answer, data.sources, data.request_id), 'bot');
+    addMsg(formatAiAnswer(data.answer, data.sources, data.request_id, q), 'bot');
     renderChatContext(data.remaining);
     if (window.BabyAnalytics) BabyAnalytics.track('ai_answer_received', { remaining: data.remaining, mode: data.mode || 'unknown' });
   } catch (error) {
@@ -405,8 +434,12 @@ function renderChatContext(remaining) {
   if (typeof refreshIcons === 'function') refreshIcons();
 }
 
-function formatAiAnswer(answer, sources, requestId) {
-  const text = escapeHtml(String(answer || '')).replace(/\n/g, '<br>');
+function formatAiAnswer(answer, sources, requestId, question = '') {
+  const raw = String(answer || '');
+  const explicitStep = raw.match(/(?:^|\n)\s*Следующий шаг\s*:\s*([^\n]+)/i);
+  const body = explicitStep ? raw.replace(explicitStep[0], '').trim() : raw;
+  const text = escapeHtml(body).replace(/\n/g, '<br>');
+  const nextStep = nextStepBlock(explicitStep?.[1]?.trim() || getSuggestedNextStep(question, raw));
   const validSources = (Array.isArray(sources) ? sources : []).filter(source => /^https:\/\//.test(String(source?.url || ''))).slice(0, 3);
   const links = validSources.length
     ? `<div class="chat-sources"><strong>Проверенные источники</strong>${validSources.map(source => `<a href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label || 'Источник')}</a>`).join('')}</div>`
@@ -415,7 +448,7 @@ function formatAiAnswer(answer, sources, requestId) {
   const feedback = safeRequestId
     ? `<div class="chat-feedback" data-request-id="${safeRequestId}"><span>Ответ помог?</span><div><button type="button" onclick="sendAiFeedback('${safeRequestId}','helpful',this)">Полезно</button><button type="button" onclick="sendAiFeedback('${safeRequestId}','not_helpful',this)">Не помогло</button></div></div>`
     : '';
-  return `${text}${links}${feedback}`;
+  return `${text}${nextStep}${links}${feedback}`;
 }
 
 async function sendAiFeedback(requestId, rating, button) {
@@ -555,6 +588,7 @@ if (typeof module !== 'undefined') {
     normalizeQuestion,
     buildAiDiary,
     buildAiPayload,
-    formatAiAnswer
+    formatAiAnswer,
+    getSuggestedNextStep
   };
 }
