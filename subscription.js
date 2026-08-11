@@ -307,7 +307,7 @@ function _renderFreePage() {
   return `
     <div class="sub-hero">
       <span class="sub-hero-emoji">✨</span>
-      <h2>Малыш в ритме Premium</h2>
+      <h2>Режим Малыша Premium</h2>
       <p>Базовый режим остаётся бесплатным. Premium добавляет глубокий анализ и автоматизацию.</p>
     </div>
 

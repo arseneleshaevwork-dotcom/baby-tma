@@ -724,7 +724,7 @@ function drawPdfReportPage(model, rows, page, pages) {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#3d2c3e';
   ctx.font = '800 54px Arial, sans-serif';
-  ctx.fillText('Малыш в ритме', 84, 105);
+  ctx.fillText('Режим малыша', 84, 105);
   ctx.fillStyle = '#8d758f';
   ctx.font = '28px Arial, sans-serif';
   const child = model.babyName ? `${model.babyName}${model.age ? ` · ${model.age} мес.` : ''}` : (model.age ? `${model.age} мес.` : 'Дневник сна');

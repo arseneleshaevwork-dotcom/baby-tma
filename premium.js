@@ -26,7 +26,7 @@ function generatePDF() {
   }
 
   w.document.write(`<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-<title>Малыш в ритме${babyName ? ' — ' + babyName : ''}</title>
+<title>Режим Малыша${babyName ? ' — ' + babyName : ''}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap');
   body{font-family:'Nunito',Arial,sans-serif;color:#3D2C3E;padding:32px;max-width:800px;margin:0 auto;background:#FFF9F5}
@@ -100,7 +100,7 @@ function generatePDF() {
   </ul>
 </div>
 
-<footer>Малыш в ритме © 2026 · Возрастные ориентиры, не медицинское назначение · По вопросам здоровья консультируйтесь с педиатром</footer>
+<footer>Режим Малыша © 2026 · Возрастные ориентиры, не медицинское назначение · По вопросам здоровья консультируйтесь с педиатром</footer>
 
 <script>
   try {

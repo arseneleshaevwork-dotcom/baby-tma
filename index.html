@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Малыш в ритме — режим дня, сон и дневник малыша</title>
-<meta name="description" content="Малыш в ритме помогает собрать режим дня, вести дневник сна и получать персональные подсказки для родителей малышей.">
+<title>Малыш в ритме — веб-версия «Режим Малыша»</title>
+<meta name="description" content="Веб-версия «Режим Малыша»: режим дня, дневник сна и персональные подсказки для родителей малышей.">
 <meta name="theme-color" content="#5B5863">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -50,7 +50,7 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
   <button class="web-auth-backdrop" type="button" onclick="BabyAccount.closeLoginPrompt()" aria-label="Закрыть окно входа"></button>
   <div class="web-auth-panel" role="dialog" aria-modal="true" aria-labelledby="webAuthTitle">
     <button class="web-auth-close" type="button" onclick="BabyAccount.closeLoginPrompt()" aria-label="Продолжить без входа"><i data-lucide="x"></i></button>
-    <div class="web-auth-logo" aria-hidden="true">МР</div>
+    <div class="web-auth-logo" aria-hidden="true">РМ</div>
     <div class="web-auth-copy">
       <h1 id="webAuthTitle">Сохранить в Telegram</h1>
       <p id="webAuthReason">Войдите, чтобы синхронизировать дневник и продолжить на любом устройстве.</p>
@@ -76,7 +76,7 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
   </button>
   <div class="app-header-copy">
     <h1 id="appTitle">Доброе утро</h1>
-    <div class="baby-name" id="babyNameDisplay">Малыш в ритме</div>
+    <div class="baby-name" id="babyNameDisplay">Режим Малыша</div>
   </div>
   <div class="trial-badge" id="trial-header-badge" style="display:none">🌸 Premium</div>
   <button class="header-notification" onclick="goPage('profile',document.getElementById('bn-profile'));renderProfilePage();hapticLight()" aria-label="Открыть уведомления и профиль">
@@ -631,7 +631,7 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
     <div class="share-card-preview" id="shareCardPreview">
       <div class="baby-avatar-emoji" style="width:48px;height:48px;font-size:28px;margin:0 auto 8px" id="shareCardAvatar">👶</div>
       <div class="share-title" id="shareCardTitle">Режим дня малыша</div>
-      <div class="share-sub" id="shareCardSub">Сгенерировано в «Малыш в ритме»</div>
+      <div class="share-sub" id="shareCardSub">Сгенерировано в Режим Малыша</div>
     </div>
     <button class="share-btn" onclick="doShareSchedule();hapticMedium()">📤 Отправить в Telegram</button>
     <button class="cta-outline-btn" style="margin-top:8px" onclick="closeShareModal();hapticLight()">Закрыть</button>
@@ -937,7 +937,7 @@ function _applyBabyName(name) {
     : parseInt(localStorage.getItem('babymode_last_age') || '0');
   if (title) title.textContent = greeting;
   if (el) {
-    el.textContent = (name || 'Малыш в ритме') + (age ? ' · ' + age + ' мес.' : '');
+    el.textContent = (name || 'Режим Малыша') + (age ? ' · ' + age + ' мес.' : '');
     el.style.display = 'block';
   }
   if (fallback && !localStorage.getItem('babymode_photo')) fallback.textContent = name ? name.trim().charAt(0).toUpperCase() : 'РМ';
@@ -1135,7 +1135,7 @@ function doShareSchedule() {
   var name = localStorage.getItem('babymode_baby_name') || 'малыша';
   var text = '👶 Режим дня ' + name + '\n\n';
   blocks.slice(0, 8).forEach(function(b) { text += b.time + ' — ' + b.title + '\n'; });
-  text += '\n🔗 Малыш в ритме';
+  text += '\n🔗 Режим Малыша';
 
   if (window.Telegram && Telegram.WebApp && Telegram.WebApp.switchInlineQuery) {
     Telegram.WebApp.switchInlineQuery(text);

@@ -38,7 +38,7 @@ export function yookassaPaymentBody({ plan, paymentId, telegramId, returnUrl, pa
   const body: any = {
     amount: { value: rubles(plan.amountMinor), currency: 'RUB' },
     capture: true,
-    description: `${plan.label} в приложении «Малыш в ритме»`,
+    description: `${plan.label} в приложении Режим Малыша`,
     metadata: {
       internal_payment_id: paymentId,
       telegram_id: String(telegramId),

@@ -242,9 +242,9 @@ function reminderForBaby(baby: any, today: string, setting: any) {
 
 function buildMessage(name: string, reminder: { type: string; ageLabel: string }) {
   if (reminder.type === 'birthday') {
-    return `Сегодня у ${name} день рождения: ${reminder.ageLabel}. Поздравьте малыша и загляните в «Малыш в ритме» — я подскажу, что меняется в этом возрасте.`;
+    return `Сегодня у ${name} день рождения: ${reminder.ageLabel}. Поздравьте малыша и загляните в «Режим малыша» — я подскажу, что меняется в этом возрасте.`;
   }
-  return `Сегодня ${name}: ${reminder.ageLabel}. Это хороший момент пересмотреть режим сна, кормления и бодрствования в «Малыш в ритме».`;
+  return `Сегодня ${name}: ${reminder.ageLabel}. Это хороший момент пересмотреть режим сна, кормления и бодрствования в «Режим малыша».`;
 }
 
 async function sendTelegram(token: string, chatId: number, text: string) {

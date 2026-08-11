@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         commands: [
-          { command: 'start', description: 'Открыть «Малыш в ритме»' },
+          { command: 'start', description: 'Открыть Режим малыша' },
           { command: 'profile', description: 'Профиль малыша' },
           { command: 'reminders_on', description: 'Включить напоминания' },
           { command: 'reminders_off', description: 'Отключить напоминания' },
