@@ -13,7 +13,7 @@ function test(name, fn) {
     });
 }
 
-function createContext({ miniApp = false } = {}) {
+function createContext({ miniApp = false, url = 'https://app.example.test/baby-tma/', handoffResponse = null } = {}) {
   const store = new Map();
   const classes = new Set();
   const elements = {
@@ -30,7 +30,12 @@ function createContext({ miniApp = false } = {}) {
     BABY_TELEGRAM_SDK_READY: Promise.resolve(miniApp),
     Telegram: miniApp ? { WebApp: { initData: 'query_id=1&hash=x' } } : undefined,
     addEventListener() {},
-    dispatchEvent() {}
+    dispatchEvent() {},
+    location: { href: url },
+    history: { replaceState(_state, _title, nextUrl) { window.replacedUrl = nextUrl; } },
+    goPage(page) { window.openedPage = page; },
+    renderPremiumPage() { window.premiumRendered = true; },
+    showToast(message) { window.lastToast = message; }
   };
   const context = {
     console,
@@ -38,6 +43,7 @@ function createContext({ miniApp = false } = {}) {
     setTimeout: fn => fn(),
     clearTimeout() {},
     Date,
+    URL,
     CustomEvent: function CustomEvent(type, options) {
       this.type = type;
       this.detail = options?.detail;
@@ -60,7 +66,13 @@ function createContext({ miniApp = false } = {}) {
         }
       }
     },
-    fetch: async () => ({ ok: false, json: async () => ({}) })
+    fetch: async (_url, options = {}) => {
+      const body = JSON.parse(options.body || '{}');
+      if (body.action === 'handoff_consume' && handoffResponse) {
+        return { ok: true, json: async () => handoffResponse };
+      }
+      return { ok: false, json: async () => ({}) };
+    }
   };
   Object.assign(window, context);
   context.globalThis = context;
@@ -113,4 +125,28 @@ test('keeps Telegram Mini App authentication automatic', async () => {
   assert.strictEqual(context.window.BabyAccount.canUseServer(), true);
   assert.strictEqual(elements.webAuthGate.hidden, true);
   assert.strictEqual(elements.profileAccountRow.style.display, 'none');
+});
+
+test('consumes a Mini App checkout handoff without showing Telegram login', async () => {
+  const { context, classes, elements } = createContext({
+    url: 'https://app.example.test/baby-tma/?checkout=quarter&handoff=signed-token',
+    handoffResponse: {
+      ok: true,
+      session_token: 'a'.repeat(48),
+      expires_at: '2099-01-01T00:00:00.000Z',
+      checkout_plan: 'quarter',
+      user: { telegram_id: 42, username: 'parent' }
+    }
+  });
+  loadAccount(context);
+
+  const authenticated = await context.window.BabyAccount.init();
+
+  assert.strictEqual(authenticated, true);
+  assert.strictEqual(context.window.BabyAccount.isAuthenticated(), true);
+  assert.strictEqual(context.window.BabyAccount.getCheckoutPlan(), 'quarter');
+  assert.strictEqual(elements.webAuthGate.hidden, true);
+  assert.strictEqual(classes.has('web-auth-modal-open'), false);
+  assert.strictEqual(context.window.openedPage, 'premium');
+  assert.strictEqual(context.window.replacedUrl, '/baby-tma/');
 });

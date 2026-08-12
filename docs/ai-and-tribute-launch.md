@@ -24,7 +24,7 @@ Pilot capacity target: up to 500 registered users, 30-100 daily active users and
 
 The launch uses one Premium entitlement with two compliant checkout paths:
 
-- Inside the Telegram bot and Mini App: Telegram Stars only.
+- Inside the Telegram bot and Mini App: Telegram Stars, plus an explicit "Card / SBP" handoff to the independent web app and YooKassa checkout.
 - On the independent website/PWA: YooKassa checkout with cards and SBP.
 
 The offers are:

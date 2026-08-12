@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { authenticateAppRequest, upsertTelegramUser } from '../_shared/auth.ts';
 import { corsHeaders, isAllowedOrigin, json, randomToken, sha256Hex } from '../_shared/http.ts';
+import { createCheckoutHandoff, verifyCheckoutHandoff } from './handoff.mjs';
 
 const TELEGRAM_ISSUER = 'https://oauth.telegram.org';
 const TELEGRAM_JWKS_URL = 'https://oauth.telegram.org/.well-known/jwks.json';
@@ -16,13 +17,71 @@ Deno.serve(async req => {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN');
   const clientId = Deno.env.get('TELEGRAM_LOGIN_CLIENT_ID') || String(botToken || '').split(':')[0];
-  if (!supabaseUrl || !serviceRoleKey || !botToken || !/^\d+$/.test(clientId)) {
+  const handoffSecret = Deno.env.get('WEB_HANDOFF_SECRET');
+  const webAppUrl = Deno.env.get('WEB_APP_URL') || 'https://arseneleshaevwork-dotcom.github.io/baby-tma/';
+  if (!supabaseUrl || !serviceRoleKey || !botToken || !handoffSecret || handoffSecret.length < 32 || !/^\d+$/.test(clientId)) {
     return json({ ok: false, error: 'server_not_configured' }, 503, headers);
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const body = await req.json().catch(() => ({}));
   const action = String(body?.action || 'session');
+
+  if (action === 'handoff_create') {
+    const auth = await authenticateAppRequest({ req, body, supabase, botToken });
+    if (!auth.ok || auth.method !== 'mini_app') return json({ ok: false, error: auth.error || 'mini_app_required' }, 401, headers);
+    const plan = String(body?.plan || '');
+    if (!['month', 'quarter'].includes(plan)) return json({ ok: false, error: 'invalid_plan' }, 400, headers);
+    const fingerprint = `handoff:${auth.telegramId}`;
+    const since = new Date(Date.now() - 10 * 60_000).toISOString();
+    const { count } = await supabase.from('web_login_nonces').select('id', { count: 'exact', head: true })
+      .eq('request_fingerprint', fingerprint).gte('created_at', since);
+    if ((count || 0) >= 6) return json({ ok: false, error: 'rate_limited' }, 429, headers);
+
+    const nonce = randomToken(24);
+    const handoff = await createCheckoutHandoff({
+      secret: handoffSecret, userId: auth.user.id, telegramId: auth.telegramId, plan, nonce
+    });
+    const { error } = await supabase.from('web_login_nonces').insert({
+      nonce_hash: await sha256Hex(handoff.token),
+      request_fingerprint: fingerprint,
+      expires_at: new Date(handoff.claims.exp * 1000).toISOString()
+    });
+    if (error) return json({ ok: false, error: 'handoff_create_failed' }, 500, headers);
+    const target = new URL(webAppUrl);
+    if (target.protocol !== 'https:' || !isAllowedOrigin(target.origin)) return json({ ok: false, error: 'web_app_url_invalid' }, 503, headers);
+    target.searchParams.set('checkout', plan);
+    target.searchParams.set('handoff', handoff.token);
+    return json({ ok: true, web_url: target.toString(), plan, expires_at: new Date(handoff.claims.exp * 1000).toISOString() }, 200, headers);
+  }
+
+  if (action === 'handoff_consume') {
+    const handoffToken = String(body?.handoff || '');
+    const claims = await verifyCheckoutHandoff(handoffToken, handoffSecret);
+    if (!claims) return json({ ok: false, error: 'handoff_invalid' }, 401, headers);
+    const now = new Date().toISOString();
+    const { data: consumed } = await supabase.from('web_login_nonces')
+      .update({ used_at: now })
+      .eq('nonce_hash', await sha256Hex(handoffToken))
+      .is('used_at', null)
+      .gt('expires_at', now)
+      .select('id')
+      .maybeSingle();
+    if (!consumed) return json({ ok: false, error: 'handoff_used_or_expired' }, 401, headers);
+    const { data: user } = await supabase.from('users')
+      .select('id,telegram_id,username,first_name,language_code')
+      .eq('id', claims.sub)
+      .eq('telegram_id', claims.tid)
+      .maybeSingle();
+    if (!user) return json({ ok: false, error: 'handoff_user_invalid' }, 401, headers);
+    const session = await issueWebSession(supabase, user);
+    if (!session) return json({ ok: false, error: 'session_create_failed' }, 500, headers);
+    await supabase.from('events').insert({
+      event_name: 'web_login', user_id: user.id, telegram_id: claims.tid,
+      payload: { method: 'mini_app_handoff', checkout_plan: claims.plan }
+    });
+    return json({ ok: true, ...session, user: publicUser(user), checkout_plan: claims.plan }, 200, headers);
+  }
 
   if (action === 'nonce') {
     const fingerprint = await requestFingerprint(req);
@@ -61,28 +120,15 @@ Deno.serve(async req => {
 
     const user = await upsertTelegramUser(supabase, claims);
     if (!user?.id) return json({ ok: false, error: 'user_upsert_failed' }, 500, headers);
-    const sessionToken = randomToken(48);
-    const expiresAt = new Date(Date.now() + 30 * 86400_000).toISOString();
-    const { error } = await supabase.from('web_sessions').insert({
-      user_id: user.id,
-      telegram_id: telegramId,
-      token_hash: await sha256Hex(sessionToken),
-      expires_at: expiresAt
-    });
-    if (error) return json({ ok: false, error: 'session_create_failed' }, 500, headers);
-
-    const { data: sessions } = await supabase.from('web_sessions')
-      .select('id').eq('user_id', user.id).is('revoked_at', null).order('created_at', { ascending: false });
-    const staleIds = (sessions || []).slice(5).map((item: any) => item.id);
-    if (staleIds.length) await supabase.from('web_sessions').update({ revoked_at: now }).in('id', staleIds);
+    const session = await issueWebSession(supabase, user);
+    if (!session) return json({ ok: false, error: 'session_create_failed' }, 500, headers);
 
     await supabase.from('events').insert({
       event_name: 'web_login', user_id: user.id, telegram_id: telegramId, payload: { method: 'telegram_oidc' }
     });
     return json({
       ok: true,
-      session_token: sessionToken,
-      expires_at: expiresAt,
+      ...session,
       user: publicUser(user)
     }, 200, headers);
   }
@@ -107,6 +153,24 @@ function publicUser(user: any) {
     username: user.username || '',
     first_name: user.first_name || ''
   };
+}
+
+async function issueWebSession(supabase: any, user: any) {
+  const sessionToken = randomToken(48);
+  const expiresAt = new Date(Date.now() + 30 * 86400_000).toISOString();
+  const { error } = await supabase.from('web_sessions').insert({
+    user_id: user.id,
+    telegram_id: Number(user.telegram_id),
+    token_hash: await sha256Hex(sessionToken),
+    expires_at: expiresAt
+  });
+  if (error) return null;
+  const now = new Date().toISOString();
+  const { data: sessions } = await supabase.from('web_sessions')
+    .select('id').eq('user_id', user.id).is('revoked_at', null).order('created_at', { ascending: false });
+  const staleIds = (sessions || []).slice(5).map((item: any) => item.id);
+  if (staleIds.length) await supabase.from('web_sessions').update({ revoked_at: now }).in('id', staleIds);
+  return { session_token: sessionToken, expires_at: expiresAt };
 }
 
 async function requestFingerprint(req: Request) {

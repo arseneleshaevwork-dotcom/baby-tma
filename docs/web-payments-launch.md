@@ -9,7 +9,7 @@
 5. The browser returns to `index.html?payment=return`, but access changes only after the verified YooKassa notification is processed.
 6. The app refreshes subscription status and syncs profile, diary and settings across web and Telegram.
 
-Inside Telegram the checkout remains Stars-only: 299 Stars monthly or 769 Stars for a one-time 90-day period.
+Inside the Mini App the customer chooses either Telegram Stars or "Card / SBP". The second option creates a short-lived one-time handoff, opens the independent web app in the external browser, signs the same verified Telegram user into the web session without a second Telegram prompt, and continues through YooKassa. Stars remain 299 monthly or 769 for a one-time 90-day period.
 
 ## Production setup
 

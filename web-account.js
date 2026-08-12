@@ -9,6 +9,7 @@
   let initPromise = null;
   let loginSdkPromise = null;
   let previousFocus = null;
+  let checkoutPlan = null;
 
   function isMiniApp() {
     try { return Boolean(global.Telegram?.WebApp?.initData); }
@@ -57,6 +58,31 @@
         hideGate();
         dispatchReady();
         return true;
+      }
+      const handoff = readCheckoutHandoff();
+      if (handoff.token) {
+        clearCheckoutHandoffFromUrl();
+        try {
+          const response = await fetch(global.BABY_WEB_AUTH_ENDPOINT, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'handoff_consume', handoff: handoff.token })
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.session_token) throw new Error(data.error || 'handoff_failed');
+          applySession(data);
+          checkoutPlan = ['month', 'quarter'].includes(data.checkout_plan) ? data.checkout_plan : handoff.plan;
+          hideGate();
+          renderAccount();
+          dispatchReady();
+          openCheckoutPage('Переход выполнен. Выберите оплату картой или через СБП.');
+          return true;
+        } catch (_) {
+          checkoutPlan = handoff.plan;
+          hideGate();
+          dispatchReady();
+          openCheckoutPage('Ссылка на оплату истекла. Вернитесь в Mini App и откройте веб-оплату ещё раз.');
+          return false;
+        }
       }
       const token = getSessionToken();
       if (token) {
@@ -111,10 +137,7 @@
       });
       const data = await loginResponse.json().catch(() => ({}));
       if (!loginResponse.ok || !data.session_token) throw new Error(data.error || 'session_failed');
-      localStorage.setItem(SESSION_KEY, data.session_token);
-      localStorage.setItem(SESSION_EXPIRY_KEY, data.expires_at || '');
-      authenticated = true;
-      user = data.user || null;
+      applySession(data);
       hideGate();
       renderAccount();
       global.dispatchEvent(new CustomEvent('baby-account-authenticated', { detail: { mode, user } }));
@@ -122,6 +145,9 @@
       if (global.SUB) await global.SUB.refreshPremiumStatus();
       if (typeof global.renderPremiumPage === 'function') global.renderPremiumPage();
       if (global.BabyAnalytics) global.BabyAnalytics.track('web_login', { method: 'telegram_oidc' });
+      if (typeof global.resumePendingWebCheckout === 'function') {
+        global.setTimeout(() => global.resumePendingWebCheckout(), 0);
+      }
       return true;
     } catch (error) {
       setGateMessage(error?.message === 'login_cancelled' ? 'Вход отменён' : 'Не удалось войти. Попробуйте ещё раз.');
@@ -150,6 +176,43 @@
       localStorage.removeItem(SESSION_KEY);
       localStorage.removeItem(SESSION_EXPIRY_KEY);
     } catch (_) {}
+  }
+
+  function applySession(data) {
+    localStorage.setItem(SESSION_KEY, data.session_token);
+    localStorage.setItem(SESSION_EXPIRY_KEY, data.expires_at || '');
+    authenticated = true;
+    user = data.user || null;
+  }
+
+  function readCheckoutHandoff() {
+    try {
+      const url = new URL(global.location.href);
+      const plan = url.searchParams.get('checkout');
+      return {
+        token: String(url.searchParams.get('handoff') || ''),
+        plan: ['month', 'quarter'].includes(plan) ? plan : null
+      };
+    } catch (_) {
+      return { token: '', plan: null };
+    }
+  }
+
+  function clearCheckoutHandoffFromUrl() {
+    try {
+      const url = new URL(global.location.href);
+      url.searchParams.delete('handoff');
+      url.searchParams.delete('checkout');
+      global.history.replaceState({}, '', url.pathname + (url.search || '') + url.hash);
+    } catch (_) {}
+  }
+
+  function openCheckoutPage(message) {
+    global.setTimeout(() => {
+      if (typeof global.goPage === 'function') global.goPage('premium', null);
+      if (typeof global.renderPremiumPage === 'function') global.renderPremiumPage();
+      if (typeof global.showToast === 'function') global.showToast(message, 6000);
+    }, 0);
   }
 
   function requestLogin(reason) {
@@ -245,7 +308,7 @@
 
   function dispatchReady() {
     renderAccount();
-    global.dispatchEvent(new CustomEvent('baby-account-ready', { detail: { mode, authenticated, user } }));
+    global.dispatchEvent(new CustomEvent('baby-account-ready', { detail: { mode, authenticated, user, checkoutPlan } }));
   }
 
   global.BabyAccount = {
@@ -254,7 +317,8 @@
     isAuthenticated: () => authenticated,
     canUseServer,
     getMode: () => mode,
-    getUser: () => user
+    getUser: () => user,
+    getCheckoutPlan: () => checkoutPlan
   };
 
   global.addEventListener('keydown', event => {

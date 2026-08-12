@@ -236,6 +236,9 @@ const SUB = (() => {
 })();
 window.SUB = SUB;
 
+let _miniPaymentMode = _readSessionValue('babymode_payment_mode') === 'web' ? 'web' : 'stars';
+let _webCheckoutOpening = false;
+
 // ─── Premium Page Renderer ───────────────────────────────────────────────────
 function initPremium() {
   renderPremiumPage();
@@ -255,6 +258,7 @@ function renderPremiumPage() {
   } else {
     page.innerHTML = _renderFreePage();
   }
+  if (typeof refreshIcons === 'function') requestAnimationFrame(refreshIcons);
 }
 
 function _renderPremiumActive() {
@@ -296,14 +300,16 @@ function _renderTrialActive(days) {
         <div class="ts-label">Бесплатного пробного периода</div>
       </div>
     </div>
-    <div class="plan-comparison">${_featuresList(true)}</div>
+    ${!web ? _renderPaymentMethodSwitch() : ''}
     ${_renderCheckoutActions(web)}
+    <div class="plan-comparison">${_featuresList(true)}</div>
   `;
 }
 
 function _renderFreePage() {
   const trialStarted = SUB.hasUsedTrial();
   const web = _isWebBillingMode();
+  const rubles = web || _isMiniWebCheckoutMode();
   return `
     <div class="sub-hero">
       <span class="sub-hero-emoji">✨</span>
@@ -322,26 +328,29 @@ function _renderFreePage() {
     </div>
     ` : ''}
 
+    ${!web ? _renderPaymentMethodSwitch() : ''}
+
     <div class="plans-row">
       <div class="plan-card" onclick="handleSubscribe('month');hapticLight()">
-        <div class="plan-price">${web ? '349<span> ₽</span>' : '299<span> ⭐</span>'}</div>
+        <div class="plan-price">${rubles ? '349<span> ₽</span>' : '299<span> Stars</span>'}</div>
         <div class="plan-label">на 1 месяц</div>
       </div>
       <div class="plan-card recommended" onclick="handleSubscribe('quarter');hapticLight()">
         <div class="plan-badge">Выгоднее</div>
-        <div class="plan-price">${web ? '899<span> ₽</span>' : '769<span> ⭐</span>'}</div>
+        <div class="plan-price">${rubles ? '899<span> ₽</span>' : '769<span> Stars</span>'}</div>
         <div class="plan-label">на 3 месяца</div>
         <div class="plan-save">Экономия 14%</div>
       </div>
     </div>
 
-    <div class="plan-comparison">${_featuresList(false)}</div>
-
     ${_renderCheckoutActions(web)}
+
+    <div class="plan-comparison">${_featuresList(false)}</div>
   `;
 }
 
 function _renderCheckoutActions(web) {
+  const miniWeb = !web && _isMiniWebCheckoutMode();
   const consent = web ? `
     <label class="web-billing-consent">
       <input id="webBillingConsent" type="checkbox" onchange="renderPremiumPage()" ${_webBillingConsentChecked() ? 'checked' : ''}>
@@ -352,33 +361,72 @@ function _renderCheckoutActions(web) {
     ${consent}
     <div style="padding:0 0 8px">
       <button class="cta-sub-btn" ${disabled} onclick="handleSubscribe('quarter');hapticMedium()">
-        ${web ? '3 месяца за 899 ₽' : '3 месяца за 769 ⭐'}
+        ${web ? '3 месяца за 899 ₽' : miniWeb ? 'Открыть веб-оплату · 899 ₽' : '3 месяца за 769 Stars'}
       </button>
       <button class="cta-outline-btn" ${disabled} style="margin-top:8px" onclick="handleSubscribe('month');hapticLight()">
-        ${web ? '1 месяц за 349 ₽' : 'или 299 ⭐ на 30 дней'}
+        ${web ? '1 месяц за 349 ₽' : miniWeb ? 'Открыть веб-оплату · 349 ₽' : 'или 299 Stars на 30 дней'}
       </button>
     </div>
     <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
       ${web
         ? 'Карта, СБП и банковские приложения · автопродление можно отключить здесь'
-        : 'Месячная подписка продлевается автоматически · 3 месяца оплачиваются один раз<br>Автопродлением можно управлять в настройках подписок Telegram'}
+        : miniWeb
+          ? 'Откроется веб-версия приложения · повторно входить в Telegram не нужно'
+          : 'Месячная подписка продлевается автоматически · 3 месяца оплачиваются один раз<br>Автопродлением можно управлять в настройках подписок Telegram'}
     </p>
-    <div class="billing-provider-note"><span>🔒</span><span>${web ? 'Безопасная оплата через ЮKassa' : 'Оплата внутри Telegram Stars'}</span></div>
+    <div class="billing-provider-note"><i data-lucide="shield-check"></i><span>${web || miniWeb ? 'Безопасная оплата через ЮKassa' : 'Оплата внутри Telegram Stars'}</span></div>
   `;
 }
 
+function _renderPaymentMethodSwitch() {
+  const webSelected = _isMiniWebCheckoutMode();
+  return `
+    <div class="payment-method-block">
+      <div class="payment-method-label">Как удобнее оплатить</div>
+      <div class="payment-method-switch" role="group" aria-label="Способ оплаты">
+        <button type="button" class="${webSelected ? '' : 'active'}" aria-pressed="${webSelected ? 'false' : 'true'}" onclick="setPremiumPaymentMode('stars');hapticLight()">
+          <i data-lucide="star"></i><span>Stars</span>
+        </button>
+        <button type="button" class="${webSelected ? 'active' : ''}" aria-pressed="${webSelected ? 'true' : 'false'}" onclick="setPremiumPaymentMode('web');hapticLight()">
+          <i data-lucide="credit-card"></i><span>Карта / СБП</span>
+        </button>
+      </div>
+    </div>`;
+}
+
+function setPremiumPaymentMode(mode) {
+  _miniPaymentMode = mode === 'web' ? 'web' : 'stars';
+  _writeSessionValue('babymode_payment_mode', _miniPaymentMode);
+  renderPremiumPage();
+  if (window.BabyAnalytics) BabyAnalytics.track('payment_method_selected', { provider: _miniPaymentMode === 'web' ? 'yookassa' : 'telegram_stars' });
+}
+
+function _isMiniWebCheckoutMode() {
+  return !_isWebBillingMode() && _miniPaymentMode === 'web';
+}
+
 function _isWebBillingMode() {
-  return Boolean(window.BabyAccount && !BabyAccount.isMiniApp());
+  return Boolean(window.BabyAccount && !window.BabyAccount.isMiniApp());
 }
 
 function _webBillingConsentChecked() {
   const checkbox = document.getElementById('webBillingConsent');
-  return checkbox ? checkbox.checked : sessionStorage.getItem('babymode_billing_consent') === '1';
+  return checkbox ? checkbox.checked : _readSessionValue('babymode_billing_consent') === '1';
 }
 
 function rememberWebBillingConsent() {
   const checkbox = document.getElementById('webBillingConsent');
-  sessionStorage.setItem('babymode_billing_consent', checkbox?.checked ? '1' : '0');
+  _writeSessionValue('babymode_billing_consent', checkbox?.checked ? '1' : '0');
+}
+
+function _readSessionValue(key) {
+  try { return window.sessionStorage?.getItem(key) || ''; }
+  catch (_) { return ''; }
+}
+
+function _writeSessionValue(key, value) {
+  try { window.sessionStorage?.setItem(key, value); }
+  catch (_) {}
 }
 
 function _featuresList(unlocked) {
@@ -440,7 +488,8 @@ async function handleSubscribe(plan) {
   if (_isWebBillingMode()) {
     rememberWebBillingConsent();
     if (!window.BabyAccount?.isAuthenticated()) {
-      window.BabyAccount?.requestLogin('Войдите через Telegram, чтобы привязать оплату к вашему аккаунту и открыть Premium во всех версиях.');
+      _writeSessionValue('babymode_pending_web_checkout', plan);
+      window.BabyAccount?.requestLogin('Один раз подтвердите аккаунт. После входа мы вернём вас сюда и сразу откроем оплату ЮKassa.');
       return;
     }
     if (!_webBillingConsentChecked()) {
@@ -449,6 +498,9 @@ async function handleSubscribe(plan) {
     }
     const endpoint = window.BABY_CREATE_YOOKASSA_PAYMENT_ENDPOINT;
     if (!endpoint) { showToast('Веб-оплата пока не настроена.'); return; }
+    if (_webCheckoutOpening) return;
+    _webCheckoutOpening = true;
+    _setCheckoutButtonsLoading(true);
     try {
       showToast('Открываем безопасную оплату...');
       const response = await BabyAccount.request(endpoint, {
@@ -469,7 +521,15 @@ async function handleSubscribe(plan) {
       window.location.assign(data.confirmation_url);
     } catch (_) {
       showToast('Оплата временно недоступна. Попробуйте позже.');
+    } finally {
+      _webCheckoutOpening = false;
+      _setCheckoutButtonsLoading(false);
     }
+    return;
+  }
+
+  if (_isMiniWebCheckoutMode()) {
+    await openWebCheckoutFromMiniApp(plan);
     return;
   }
 
@@ -509,6 +569,61 @@ async function handleSubscribe(plan) {
   } catch(e) {
     showToast('Оплата временно недоступна. Попробуйте позже.');
   }
+}
+
+async function openWebCheckoutFromMiniApp(plan) {
+  if (_webCheckoutOpening) return;
+  const endpoint = window.BABY_WEB_AUTH_ENDPOINT;
+  const initData = _getTelegramInitData();
+  if (!endpoint || !initData) {
+    showToast('Не удалось подготовить веб-оплату. Откройте приложение заново.');
+    return;
+  }
+  _webCheckoutOpening = true;
+  _setCheckoutButtonsLoading(true);
+  try {
+    showToast('Открываем веб-версию для оплаты...');
+    const response = window.BabyAccount
+      ? await window.BabyAccount.request(endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: { action: 'handoff_create', plan }
+      })
+      : await fetch(endpoint, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'handoff_create', plan, initData })
+      });
+    const data = await response.json().catch(() => ({}));
+    const target = new URL(String(data.web_url || ''));
+    const expected = new URL(window.BABY_WEB_APP_URL || location.origin + location.pathname);
+    if (!response.ok || target.protocol !== 'https:' || target.origin !== expected.origin || !target.pathname.startsWith(expected.pathname)) {
+      throw new Error(data.error || 'handoff_failed');
+    }
+    if (window.BabyAnalytics) BabyAnalytics.track('checkout_handoff_opened', { plan, provider: 'yookassa' });
+    const tg = window.Telegram?.WebApp;
+    if (tg && typeof tg.openLink === 'function') tg.openLink(target.toString());
+    else window.open(target.toString(), '_blank', 'noopener');
+  } catch (_) {
+    showToast('Не удалось открыть веб-оплату. Попробуйте ещё раз.');
+  } finally {
+    _webCheckoutOpening = false;
+    _setCheckoutButtonsLoading(false);
+  }
+}
+
+function _setCheckoutButtonsLoading(loading) {
+  if (typeof document.querySelectorAll !== 'function') return;
+  document.querySelectorAll('#page-premium .cta-sub-btn, #page-premium .cta-outline-btn').forEach(button => {
+    button.disabled = Boolean(loading);
+    button.setAttribute('aria-busy', loading ? 'true' : 'false');
+  });
+}
+
+function resumePendingWebCheckout() {
+  const plan = _readSessionValue('babymode_pending_web_checkout');
+  if (!['month', 'quarter'].includes(plan) || !_isWebBillingMode() || !window.BabyAccount?.isAuthenticated()) return false;
+  _writeSessionValue('babymode_pending_web_checkout', '');
+  handleSubscribe(plan);
+  return true;
 }
 
 async function cancelWebSubscription() {

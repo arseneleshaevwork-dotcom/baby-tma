@@ -108,6 +108,7 @@ The standalone site signs users in through Telegram Login, creates an opaque web
 ```bash
 supabase secrets set \
   TELEGRAM_LOGIN_CLIENT_ID='8999375510' \
+  WEB_HANDOFF_SECRET='<random_32_byte_secret>' \
   YOOKASSA_SHOP_ID='<shop_id>' \
   YOOKASSA_SECRET_KEY='<secret_key>' \
   BILLING_ENCRYPTION_KEY='<random_secret_at_least_32_chars>' \

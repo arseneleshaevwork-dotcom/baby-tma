@@ -186,6 +186,47 @@ body.web-auth-modal-open { overflow:hidden; }
   font-weight:700;
 }
 .billing-provider-note svg { width:14px; height:14px; }
+.payment-method-block { margin:0 0 14px; }
+.payment-method-label {
+  margin:0 0 7px;
+  color:var(--text-dark);
+  font-size:.76rem;
+  font-weight:800;
+}
+.payment-method-switch {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:4px;
+  padding:4px;
+  border:1px solid var(--border-soft);
+  border-radius:8px;
+  background:#F0EDF1;
+}
+.payment-method-switch button {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-width:0;
+  min-height:46px;
+  padding:9px 10px;
+  border:1px solid transparent;
+  border-radius:6px;
+  background:transparent;
+  color:var(--text-mid);
+  font:800 .78rem 'Nunito',sans-serif;
+  cursor:pointer;
+  touch-action:manipulation;
+  transition:background var(--dur-fast), border-color var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.payment-method-switch button svg { width:18px; height:18px; flex:0 0 18px; }
+.payment-method-switch button.active {
+  border-color:rgba(201,123,219,.24);
+  background:#fff;
+  color:var(--text-dark);
+  box-shadow:var(--shadow-sm);
+}
+.payment-method-switch button:focus-visible { outline:3px solid rgba(91,107,102,.28); outline-offset:2px; }
 .billing-manage {
   margin-top:14px;
   padding:14px;
@@ -1231,6 +1272,13 @@ body[data-page="profile"] #page-profile { padding-top:16px; }
   cursor:pointer; font-family:'Nunito',inherit; transition:all .15s; min-height:48px;
 }
 .cta-outline-btn:hover { background:linear-gradient(135deg,#FFF5F0,#F8F0FF); }
+.cta-sub-btn:disabled,
+.cta-outline-btn:disabled {
+  opacity:.45;
+  cursor:not-allowed;
+  box-shadow:none;
+  filter:grayscale(.35);
+}
 
 /* Premium active state */
 .premium-active-card {

@@ -13,8 +13,9 @@ function test(name, fn) {
     });
 }
 
-function createContext({ initData = '', invoiceResponse = null } = {}) {
+function createContext({ initData = '', invoiceResponse = null, babyAccount = false } = {}) {
   const store = new Map();
+  const sessionStore = new Map();
   const context = {
     console,
     setTimeout: (fn) => fn(),
@@ -22,23 +23,32 @@ function createContext({ initData = '', invoiceResponse = null } = {}) {
     window: {
       BABY_CREATE_STARS_INVOICE_ENDPOINT: 'https://example.test/create-stars-invoice',
       BABY_SUBSCRIPTION_STATUS_ENDPOINT: 'https://example.test/subscription-status',
+      BABY_WEB_AUTH_ENDPOINT: 'https://example.test/web-auth',
+      BABY_WEB_APP_URL: 'https://app.example.test/baby-tma/',
       Telegram: {
         WebApp: {
           initData,
           openInvoice: (link, cb) => {
             context.openedInvoice = link;
             if (cb) cb('cancelled');
-          }
+          },
+          openLink: link => { context.openedExternal = link; }
         }
       },
       BabyAnalytics: null,
-      open: (url) => { context.openedWindow = url; }
+      open: (url) => { context.openedWindow = url; },
+      sessionStorage: {
+        getItem: key => sessionStore.has(key) ? sessionStore.get(key) : null,
+        setItem: (key, value) => sessionStore.set(key, String(value))
+      }
     },
     localStorage: {
       getItem: key => store.has(key) ? store.get(key) : null,
       setItem: (key, value) => store.set(key, String(value)),
       removeItem: key => store.delete(key)
     },
+    URL,
+    location: { origin: 'https://app.example.test', pathname: '/baby-tma/' },
     document: {
       getElementById: () => null,
       createElement: () => ({ style: {}, remove() {} }),
@@ -52,6 +62,13 @@ function createContext({ initData = '', invoiceResponse = null } = {}) {
   };
   context.window.localStorage = context.localStorage;
   context.window.document = context.document;
+  context.window.location = context.location;
+  if (babyAccount) {
+    context.window.BabyAccount = {
+      isMiniApp: () => true,
+      request: async () => context.fetch()
+    };
+  }
   context.globalThis = context;
   return { context, store };
 }
@@ -85,6 +102,8 @@ test('shows the actual free and premium limits', () => {
   assert.match(html, /40 ИИ-ответов в день/);
   assert.match(html, /Дневник за 7 дней/);
   assert.match(html, /анализ дневника за 14 дней/i);
+  assert.match(html, /Stars/);
+  assert.match(html, /Карта \/ СБП/);
 });
 
 test('onboarding does not show an automatic trial toast', () => {
@@ -113,4 +132,19 @@ test('subscribe in Telegram opens Stars invoice from backend', async () => {
 
   assert.strictEqual(context.openedInvoice, 'https://t.me/invoice/test');
   assert.notStrictEqual(store.get('babymode_premium'), '1');
+});
+
+test('card or SBP in Mini App opens the signed web checkout instead of Telegram invoice', async () => {
+  const { context } = createContext({
+    initData: 'query_id=1&auth_date=1&user=%7B%22id%22%3A1%7D&hash=x',
+    babyAccount: true,
+    invoiceResponse: { ok: true, web_url: 'https://app.example.test/baby-tma/?checkout=quarter&handoff=signed' }
+  });
+  loadSubscription(context);
+
+  context.setPremiumPaymentMode('web');
+  await context.handleSubscribe('quarter');
+
+  assert.strictEqual(context.openedExternal, 'https://app.example.test/baby-tma/?checkout=quarter&handoff=signed');
+  assert.strictEqual(context.openedInvoice, undefined);
 });
