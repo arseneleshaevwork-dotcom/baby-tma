@@ -238,6 +238,7 @@ window.SUB = SUB;
 
 let _miniPaymentMode = _readSessionValue('babymode_payment_mode') === 'web' ? 'web' : 'stars';
 let _webCheckoutOpening = false;
+let _selectedPremiumPlan = '';
 
 // ─── Premium Page Renderer ───────────────────────────────────────────────────
 function initPremium() {
@@ -287,6 +288,7 @@ function _renderPremiumActive() {
 
 function _renderTrialActive(days) {
   const web = _isWebBillingMode();
+  const rubles = web || _isMiniWebCheckoutMode();
   return `
     <div class="sub-hero">
       <span class="sub-hero-emoji">🌸</span>
@@ -301,6 +303,7 @@ function _renderTrialActive(days) {
       </div>
     </div>
     ${!web ? _renderPaymentMethodSwitch() : ''}
+    ${_renderPlanCards(rubles)}
     ${_renderCheckoutActions(web)}
     <div class="plan-comparison">${_featuresList(true)}</div>
   `;
@@ -330,18 +333,7 @@ function _renderFreePage() {
 
     ${!web ? _renderPaymentMethodSwitch() : ''}
 
-    <div class="plans-row">
-      <div class="plan-card" onclick="handleSubscribe('month');hapticLight()">
-        <div class="plan-price">${rubles ? '349<span> ₽</span>' : '299<span> Stars</span>'}</div>
-        <div class="plan-label">на 1 месяц</div>
-      </div>
-      <div class="plan-card recommended" onclick="handleSubscribe('quarter');hapticLight()">
-        <div class="plan-badge">Выгоднее</div>
-        <div class="plan-price">${rubles ? '899<span> ₽</span>' : '769<span> Stars</span>'}</div>
-        <div class="plan-label">на 3 месяца</div>
-        <div class="plan-save">Экономия 14%</div>
-      </div>
-    </div>
+    ${_renderPlanCards(rubles)}
 
     ${_renderCheckoutActions(web)}
 
@@ -349,33 +341,96 @@ function _renderFreePage() {
   `;
 }
 
+function _renderPlanCards(rubles) {
+  const selected = _getSelectedPremiumPlan();
+  return `
+    <div class="plans-row" role="group" aria-label="Выберите тариф">
+      <button type="button" class="plan-card ${selected === 'month' ? 'selected' : ''}" aria-pressed="${selected === 'month'}" onclick="selectPremiumPlan('month');hapticLight()">
+        <span class="plan-selected-icon"><i data-lucide="check"></i></span>
+        <span class="plan-price">${rubles ? '349<span> ₽</span>' : '299<span> Stars</span>'}</span>
+        <span class="plan-label">на 1 месяц</span>
+      </button>
+      <button type="button" class="plan-card recommended ${selected === 'quarter' ? 'selected' : ''}" aria-pressed="${selected === 'quarter'}" onclick="selectPremiumPlan('quarter');hapticLight()">
+        <span class="plan-badge">Выгоднее</span>
+        <span class="plan-selected-icon"><i data-lucide="check"></i></span>
+        <span class="plan-price">${rubles ? '899<span> ₽</span>' : '769<span> Stars</span>'}</span>
+        <span class="plan-label">на 3 месяца</span>
+        <span class="plan-save">Экономия 14%</span>
+      </button>
+    </div>`;
+}
+
 function _renderCheckoutActions(web) {
   const miniWeb = !web && _isMiniWebCheckoutMode();
+  const plan = _getSelectedPremiumPlan();
+  const quarter = plan === 'quarter';
+  const price = quarter ? 899 : 349;
+  const stars = quarter ? 769 : 299;
+  const period = quarter ? '3 месяца' : '1 месяц';
   const consent = web ? `
     <label class="web-billing-consent">
-      <input id="webBillingConsent" type="checkbox" onchange="renderPremiumPage()" ${_webBillingConsentChecked() ? 'checked' : ''}>
-      <span>Соглашаюсь с <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">условиями подписки</a> и автоматическим списанием 899 ₽ каждые 3 месяца или 349 ₽ ежемесячно до отмены.</span>
+      <input id="webBillingConsent" type="checkbox" onchange="handleBillingConsentChange()" ${_webBillingConsentChecked() ? 'checked' : ''}>
+      <span>Соглашаюсь с <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">условиями подписки</a> и автоматическим списанием ${price} ₽ ${quarter ? 'каждые 3 месяца' : 'ежемесячно'} до отмены.</span>
     </label>` : '';
   const disabled = web && !_webBillingConsentChecked() ? 'disabled' : '';
   return `
-    ${consent}
-    <div style="padding:0 0 8px">
-      <button class="cta-sub-btn" ${disabled} onclick="handleSubscribe('quarter');hapticMedium()">
-        ${web ? '3 месяца за 899 ₽' : miniWeb ? 'Открыть веб-оплату · 899 ₽' : '3 месяца за 769 Stars'}
-      </button>
-      <button class="cta-outline-btn" ${disabled} style="margin-top:8px" onclick="handleSubscribe('month');hapticLight()">
-        ${web ? '1 месяц за 349 ₽' : miniWeb ? 'Открыть веб-оплату · 349 ₽' : 'или 299 Stars на 30 дней'}
-      </button>
+    <div id="premiumCheckout" class="premium-checkout">
+      ${consent}
+      <div class="checkout-plan-summary">
+        <span>Выбран тариф</span>
+        <strong>${period} · ${web || miniWeb ? `${price} ₽` : `${stars} Stars`}</strong>
+      </div>
+      <div style="padding:0 0 8px">
+        <button id="premiumCheckoutButton" class="cta-sub-btn" ${disabled} onclick="handleSubscribe('${plan}');hapticMedium()">
+          ${web ? `Перейти к оплате · ${price} ₽` : miniWeb ? `Открыть веб-оплату · ${price} ₽` : `Оплатить ${stars} Stars`}
+        </button>
+      </div>
+      <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
+        ${web
+          ? 'Карта, СБП и банковские приложения · автопродление можно отключить здесь'
+          : miniWeb
+            ? 'Откроется веб-версия приложения · повторно входить в Telegram не нужно'
+            : quarter
+              ? 'Оплата один раз за 3 месяца · продление оформляется вручную'
+              : 'Подписка продлевается автоматически · управлять ей можно в Telegram'}
+      </p>
+      <div class="billing-provider-note"><i data-lucide="shield-check"></i><span>${web || miniWeb ? 'Безопасная оплата через ЮKassa' : 'Оплата внутри Telegram Stars'}</span></div>
     </div>
-    <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
-      ${web
-        ? 'Карта, СБП и банковские приложения · автопродление можно отключить здесь'
-        : miniWeb
-          ? 'Откроется веб-версия приложения · повторно входить в Telegram не нужно'
-          : 'Месячная подписка продлевается автоматически · 3 месяца оплачиваются один раз<br>Автопродлением можно управлять в настройках подписок Telegram'}
-    </p>
-    <div class="billing-provider-note"><i data-lucide="shield-check"></i><span>${web || miniWeb ? 'Безопасная оплата через ЮKassa' : 'Оплата внутри Telegram Stars'}</span></div>
   `;
+}
+
+function _getSelectedPremiumPlan() {
+  if (['month', 'quarter'].includes(_selectedPremiumPlan)) return _selectedPremiumPlan;
+  const checkoutPlan = window.BabyAccount?.getCheckoutPlan?.();
+  if (['month', 'quarter'].includes(checkoutPlan)) return checkoutPlan;
+  const storedPlan = _readSessionValue('babymode_selected_plan');
+  return ['month', 'quarter'].includes(storedPlan) ? storedPlan : 'quarter';
+}
+
+function selectPremiumPlan(plan, shouldScroll = true) {
+  if (!['month', 'quarter'].includes(plan)) return;
+  rememberWebBillingConsent();
+  _selectedPremiumPlan = plan;
+  _writeSessionValue('babymode_selected_plan', plan);
+  renderPremiumPage();
+  if (window.BabyAnalytics) BabyAnalytics.track('subscription_plan_selected', { plan });
+  if (!shouldScroll) return;
+  const schedule = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : setTimeout;
+  schedule(() => {
+    const checkout = document.getElementById('premiumCheckout');
+    if (!checkout || typeof checkout.getBoundingClientRect !== 'function') return;
+    const rect = checkout.getBoundingClientRect();
+    if (rect.bottom > window.innerHeight - 12 || rect.top < 12) {
+      const behavior = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+      checkout.scrollIntoView({ behavior, block: 'nearest' });
+    }
+  });
+}
+
+function handleBillingConsentChange() {
+  rememberWebBillingConsent();
+  const button = document.getElementById('premiumCheckoutButton');
+  if (button) button.disabled = !_webBillingConsentChecked();
 }
 
 function _renderPaymentMethodSwitch() {

@@ -106,6 +106,40 @@ test('shows the actual free and premium limits', () => {
   assert.match(html, /Карта \/ СБП/);
 });
 
+test('selecting a tariff updates the visible checkout instead of starting payment', () => {
+  const { context } = createContext();
+  loadSubscription(context);
+
+  const initialHtml = vm.runInContext('_renderFreePage()', context);
+  assert.match(initialHtml, /plan-card recommended selected/);
+  assert.match(initialHtml, /Оплатить 769 Stars/);
+
+  vm.runInContext("selectPremiumPlan('month', false)", context);
+  const selectedHtml = vm.runInContext('_renderFreePage()', context);
+  assert.match(selectedHtml, /plan-card selected/);
+  assert.match(selectedHtml, /Выбран тариф/);
+  assert.match(selectedHtml, /1 месяц · 299 Stars/);
+  assert.match(selectedHtml, /handleSubscribe\('month'\)/);
+  assert.doesNotMatch(selectedHtml, /handleSubscribe\('quarter'\)/);
+});
+
+test('web checkout reflects the selected ruble plan and its consent terms', () => {
+  const { context } = createContext();
+  context.window.BabyAccount = {
+    isMiniApp: () => false,
+    getCheckoutPlan: () => null,
+    isAuthenticated: () => false
+  };
+  loadSubscription(context);
+
+  vm.runInContext("selectPremiumPlan('month', false)", context);
+  const html = vm.runInContext('_renderFreePage()', context);
+  assert.match(html, /1 месяц · 349 ₽/);
+  assert.match(html, /автоматическим списанием 349 ₽ ежемесячно/);
+  assert.match(html, /Перейти к оплате · 349 ₽/);
+  assert.match(html, /premiumCheckoutButton[^>]*disabled/);
+});
+
 test('onboarding does not show an automatic trial toast', () => {
   const source = fs.readFileSync('./onboarding.js', 'utf8');
   assert.doesNotMatch(source, /Активируйте 7 дней Premium/);
