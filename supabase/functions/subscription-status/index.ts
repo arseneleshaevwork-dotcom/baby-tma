@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { authenticateAppRequest } from '../_shared/auth.ts';
+import { authenticateBillingRequest } from '../_shared/billing-auth.ts';
 import { corsHeaders, isAllowedOrigin, json } from '../_shared/http.ts';
 
 Deno.serve(async (req) => {
@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
 
   const body = await req.json().catch(() => ({}));
   const supabase = createClient(supabaseUrl, serviceRoleKey);
-  const auth = await authenticateAppRequest({ req, body, supabase, botToken });
+  const auth = await authenticateBillingRequest({ req, body, supabase, botToken });
   if (!auth.ok) return json({ ok: false, error: auth.error || 'auth_failed' }, 401, headers);
   const telegramId = Number(auth.telegramId);
   const { data: subscription } = await supabase
@@ -28,6 +28,7 @@ Deno.serve(async (req) => {
     .maybeSingle();
 
   if (body?.start_trial) {
+    if (auth.method === 'billing_guest') return json({ ok: false, error: 'telegram_auth_required_for_trial' }, 401, headers);
     if (subscription) return json({ ok: false, error: 'trial_already_used' }, 409, headers);
     const start = new Date();
     const end = new Date(start.getTime() + 7 * 86400000);

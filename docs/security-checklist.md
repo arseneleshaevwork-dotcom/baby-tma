@@ -4,7 +4,7 @@
 
 - Premium can no longer be activated by the subscribe button in the client.
 - Telegram Stars invoices are created only by `create-stars-invoice`.
-- `create-stars-invoice` and `subscription-status` verify Telegram Mini App `initData`.
+- `create-stars-invoice` verifies Telegram Mini App `initData`; `subscription-status` accepts either verified Telegram authentication or a hashed guest billing key.
 - `telegram-webhook` requires `TELEGRAM_WEBHOOK_SECRET` and fails closed when it is missing.
 - Pre-checkout payments are accepted only when the invoice payload exists in `payments`, belongs to the same Telegram user, and matches currency/amount.
 - Successful payments activate Premium only when the invoice payload is a valid project payload for that Telegram user.
@@ -20,6 +20,7 @@
 - YooKassa notifications are treated as untrusted hints: the function retrieves the payment or refund from YooKassa before changing access.
 - YooKassa amounts, currency, owner and internal payment ID are checked server-side; requests and events are idempotent.
 - Saved payment-method identifiers are encrypted with `BILLING_ENCRYPTION_KEY`; card details are redacted from stored payloads.
+- Guest web checkout uses a 256-bit random browser key, stores only its SHA-256 hash, never puts it in the URL, requires an approved browser origin and applies both fingerprint and billing-identity rate limits.
 - Full refunds revoke web Premium; partial refunds do not accidentally remove the entire paid period.
 - Browser CORS is restricted to production origins and approved local development origins.
 
@@ -29,6 +30,7 @@
 - Review failed payments, failed reminders and AI error rate in the admin dashboard before each advertising increase.
 - Run a real Stars purchase and renewal test from a Telegram test account before paid traffic.
 - Run real YooKassa card and SBP purchases, cancellation, renewal failure and full/partial refund tests before paid traffic.
+- Test guest checkout return, access recovery on the purchasing browser and support recovery when that browser storage is lost.
 - Add the seller's legal name, tax details, support contact, refund rules and receipt configuration before accepting RUB payments.
 - Rotate the Telegram bot token and Supabase personal access token that were previously pasted into a chat, then update deployment secrets and the webhook.
 - Register the production website in Telegram Login allowed URLs and keep `TELEGRAM_LOGIN_CLIENT_ID` equal to the bot ID.

@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { authenticateAppRequest } from '../_shared/auth.ts';
+import { authenticateBillingRequest } from '../_shared/billing-auth.ts';
 import { corsHeaders, isAllowedOrigin, json } from '../_shared/http.ts';
 
 Deno.serve(async req => {
@@ -14,8 +14,10 @@ Deno.serve(async req => {
   if (!botToken || !supabaseUrl || !serviceRoleKey) return json({ ok: false, error: 'server_not_configured' }, 503, headers);
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const body = await req.json().catch(() => ({}));
-  const auth = await authenticateAppRequest({ req, body, supabase, botToken });
-  if (!auth.ok || auth.method !== 'web_session') return json({ ok: false, error: 'web_session_required' }, 401, headers);
+  const auth = await authenticateBillingRequest({ req, body, supabase, botToken });
+  if (!auth.ok || !['web_session', 'billing_guest'].includes(auth.method)) {
+    return json({ ok: false, error: auth.error || 'billing_identity_required' }, 401, headers);
+  }
   const action = String(body?.action || 'status');
   const { data: agreement } = await supabase.from('billing_agreements')
     .select('id,plan,status,next_charge_at,current_period_end,cancel_at_period_end,payment_method_type,last_error')

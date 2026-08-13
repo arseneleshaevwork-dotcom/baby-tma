@@ -1,4 +1,5 @@
 const assert = require('assert');
+const { webcrypto } = require('crypto');
 const fs = require('fs');
 const vm = require('vm');
 
@@ -22,6 +23,7 @@ function createContext({ initData = '', invoiceResponse = null, babyAccount = fa
     Date,
     window: {
       BABY_CREATE_STARS_INVOICE_ENDPOINT: 'https://example.test/create-stars-invoice',
+      BABY_CREATE_YOOKASSA_PAYMENT_ENDPOINT: 'https://example.test/create-yookassa-payment',
       BABY_SUBSCRIPTION_STATUS_ENDPOINT: 'https://example.test/subscription-status',
       BABY_WEB_AUTH_ENDPOINT: 'https://example.test/web-auth',
       BABY_WEB_APP_URL: 'https://app.example.test/baby-tma/',
@@ -36,6 +38,7 @@ function createContext({ initData = '', invoiceResponse = null, babyAccount = fa
         }
       },
       BabyAnalytics: null,
+      crypto: webcrypto,
       open: (url) => { context.openedWindow = url; },
       sessionStorage: {
         getItem: key => sessionStore.has(key) ? sessionStore.get(key) : null,
@@ -48,7 +51,14 @@ function createContext({ initData = '', invoiceResponse = null, babyAccount = fa
       removeItem: key => store.delete(key)
     },
     URL,
-    location: { origin: 'https://app.example.test', pathname: '/baby-tma/' },
+    Uint8Array,
+    btoa: value => Buffer.from(value, 'binary').toString('base64'),
+    crypto: webcrypto,
+    location: {
+      origin: 'https://app.example.test',
+      pathname: '/baby-tma/',
+      assign: url => { context.assignedLocation = url; }
+    },
     document: {
       getElementById: () => null,
       createElement: () => ({ style: {}, remove() {} }),
@@ -138,6 +148,38 @@ test('web checkout reflects the selected ruble plan and its consent terms', () =
   assert.match(html, /автоматическим списанием 349 ₽ ежемесячно/);
   assert.match(html, /Перейти к оплате · 349 ₽/);
   assert.match(html, /premiumCheckoutButton[^>]*disabled/);
+  assert.match(html, /Вход в Telegram не нужен/);
+});
+
+test('guest web checkout opens YooKassa without a Telegram login prompt', async () => {
+  const { context } = createContext();
+  context.window.BabyAccount = {
+    isMiniApp: () => false,
+    isAuthenticated: () => false,
+    canUseServer: () => false,
+    getCheckoutPlan: () => null,
+    requestLogin: reason => { context.loginPrompt = reason; },
+    request: async (url, options) => {
+      context.webCheckoutRequest = { url, body: options.body };
+      return {
+        ok: true,
+        json: async () => ({ confirmation_url: 'https://yookassa.test/checkout/123' })
+      };
+    }
+  };
+  context.BabyAccount = context.window.BabyAccount;
+  context.document.getElementById = id => id === 'webBillingConsent' ? { checked: true } : null;
+  loadSubscription(context);
+
+  assert.match(vm.runInContext('_getGuestBillingKey(true)', context), /^[A-Za-z0-9_-]{43}$/);
+  await context.handleSubscribe('month');
+
+  assert.strictEqual(context.loginPrompt, undefined);
+  assert.ok(context.webCheckoutRequest, context.lastToast || 'checkout request was not sent');
+  assert.strictEqual(context.webCheckoutRequest.url, 'https://example.test/create-yookassa-payment');
+  assert.match(context.webCheckoutRequest.body.guest_key, /^[A-Za-z0-9_-]{43}$/);
+  assert.strictEqual(context.webCheckoutRequest.body.plan, 'month');
+  assert.strictEqual(context.assignedLocation, 'https://yookassa.test/checkout/123');
 });
 
 test('onboarding does not show an automatic trial toast', () => {

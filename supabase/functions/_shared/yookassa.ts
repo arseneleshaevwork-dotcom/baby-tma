@@ -28,13 +28,15 @@ export async function yookassaRequest(path: string, options: {
   return data;
 }
 
-export function yookassaPaymentBody({ plan, paymentId, telegramId, returnUrl, paymentMethodId }: {
+export function yookassaPaymentBody({ plan, paymentId, telegramId, returnUrl, paymentMethodId, customerType }: {
   plan: any;
   paymentId: string;
   telegramId: number;
   returnUrl?: string;
   paymentMethodId?: string;
+  customerType?: string;
 }) {
+  const resolvedCustomerType = customerType === 'guest' || telegramId < 0 ? 'guest' : 'telegram';
   const body: any = {
     amount: { value: rubles(plan.amountMinor), currency: 'RUB' },
     capture: true,
@@ -42,6 +44,7 @@ export function yookassaPaymentBody({ plan, paymentId, telegramId, returnUrl, pa
     metadata: {
       internal_payment_id: paymentId,
       telegram_id: String(telegramId),
+      customer_type: resolvedCustomerType,
       plan: plan.key
     }
   };
@@ -49,7 +52,9 @@ export function yookassaPaymentBody({ plan, paymentId, telegramId, returnUrl, pa
   else {
     body.confirmation = { type: 'redirect', return_url: returnUrl };
     body.save_payment_method = true;
-    body.merchant_customer_id = `tg_${telegramId}`;
+    body.merchant_customer_id = resolvedCustomerType === 'guest'
+      ? `web_${Math.abs(telegramId)}`
+      : `tg_${telegramId}`;
   }
   return body;
 }
@@ -165,7 +170,7 @@ export async function applySucceededYookassaPayment({ supabase, payment, encrypt
     await supabase.from('events').insert({
       event_name: 'payment_success',
       user_id: localPayment.user_id,
-      telegram_id: telegramId,
+      telegram_id: telegramId > 0 ? telegramId : null,
       payload: { provider: 'yookassa', plan: plan.key, amount_minor: plan.amountMinor }
     });
   }

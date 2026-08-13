@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { addBillingMonths, getBillingPlan, openBillingSecret, rubles, sealBillingSecret } from '../supabase/functions/_shared/billing.mjs';
+import { hashGuestBillingKey, normalizeGuestBillingKey } from '../supabase/functions/_shared/guest-billing.mjs';
 
 test('exposes the approved monthly and quarterly ruble plans', () => {
   assert.deepEqual(getBillingPlan('month'), { key: 'month', amountMinor: 34900, months: 1, label: 'Premium на 1 месяц' });
@@ -19,4 +20,13 @@ test('billing payment method tokens are encrypted at rest', async () => {
   const sealed = await sealBillingSecret('pm_123', secret);
   assert.notEqual(sealed, 'pm_123');
   assert.equal(await openBillingSecret(sealed, secret), 'pm_123');
+});
+
+test('guest billing keys are strict and stored only as hashes', async () => {
+  const key = 'A'.repeat(43);
+  assert.equal(normalizeGuestBillingKey(key), key);
+  assert.equal(normalizeGuestBillingKey('short'), '');
+  const hash = await hashGuestBillingKey(key);
+  assert.match(hash, /^[0-9a-f]{64}$/);
+  assert.notEqual(hash, key);
 });

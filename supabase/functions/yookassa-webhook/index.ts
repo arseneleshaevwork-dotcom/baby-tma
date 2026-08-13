@@ -37,11 +37,12 @@ Deno.serve(async req => {
     const actualEvent = payment.status === 'succeeded' ? 'payment.succeeded' : payment.status === 'canceled' ? 'payment.canceled' : '';
     if (actualEvent !== eventType) throw new Error('webhook_status_mismatch');
     const eventKey = `${eventType}:${incomingId}`;
+    const billingIdentityId = Number(payment?.metadata?.telegram_id || 0);
     const { data: previous } = await supabase.from('billing_events').select('id,status').eq('provider', 'yookassa').eq('event_key', eventKey).maybeSingle();
     if (previous?.status === 'processed') return json({ ok: true }, 200, headers);
     const eventValues = {
       provider: 'yookassa', event_key: eventKey, event_type: eventType, status: 'processing',
-      external_payment_id: incomingId, telegram_id: Number(payment?.metadata?.telegram_id || 0) || null,
+      external_payment_id: incomingId, telegram_id: billingIdentityId > 0 ? billingIdentityId : null,
       payload: redactPayment(payment), error: null
     };
     if (previous) await supabase.from('billing_events').update(eventValues).eq('id', previous.id);
@@ -84,7 +85,7 @@ async function processRefund(supabase: any, refund: any, payment: any) {
   const isFullRefund = totalRefundMinor >= paymentMinor;
   await supabase.from('billing_events').upsert({
     provider: 'yookassa', event_key: eventKey, event_type: 'refund.succeeded', status: 'processing',
-    external_payment_id: String(payment.id || ''), telegram_id: telegramId || null,
+    external_payment_id: String(payment.id || ''), telegram_id: telegramId > 0 ? telegramId : null,
     payload: {
       id: refund.id,
       payment_id: refund.payment_id,

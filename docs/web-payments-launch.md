@@ -3,11 +3,11 @@
 ## Customer flow
 
 1. The customer opens the standalone website or installs it as a PWA.
-2. Telegram Login links the browser to the same Telegram ID used in the Mini App.
-3. The Premium page offers 349 RUB per month or 899 RUB per three months.
+2. The Premium page offers 349 RUB per month or 899 RUB per three months without requiring Telegram Login.
+3. The browser creates a random guest billing key; only its SHA-256 hash is stored on the server. A signed-in customer continues to use the verified Telegram identity.
 4. After explicit subscription and recurring-payment consent, YooKassa opens its hosted checkout with the methods enabled for the shop, including cards and SBP where available.
 5. The browser returns to `index.html?payment=return`, but access changes only after the verified YooKassa notification is processed.
-6. The app refreshes subscription status and syncs profile, diary and settings across web and Telegram.
+6. The app refreshes subscription status through the guest billing key or web session. Telegram Login remains optional and is used for cross-device data sync.
 
 Inside the Mini App the customer chooses either Telegram Stars or "Card / SBP". The second option creates a short-lived one-time handoff, opens the independent web app in the external browser, signs the same verified Telegram user into the web session without a second Telegram prompt, and continues through YooKassa. Stars remain 299 monthly or 769 for a one-time 90-day period.
 
@@ -25,6 +25,7 @@ Inside the Mini App the customer chooses either Telegram Stars or "Card / SBP". 
 ## Acceptance tests
 
 - Monthly card checkout grants Premium on both web and Mini App.
+- Guest monthly checkout opens YooKassa without a Telegram Login prompt and activates Premium in the purchasing browser.
 - Quarterly SBP checkout grants Premium on both surfaces and sets the correct next charge date.
 - A repeated webhook does not extend access twice.
 - Cancelling renewal preserves access until the paid end date; resuming restores the scheduled charge.

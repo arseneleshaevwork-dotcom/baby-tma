@@ -1,6 +1,8 @@
 // ─── Subscription / Freemium Logic ─────────────────────────────────────────
 // Manages trial period, premium status, and feature gates
 
+const WEB_BILLING_GUEST_KEY_STORAGE = 'babymode_web_billing_guest_v1';
+
 const SUB = (() => {
   const KEY_PREMIUM    = 'babymode_premium';
   const KEY_PREMIUM_UNTIL = 'babymode_premium_until';
@@ -189,11 +191,16 @@ const SUB = (() => {
 
   async function refreshPremiumStatus() {
     const endpoint = window.BABY_SUBSCRIPTION_STATUS_ENDPOINT;
-    const canUseServer = window.BabyAccount ? BabyAccount.canUseServer() : Boolean(_getTelegramInitData());
+    const guestKey = window.BabyAccount && !BabyAccount.isMiniApp() && !BabyAccount.isAuthenticated()
+      ? _getGuestBillingKey(false)
+      : '';
+    const canUseServer = window.BabyAccount ? BabyAccount.canUseServer() || Boolean(guestKey) : Boolean(_getTelegramInitData());
     if (!canUseServer || !endpoint) return false;
     try {
       const response = window.BabyAccount
-        ? await BabyAccount.request(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: {} })
+        ? await BabyAccount.request(endpoint, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: guestKey ? { guest_key: guestKey } : {}
+        })
         : await fetch(endpoint, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: _getTelegramInitData() })
         });
@@ -387,7 +394,7 @@ function _renderCheckoutActions(web) {
       </div>
       <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
         ${web
-          ? 'Карта, СБП и банковские приложения · автопродление можно отключить здесь'
+          ? 'Вход в Telegram не нужен · карта, СБП и банковские приложения'
           : miniWeb
             ? 'Откроется веб-версия приложения · повторно входить в Telegram не нужно'
             : quarter
@@ -484,6 +491,23 @@ function _writeSessionValue(key, value) {
   catch (_) {}
 }
 
+function _getGuestBillingKey(createIfMissing) {
+  try {
+    const saved = localStorage.getItem(WEB_BILLING_GUEST_KEY_STORAGE) || '';
+    if (/^[A-Za-z0-9_-]{43}$/.test(saved)) return saved;
+    if (!createIfMissing || !window.crypto?.getRandomValues) return '';
+    const bytes = new Uint8Array(32);
+    window.crypto.getRandomValues(bytes);
+    const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join('');
+    const key = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    if (!/^[A-Za-z0-9_-]{43}$/.test(key)) return '';
+    localStorage.setItem(WEB_BILLING_GUEST_KEY_STORAGE, key);
+    return key;
+  } catch (_) {
+    return '';
+  }
+}
+
 function _featuresList(unlocked) {
   const limits = SUB.getPlanLimits();
   const freeFeatures = [
@@ -542,13 +566,13 @@ async function handleSubscribe(plan) {
 
   if (_isWebBillingMode()) {
     rememberWebBillingConsent();
-    if (!window.BabyAccount?.isAuthenticated()) {
-      _writeSessionValue('babymode_pending_web_checkout', plan);
-      window.BabyAccount?.requestLogin('Один раз подтвердите аккаунт. После входа мы вернём вас сюда и сразу откроем оплату ЮKassa.');
-      return;
-    }
     if (!_webBillingConsentChecked()) {
       showToast('Подтвердите условия подписки и автопродление.');
+      return;
+    }
+    const guestKey = window.BabyAccount?.isAuthenticated() ? '' : _getGuestBillingKey(true);
+    if (!window.BabyAccount?.isAuthenticated() && !guestKey) {
+      showToast('Не удалось подготовить защищённую оплату. Обновите страницу и попробуйте ещё раз.');
       return;
     }
     const endpoint = window.BABY_CREATE_YOOKASSA_PAYMENT_ENDPOINT;
@@ -560,7 +584,12 @@ async function handleSubscribe(plan) {
       showToast('Открываем безопасную оплату...');
       const response = await BabyAccount.request(endpoint, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: { plan, terms_accepted: true, recurring_accepted: true }
+        body: {
+          plan,
+          terms_accepted: true,
+          recurring_accepted: true,
+          ...(guestKey ? { guest_key: guestKey } : {})
+        }
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !/^https:\/\//.test(String(data.confirmation_url || ''))) {
@@ -690,10 +719,16 @@ async function resumeWebSubscription() {
 }
 
 async function _manageWebSubscription(action) {
-  if (!_isWebBillingMode() || !BabyAccount.isAuthenticated()) return;
+  if (!_isWebBillingMode()) return;
+  const guestKey = BabyAccount.isAuthenticated() ? '' : _getGuestBillingKey(false);
+  if (!BabyAccount.isAuthenticated() && !guestKey) {
+    showToast('Войдите через Telegram или откройте сайт на устройстве, где оформляли подписку.');
+    return;
+  }
   try {
     const response = await BabyAccount.request(window.BABY_BILLING_SUBSCRIPTION_ENDPOINT, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: { action }
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: { action, ...(guestKey ? { guest_key: guestKey } : {}) }
     });
     if (!response.ok) throw new Error('billing_manage_failed');
     await SUB.refreshPremiumStatus();
