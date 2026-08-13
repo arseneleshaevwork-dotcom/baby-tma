@@ -148,7 +148,7 @@ test('web checkout reflects the selected ruble plan and its consent terms', () =
   assert.match(html, /автоматическим списанием 349 ₽ ежемесячно/);
   assert.match(html, /Перейти к оплате · 349 ₽/);
   assert.match(html, /premiumCheckoutButton[^>]*disabled/);
-  assert.match(html, /Вход в Telegram не нужен/);
+  assert.match(html, /Вход в Telegram не нужен · Premium сохранится в этом браузере/);
 });
 
 test('guest web checkout opens YooKassa without a Telegram login prompt', async () => {

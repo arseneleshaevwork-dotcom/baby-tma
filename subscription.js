@@ -394,7 +394,7 @@ function _renderCheckoutActions(web) {
       </div>
       <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
         ${web
-          ? 'Вход в Telegram не нужен · карта, СБП и банковские приложения'
+          ? 'Вход в Telegram не нужен · Premium сохранится в этом браузере'
           : miniWeb
             ? 'Откроется веб-версия приложения · повторно входить в Telegram не нужно'
             : quarter
