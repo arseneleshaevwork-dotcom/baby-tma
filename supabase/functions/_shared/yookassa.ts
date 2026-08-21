@@ -1,4 +1,5 @@
 import { addBillingMonths, getBillingPlan, rubles, sealBillingSecret } from './billing.mjs';
+import { accruePartnerCommission } from './partners.mjs';
 
 export function getYookassaCredentials() {
   const shopId = Deno.env.get('YOOKASSA_SHOP_ID')?.trim() || undefined;
@@ -192,6 +193,11 @@ export async function applySucceededYookassaPayment({ supabase, payment, encrypt
   if (subscriptionError) throw subscriptionError;
 
   if (newlyPaid) {
+    await accruePartnerCommission({
+      supabase,
+      payment: { ...localPayment, status: 'paid' },
+      paidAt: now
+    });
     await supabase.from('events').insert({
       event_name: 'payment_success',
       user_id: localPayment.user_id,

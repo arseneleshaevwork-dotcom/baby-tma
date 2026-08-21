@@ -32,7 +32,7 @@ const { buildUpcomingBabyDates } = typeof require === 'function'
   ? require('./baby-milestones')
   : { buildUpcomingBabyDates: () => [] };
 
-function buildAdminDashboard({ events = [], babies = [], subscriptions = [], payments = [], billingAgreements = [], billingEvents = [], aiRequests = [], notificationSettings = [], notificationDeliveries = [], scheduleReminders = [], notificationRuns = [], supportRequests = [], generatedAt, rangeDays = 30, now = new Date() } = {}) {
+function buildAdminDashboard({ events = [], babies = [], subscriptions = [], payments = [], billingAgreements = [], billingEvents = [], partners = [], partnerReferrals = [], partnerCommissions = [], partnerPayouts = [], aiRequests = [], notificationSettings = [], notificationDeliveries = [], scheduleReminders = [], notificationRuns = [], supportRequests = [], generatedAt, rangeDays = 30, now = new Date() } = {}) {
   const totals = Object.fromEntries(TRACKED_EVENTS.map(event => [event, 0]));
   const usersByEvent = Object.fromEntries(TRACKED_EVENTS.map(event => [event, new Set()]));
   const userEvents = new Map();
@@ -85,6 +85,7 @@ function buildAdminDashboard({ events = [], babies = [], subscriptions = [], pay
     bot_started_not_opened: botStartedNotOpened,
     sources: buildSources(events),
     billing: buildBilling({ subscriptions, payments, billingAgreements, billingEvents, now }),
+    partners: buildPartners({ partners, referrals: partnerReferrals, commissions: partnerCommissions, payouts: partnerPayouts, now }),
     ai_usage: buildAiUsage(aiRequests),
     operations: buildOperations({ notificationSettings, notificationDeliveries, scheduleReminders, notificationRuns, now }),
     support_requests: supportRequests.map(formatSupportRequest),
@@ -93,6 +94,42 @@ function buildAdminDashboard({ events = [], babies = [], subscriptions = [], pay
     babies: babies.map(formatBaby).sort(byProfileCompleteness),
     upcoming_dates: buildUpcomingBabyDates({ babies, now, horizonDays: 45 }),
     recent_events: [...events].sort(byCreatedDesc).slice(0, 100).map(formatEvent)
+  };
+}
+
+function buildPartners({ partners = [], referrals = [], commissions = [], payouts = [], now = new Date() } = {}) {
+  const nowMs = new Date(now).getTime();
+  const items = partners.map(partner => {
+    const ownReferrals = referrals.filter(item => item.partner_id === partner.id);
+    const ownCommissions = commissions.filter(item => item.partner_id === partner.id);
+    const pending = ownCommissions.filter(item => item.status === 'pending');
+    const paid = ownCommissions.filter(item => item.status === 'paid');
+    const reversed = ownCommissions.filter(item => item.status === 'reversed');
+    const available = pending.filter(item => new Date(item.available_at).getTime() <= nowMs);
+    return {
+      ...partner,
+      referrals: ownReferrals.length,
+      conversions: ownCommissions.length,
+      conversion_rate: ownReferrals.length ? Math.round(ownCommissions.length / ownReferrals.length * 1000) / 10 : 0,
+      gross_rubles: ownCommissions.filter(item => item.status !== 'reversed').reduce((sum, item) => sum + Number(item.amount_minor || 0), 0) / 100,
+      pending_rubles: pending.reduce((sum, item) => sum + Number(item.commission_minor || 0), 0) / 100,
+      available_rubles: available.reduce((sum, item) => sum + Number(item.commission_minor || 0), 0) / 100,
+      paid_rubles: paid.reduce((sum, item) => sum + Number(item.commission_minor || 0), 0) / 100,
+      reversed_rubles: reversed.reduce((sum, item) => sum + Number(item.commission_minor || 0), 0) / 100,
+      payouts: payouts.filter(item => item.partner_id === partner.id && item.status === 'paid').length,
+      last_referral_at: ownReferrals[0]?.captured_at || null
+    };
+  }).sort((a, b) => Number(b.gross_rubles) - Number(a.gross_rubles));
+  return {
+    summary: {
+      active: partners.filter(item => item.status === 'active').length,
+      referrals: referrals.length,
+      conversions: commissions.length,
+      available_rubles: items.reduce((sum, item) => sum + Number(item.available_rubles || 0), 0),
+      paid_rubles: items.reduce((sum, item) => sum + Number(item.paid_rubles || 0), 0),
+      reversed_rubles: items.reduce((sum, item) => sum + Number(item.reversed_rubles || 0), 0)
+    },
+    items
   };
 }
 

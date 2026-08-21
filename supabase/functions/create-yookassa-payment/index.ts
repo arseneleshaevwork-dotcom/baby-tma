@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { authenticateBillingRequest } from '../_shared/billing-auth.ts';
 import { getBillingPlan } from '../_shared/billing.mjs';
 import { clientAddress, corsHeaders, isAllowedOrigin, json, readJsonBody, sha256Hex } from '../_shared/http.ts';
+import { claimPartnerReferral, normalizePartnerCode } from '../_shared/partners.mjs';
 import { getYookassaCredentials, redactPayment, yookassaPaymentBody, yookassaRequest } from '../_shared/yookassa.ts';
 
 Deno.serve(async req => {
@@ -55,6 +56,17 @@ Deno.serve(async req => {
     return json({ ok: false, error: 'billing_consent_required' }, 400, headers);
   }
 
+  const partnerCode = normalizePartnerCode(body?.partner_code);
+  if (partnerCode) {
+    await claimPartnerReferral({
+      supabase,
+      code: partnerCode,
+      userId: auth.user.id,
+      billingIdentityId: auth.telegramId,
+      source: 'web_checkout'
+    });
+  }
+
   const since = new Date(Date.now() - 30 * 60_000).toISOString();
   const { data: pendingPayment } = await supabase.from('payments')
     .select('id,plan,idempotency_key').eq('telegram_id', auth.telegramId).eq('provider', 'yookassa')
@@ -84,7 +96,8 @@ Deno.serve(async req => {
       raw_payload: {
         terms_accepted_at: now,
         terms_version: '2026-08-21',
-        recurring_accepted: recurringEnabled && body?.recurring_accepted === true
+        recurring_accepted: recurringEnabled && body?.recurring_accepted === true,
+        partner_attribution_present: Boolean(partnerCode)
       }
     });
     if (insertError) return json({ ok: false, error: 'payment_create_failed' }, 500, headers);

@@ -149,6 +149,32 @@ test('builds admin totals, funnel and baby table from raw analytics rows', () =>
   assert.strictEqual(dashboard.recent_events[0].event_name, 'premium_opened');
 });
 
+test('builds partner balances with hold, payouts and refunds', () => {
+  const dashboard = buildAdminDashboard({
+    events: [],
+    babies: [],
+    partners: [{ id: 'partner-1', code: 'maria', name: 'Мария', status: 'active' }],
+    partnerReferrals: [
+      { id: 'ref-1', partner_id: 'partner-1', captured_at: '2026-08-01T00:00:00.000Z' },
+      { id: 'ref-2', partner_id: 'partner-1', captured_at: '2026-08-02T00:00:00.000Z' }
+    ],
+    partnerCommissions: [
+      { partner_id: 'partner-1', status: 'pending', amount_minor: 34900, commission_minor: 10470, available_at: '2026-08-15T00:00:00.000Z' },
+      { partner_id: 'partner-1', status: 'paid', amount_minor: 89900, commission_minor: 26970, available_at: '2026-08-16T00:00:00.000Z' },
+      { partner_id: 'partner-1', status: 'reversed', amount_minor: 34900, commission_minor: 10470, available_at: '2026-08-17T00:00:00.000Z' }
+    ],
+    partnerPayouts: [{ partner_id: 'partner-1', status: 'paid' }],
+    now: '2026-08-21T00:00:00.000Z'
+  });
+
+  assert.strictEqual(dashboard.partners.summary.active, 1);
+  assert.strictEqual(dashboard.partners.items[0].referrals, 2);
+  assert.strictEqual(dashboard.partners.items[0].conversions, 3);
+  assert.strictEqual(dashboard.partners.items[0].available_rubles, 104.7);
+  assert.strictEqual(dashboard.partners.items[0].paid_rubles, 269.7);
+  assert.strictEqual(dashboard.partners.items[0].reversed_rubles, 104.7);
+});
+
 function row(eventName, userId, clientId, createdAt, payload = {}, attribution = {}) {
   return {
     id: `${eventName}-${createdAt}`,

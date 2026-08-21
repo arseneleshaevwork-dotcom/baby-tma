@@ -87,9 +87,27 @@ test('captures utm and telegram start parameters for ad attribution', () => {
     utm_content: 'creative_1',
     utm_term: '',
     start_param: 'tg_ad_sleep_test',
+    partner_code: '',
     referrer: ''
   });
   assert.deepStrictEqual(getAttribution({ storage }), queue[0].attribution);
+});
+
+test('keeps first partner attribution across navigation', () => {
+  const storage = makeStorage();
+  const first = getAttribution({
+    storage,
+    location: { href: 'https://example.test/?ref=maria_sleep&utm_source=partner' }
+  });
+  const next = getAttribution({
+    storage,
+    location: { href: 'https://example.test/premium' },
+    documentRef: { referrer: 'https://example.test/' }
+  });
+
+  assert.strictEqual(first.partner_code, 'maria_sleep');
+  assert.strictEqual(next.partner_code, 'maria_sleep');
+  assert.strictEqual(next.utm_source, 'partner');
 });
 
 test('saves baby profile and tracks profile_saved', () => {

@@ -150,7 +150,8 @@ function getAttribution(env = {}) {
   const stored = readStoredAttribution(storage);
   const parsed = parseAttribution({ location: locationRef, telegram, documentRef });
   const hasNewData = Object.values(parsed).some(Boolean);
-  const attribution = hasNewData ? { ...stored, ...parsed } : stored;
+  const newValues = Object.fromEntries(Object.entries(parsed).filter(([, value]) => Boolean(value)));
+  const attribution = hasNewData ? { ...stored, ...newValues } : stored;
   if (storage && hasNewData) storage.setItem(ATTRIBUTION_KEY, JSON.stringify(attribution));
   return attribution;
 }
@@ -163,6 +164,7 @@ function readStoredAttribution(storage) {
     utm_content: '',
     utm_term: '',
     start_param: '',
+    partner_code: '',
     referrer: ''
   };
   if (!storage) return empty;
@@ -183,6 +185,7 @@ function parseAttribution({ location, telegram, documentRef }) {
     utm_content: url.searchParams.get('utm_content') || '',
     utm_term: url.searchParams.get('utm_term') || '',
     start_param: url.searchParams.get('startapp') || url.searchParams.get('tgWebAppStartParam') || tgStartParam || '',
+    partner_code: url.searchParams.get('ref') || '',
     referrer: documentRef && documentRef.referrer ? documentRef.referrer : ''
   };
 }

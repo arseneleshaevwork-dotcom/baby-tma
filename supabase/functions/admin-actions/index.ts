@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { readJsonBody } from '../_shared/http.ts';
+import { normalizePartnerCode } from '../_shared/partners.mjs';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://arseneleshaevwork-dotcom.github.io',
@@ -89,6 +90,48 @@ Deno.serve(async (req) => {
     if (error) return json({ error: 'support_update_failed' }, 500);
     if (!data) return json({ error: 'support_request_not_found' }, 404);
     return json({ ok: true, resolved: true });
+  }
+
+  if (action === 'create_partner') {
+    const code = normalizePartnerCode(body?.code);
+    const name = String(body?.name || '').trim().slice(0, 120);
+    const contact = String(body?.contact || '').trim().slice(0, 160) || null;
+    const commissionBps = Math.max(0, Math.min(5000, Math.round(Number(body?.commission_bps) || 3000)));
+    if (!code || name.length < 2) return json({ error: 'invalid_partner' }, 400);
+    const { data, error } = await supabase.from('partners').insert({
+      code, name, contact, commission_bps: commissionBps, attribution_days: 30, hold_days: 14
+    }).select('id,code,name,contact,status,commission_bps,attribution_days,hold_days').maybeSingle();
+    if (error?.code === '23505') return json({ error: 'partner_code_exists' }, 409);
+    if (error || !data) return json({ error: 'partner_create_failed' }, 500);
+    return json({ ok: true, partner: data });
+  }
+
+  if (action === 'update_partner') {
+    const partnerId = String(body?.partner_id || '');
+    const status = String(body?.status || '');
+    if (!/^[0-9a-f-]{36}$/i.test(partnerId) || !['active', 'paused'].includes(status)) {
+      return json({ error: 'invalid_partner_update' }, 400);
+    }
+    const { data, error } = await supabase.from('partners').update({
+      status, updated_at: new Date().toISOString()
+    }).eq('id', partnerId).select('id,code,name,status').maybeSingle();
+    if (error) return json({ error: 'partner_update_failed' }, 500);
+    if (!data) return json({ error: 'partner_not_found' }, 404);
+    return json({ ok: true, partner: data });
+  }
+
+  if (action === 'record_partner_payout') {
+    const partnerId = String(body?.partner_id || '');
+    const note = String(body?.note || '').trim().slice(0, 500);
+    if (!/^[0-9a-f-]{36}$/i.test(partnerId)) return json({ error: 'invalid_partner_id' }, 400);
+    const { data, error } = await supabase.rpc('record_partner_payout_internal', {
+      p_partner_id: partnerId,
+      p_note: note || null
+    });
+    if (error?.message?.includes('no_available_commissions')) return json({ error: 'partner_payout_minimum_not_reached' }, 409);
+    if (error) return json({ error: 'partner_payout_failed' }, 500);
+    const payout = Array.isArray(data) ? data[0] : data;
+    return json({ ok: true, payout });
   }
 
   if (!Number.isSafeInteger(telegramId) || telegramId <= 0) return json({ error: 'invalid_telegram_id' }, 400);

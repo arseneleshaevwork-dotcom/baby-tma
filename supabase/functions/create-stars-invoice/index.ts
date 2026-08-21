@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { upsertTelegramUser, verifyTelegramInitData } from '../_shared/auth.ts';
 import { corsHeaders, isAllowedOrigin, json, readJsonBody } from '../_shared/http.ts';
+import { claimPartnerReferral, normalizePartnerCode } from '../_shared/partners.mjs';
 
 const PLANS = {
   month: {
@@ -44,6 +45,16 @@ Deno.serve(async (req) => {
   const telegramId = Number(auth.user.id);
   const user = await upsertTelegramUser(supabase, auth.user);
   if (!user?.id) return json({ ok: false, error: 'user_upsert_failed' }, 500, headers);
+  const partnerCode = normalizePartnerCode(body?.partner_code);
+  if (partnerCode) {
+    await claimPartnerReferral({
+      supabase,
+      code: partnerCode,
+      userId: user.id,
+      billingIdentityId: telegramId,
+      source: 'telegram_stars'
+    });
+  }
 
   const recentInvoiceWindow = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   const { count: recentInvoices } = await supabase

@@ -79,7 +79,11 @@ Deno.serve(async (req) => {
     notificationRunsResult,
     supportRequestsResult,
     billingAgreementsResult,
-    billingEventsResult
+    billingEventsResult,
+    partnersResult,
+    partnerReferralsResult,
+    partnerCommissionsResult,
+    partnerPayoutsResult
   ] = await Promise.all([
     supabase
       .from('events')
@@ -146,7 +150,23 @@ Deno.serve(async (req) => {
       .select('provider,event_type,status,error,created_at,processed_at')
       .gte('created_at', since)
       .order('created_at', { ascending: false })
-      .limit(1000)
+      .limit(1000),
+    supabase.from('partners')
+      .select('id,code,name,contact,status,commission_bps,attribution_days,hold_days,created_at,updated_at')
+      .order('created_at', { ascending: false })
+      .limit(1000),
+    supabase.from('partner_referrals')
+      .select('id,partner_id,billing_identity_id,source,captured_at,expires_at')
+      .order('captured_at', { ascending: false })
+      .limit(10000),
+    supabase.from('partner_commissions')
+      .select('id,partner_id,payment_id,payout_id,amount_minor,commission_bps,commission_minor,status,available_at,paid_at,reversed_at,created_at')
+      .order('created_at', { ascending: false })
+      .limit(10000),
+    supabase.from('partner_payouts')
+      .select('id,partner_id,amount_minor,status,commission_count,note,paid_at,created_at')
+      .order('created_at', { ascending: false })
+      .limit(5000)
   ]);
 
   if (eventsResult.error) return json({ error: 'events_query_failed', details: eventsResult.error.message }, 500);
@@ -161,6 +181,10 @@ Deno.serve(async (req) => {
   if (supportRequestsResult.error) return json({ error: 'support_requests_query_failed', details: supportRequestsResult.error.message }, 500);
   if (billingAgreementsResult.error) return json({ error: 'billing_agreements_query_failed', details: billingAgreementsResult.error.message }, 500);
   if (billingEventsResult.error) return json({ error: 'billing_events_query_failed', details: billingEventsResult.error.message }, 500);
+  if (partnersResult.error) return json({ error: 'partners_query_failed', details: partnersResult.error.message }, 500);
+  if (partnerReferralsResult.error) return json({ error: 'partner_referrals_query_failed', details: partnerReferralsResult.error.message }, 500);
+  if (partnerCommissionsResult.error) return json({ error: 'partner_commissions_query_failed', details: partnerCommissionsResult.error.message }, 500);
+  if (partnerPayoutsResult.error) return json({ error: 'partner_payouts_query_failed', details: partnerPayoutsResult.error.message }, 500);
 
   return json(buildDashboard({
     events: eventsResult.data || [],
@@ -175,18 +199,26 @@ Deno.serve(async (req) => {
     supportRequests: supportRequestsResult.data || [],
     billingAgreements: billingAgreementsResult.data || [],
     billingEvents: billingEventsResult.data || [],
+    partners: partnersResult.data || [],
+    partnerReferrals: partnerReferralsResult.data || [],
+    partnerCommissions: partnerCommissionsResult.data || [],
+    partnerPayouts: partnerPayoutsResult.data || [],
     rangeDays,
     generatedAt: new Date().toISOString()
   }));
 });
 
-function buildDashboard({ events, babies, subscriptions = [], payments = [], billingAgreements = [], billingEvents = [], aiRequests = [], notificationSettings = [], notificationDeliveries = [], scheduleReminders = [], notificationRuns = [], supportRequests = [], rangeDays, generatedAt }: {
+function buildDashboard({ events, babies, subscriptions = [], payments = [], billingAgreements = [], billingEvents = [], partners = [], partnerReferrals = [], partnerCommissions = [], partnerPayouts = [], aiRequests = [], notificationSettings = [], notificationDeliveries = [], scheduleReminders = [], notificationRuns = [], supportRequests = [], rangeDays, generatedAt }: {
   events: any[];
   babies: any[];
   subscriptions?: any[];
   payments?: any[];
   billingAgreements?: any[];
   billingEvents?: any[];
+  partners?: any[];
+  partnerReferrals?: any[];
+  partnerCommissions?: any[];
+  partnerPayouts?: any[];
   aiRequests?: any[];
   notificationSettings?: any[];
   notificationDeliveries?: any[];
@@ -246,6 +278,7 @@ function buildDashboard({ events, babies, subscriptions = [], payments = [], bil
     bot_started_not_opened: botStartedNotOpened,
     sources: buildSources(events),
     billing: buildBilling({ subscriptions, payments, billingAgreements, billingEvents }),
+    partners: buildPartners({ partners, referrals: partnerReferrals, commissions: partnerCommissions, payouts: partnerPayouts, now: generatedAt }),
     ai_usage: buildAiUsage(aiRequests),
     operations: buildOperations({ notificationSettings, notificationDeliveries, scheduleReminders, notificationRuns, generatedAt }),
     support_requests: supportRequests.map(formatSupportRequest),
@@ -314,6 +347,46 @@ function buildBilling({ subscriptions = [], payments = [], billingAgreements = [
     quarter_subscriptions: activeSubscriptions.filter(item => item.plan === 'quarter').length,
     legacy_half_year_subscriptions: activeSubscriptions.filter(item => item.plan === 'half_year').length,
     legacy_year_subscriptions: activeSubscriptions.filter(item => item.plan === 'year').length
+  };
+}
+
+function buildPartners({ partners = [], referrals = [], commissions = [], payouts = [], now }: any = {}) {
+  const nowMs = new Date(now || Date.now()).getTime();
+  const rows = partners.map((partner: any) => {
+    const ownReferrals = referrals.filter((item: any) => item.partner_id === partner.id);
+    const ownCommissions = commissions.filter((item: any) => item.partner_id === partner.id);
+    const pending = ownCommissions.filter((item: any) => item.status === 'pending');
+    const paid = ownCommissions.filter((item: any) => item.status === 'paid');
+    const reversed = ownCommissions.filter((item: any) => item.status === 'reversed');
+    const available = pending.filter((item: any) => new Date(item.available_at).getTime() <= nowMs);
+    const grossMinor = ownCommissions
+      .filter((item: any) => item.status !== 'reversed')
+      .reduce((sum: number, item: any) => sum + Number(item.amount_minor || 0), 0);
+    return {
+      ...partner,
+      referrals: ownReferrals.length,
+      conversions: ownCommissions.length,
+      conversion_rate: ownReferrals.length ? Math.round(ownCommissions.length / ownReferrals.length * 1000) / 10 : 0,
+      gross_rubles: grossMinor / 100,
+      pending_rubles: pending.reduce((sum: number, item: any) => sum + Number(item.commission_minor || 0), 0) / 100,
+      available_rubles: available.reduce((sum: number, item: any) => sum + Number(item.commission_minor || 0), 0) / 100,
+      paid_rubles: paid.reduce((sum: number, item: any) => sum + Number(item.commission_minor || 0), 0) / 100,
+      reversed_rubles: reversed.reduce((sum: number, item: any) => sum + Number(item.commission_minor || 0), 0) / 100,
+      payouts: payouts.filter((item: any) => item.partner_id === partner.id && item.status === 'paid').length,
+      last_referral_at: ownReferrals[0]?.captured_at || null
+    };
+  }).sort((a: any, b: any) => Number(b.gross_rubles) - Number(a.gross_rubles));
+
+  return {
+    summary: {
+      active: partners.filter((item: any) => item.status === 'active').length,
+      referrals: referrals.length,
+      conversions: commissions.length,
+      available_rubles: rows.reduce((sum: number, item: any) => sum + Number(item.available_rubles || 0), 0),
+      paid_rubles: rows.reduce((sum: number, item: any) => sum + Number(item.paid_rubles || 0), 0),
+      reversed_rubles: rows.reduce((sum: number, item: any) => sum + Number(item.reversed_rubles || 0), 0)
+    },
+    items: rows
   };
 }
 

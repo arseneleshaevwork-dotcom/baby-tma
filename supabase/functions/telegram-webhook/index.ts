@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { buildBotReply } from './bot-flow.mjs';
 import { readJsonBody } from '../_shared/http.ts';
+import { claimPartnerReferral, normalizePartnerCode } from '../_shared/partners.mjs';
 
 const miniAppUrl = Deno.env.get('MINI_APP_URL') || 'https://arseneleshaevwork-dotcom.github.io/baby-tma/';
 
@@ -51,6 +52,18 @@ Deno.serve(async (req) => {
       }, { onConflict: 'telegram_id' })
       .select('id')
       .single();
+
+    const startPayload = text.startsWith('/start') ? text.trim().split(/\s+/, 2)[1] || '' : '';
+    const partnerCode = /^(?:ref|partner)[_-]/i.test(startPayload) ? normalizePartnerCode(startPayload) : '';
+    if (partnerCode && user?.id) {
+      await claimPartnerReferral({
+        supabase,
+        code: partnerCode,
+        userId: user.id,
+        billingIdentityId: from.id,
+        source: 'telegram_bot'
+      });
+    }
 
     if (message?.successful_payment && user?.id) {
       botReply = await handleSuccessfulPayment({
@@ -170,7 +183,8 @@ Deno.serve(async (req) => {
       payload: {
         action: botReply?.action || 'none',
         command: text.startsWith('/') ? text.split(/\s+/)[0].slice(0, 40) : null,
-        message_length: text.length
+        message_length: text.length,
+        partner_referral: Boolean(partnerCode)
       },
       language: from.language_code || null
     });

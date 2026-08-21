@@ -610,6 +610,7 @@ async function handleStartTrial() {
 
 async function handleSubscribe(plan) {
   if (window.BabyAnalytics) BabyAnalytics.track('subscribe_clicked', { plan });
+  const partnerCode = _getPartnerCode();
 
   if (_isWebBillingMode()) {
     rememberWebBillingConsent();
@@ -642,6 +643,7 @@ async function handleSubscribe(plan) {
           terms_accepted: true,
           recurring_accepted: window.BABY_YOOKASSA_RECURRING_ENABLED === true,
           receipt_email: receiptEmail,
+          ...(partnerCode ? { partner_code: partnerCode } : {}),
           ...(guestKey ? { guest_key: guestKey } : {})
         }
       });
@@ -683,7 +685,7 @@ async function handleSubscribe(plan) {
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan, initData })
+      body: JSON.stringify({ plan, initData, ...(partnerCode ? { partner_code: partnerCode } : {}) })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.invoice_link) {
@@ -706,6 +708,19 @@ async function handleSubscribe(plan) {
     }
   } catch(e) {
     showToast('Оплата временно недоступна. Попробуйте позже.');
+  }
+}
+
+function _getPartnerCode() {
+  try {
+    const attribution = JSON.parse(localStorage.getItem('babymode_attribution') || '{}');
+    const direct = String(attribution.partner_code || '').trim();
+    const startParam = String(attribution.start_param || '').trim();
+    const raw = String(direct || (/^(?:ref|partner)[_-]/i.test(startParam) ? startParam : '')).toLowerCase();
+    const normalized = raw.replace(/^(?:ref|partner)[_-]/, '');
+    return /^[a-z0-9][a-z0-9_-]{2,31}$/.test(normalized) ? normalized : '';
+  } catch (_) {
+    return '';
   }
 }
 

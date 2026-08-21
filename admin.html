@@ -296,6 +296,7 @@
       <button class="admin-tab active" type="button" data-tab="overview">Обзор</button>
       <button class="admin-tab" type="button" data-tab="users">Пользователи</button>
       <button class="admin-tab" type="button" data-tab="billing">Оплата</button>
+      <button class="admin-tab" type="button" data-tab="partners">Партнёры</button>
       <button class="admin-tab" type="button" data-tab="ai">ИИ</button>
       <button class="admin-tab" type="button" data-tab="system">Система</button>
     </nav>
@@ -329,6 +330,17 @@
 
     <section class="grid metrics" id="metrics" data-admin-view="overview"></section>
 
+    <section class="card admin-actions" data-admin-view="partners" hidden>
+      <div class="section-title"><h2>Новый партнёр</h2><span class="muted">30% · 30 дней · холд 14 дней</span></div>
+      <div class="action-row">
+        <label>Имя или канал<input id="partnerName" maxlength="120" placeholder="Мария / Сон малыша"></label>
+        <label>Код ссылки<input id="partnerCode" maxlength="32" placeholder="maria_sleep"></label>
+        <label>Контакт<input id="partnerContact" maxlength="160" placeholder="@username"></label>
+        <button id="createPartner" type="button">Создать</button>
+      </div>
+      <div class="action-result" id="partnerResult">Партнёрские ссылки появятся после создания.</div>
+    </section>
+
     <section class="grid sections">
       <div class="card" data-admin-view="overview">
         <div class="section-title">
@@ -353,6 +365,14 @@
           <span class="muted">Telegram Stars</span>
         </div>
         <div id="billing"></div>
+      </div>
+
+      <div class="card wide" data-admin-view="partners" hidden>
+        <div class="section-title">
+          <h2>Партнёрская программа</h2>
+          <span class="muted">минимальная выплата 1 000 ₽</span>
+        </div>
+        <div id="partners"></div>
       </div>
 
       <div class="card wide" data-admin-view="ai" hidden>
@@ -492,6 +512,8 @@
       events: document.getElementById('events'),
       operations: document.getElementById('operations'),
       supportRequests: document.getElementById('supportRequests'),
+      partners: document.getElementById('partners'),
+      partnerResult: document.getElementById('partnerResult'),
       notificationResult: document.getElementById('notificationResult')
     };
 
@@ -524,6 +546,8 @@
       document.getElementById('checkNotifications').addEventListener('click', () => runNotificationCheck(true));
       document.getElementById('runNotifications').addEventListener('click', () => runNotificationCheck(false));
       document.getElementById('configureBot').addEventListener('click', configureBotCommands);
+      document.getElementById('createPartner').addEventListener('click', createPartner);
+      els.partners.addEventListener('click', handlePartnerClick);
       els.supportRequests.addEventListener('click', event => {
         const button = event.target.closest('[data-resolve-support]');
         if (button) resolveSupportRequest(button.dataset.resolveSupport);
@@ -604,6 +628,7 @@
       renderSupportRequests(data.support_requests || []);
       renderSubscriptions(data.subscriptions || []);
       renderPayments(data.payments || []);
+      renderPartners(data.partners || { summary: {}, items: [] });
       renderUpcomingDates(data.upcoming_dates || []);
       renderSources(data.sources || []);
       currentBabies = data.babies || [];
@@ -855,6 +880,101 @@
           </tbody>
         </table>
       `;
+    }
+
+    function renderPartners(data) {
+      const summary = data.summary || {};
+      const items = data.items || [];
+      if (!items.length) {
+        els.partners.innerHTML = '<div class="empty">Партнёров пока нет</div>';
+        return;
+      }
+      const cards = [
+        ['Активные', number(summary.active), `${number(summary.referrals)} закреплений`],
+        ['Покупки', number(summary.conversions), 'только подтверждённые платежи'],
+        ['К выплате', `${number(summary.available_rubles)} ₽`, 'после 14 дней без возврата'],
+        ['Выплачено', `${number(summary.paid_rubles)} ₽`, `${number(summary.reversed_rubles)} ₽ отменено возвратами`]
+      ];
+      els.partners.innerHTML = `
+        <div class="grid metrics">
+          ${cards.map(([label, value, hint]) => `<article class="card"><div class="metric-label">${escapeHtml(label)}</div><div class="metric-value">${escapeHtml(value)}</div><div class="muted">${escapeHtml(hint)}</div></article>`).join('')}
+        </div>
+        <table>
+          <thead><tr><th>Партнёр</th><th>Ссылки</th><th>Лиды / покупки</th><th>Продажи</th><th>К выплате</th><th>Выплачено</th><th>Статус</th><th></th></tr></thead>
+          <tbody>${items.map(item => {
+            const webLink = `https://arseneleshaevwork-dotcom.github.io/baby-tma/?ref=${encodeURIComponent(item.code)}`;
+            const botLink = `https://t.me/babymode1_bot?start=ref_${encodeURIComponent(item.code)}`;
+            return `<tr>
+              <td><strong>${escapeHtml(item.name)}</strong><br><span class="muted">${escapeHtml(item.contact || item.code)}</span></td>
+              <td><button class="ghost" type="button" data-copy-link="${escapeHtml(webLink)}">Web</button> <button class="ghost" type="button" data-copy-link="${escapeHtml(botLink)}">Bot</button></td>
+              <td>${number(item.referrals)} / ${number(item.conversions)}<br><span class="muted">${number(item.conversion_rate)}%</span></td>
+              <td>${number(item.gross_rubles)} ₽</td>
+              <td><strong>${number(item.available_rubles)} ₽</strong><br><span class="muted">${number(item.pending_rubles)} ₽ всего в холде</span></td>
+              <td>${number(item.paid_rubles)} ₽</td>
+              <td>${statusBadge(item.status, item.status === 'active' ? 'ok' : 'warn')}</td>
+              <td><button class="ghost" type="button" data-partner-status="${item.status === 'active' ? 'paused' : 'active'}" data-partner-id="${escapeHtml(item.id)}">${item.status === 'active' ? 'Пауза' : 'Включить'}</button>${Number(item.available_rubles) >= 1000 ? ` <button type="button" data-partner-payout="${escapeHtml(item.id)}">Выплачено</button>` : ''}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>`;
+    }
+
+    async function createPartner() {
+      const name = document.getElementById('partnerName').value.trim();
+      const code = document.getElementById('partnerCode').value.trim().toLowerCase();
+      const contact = document.getElementById('partnerContact').value.trim();
+      if (name.length < 2 || !/^[a-z0-9][a-z0-9_-]{2,31}$/.test(code)) {
+        els.partnerResult.textContent = 'Укажите имя и код из латинских букв, цифр, _ или -.';
+        return;
+      }
+      const data = await runPartnerAction({ action: 'create_partner', name, code, contact, commission_bps: 3000 });
+      if (!data) return;
+      const webLink = `https://arseneleshaevwork-dotcom.github.io/baby-tma/?ref=${data.partner.code}`;
+      const botLink = `https://t.me/babymode1_bot?start=ref_${data.partner.code}`;
+      els.partnerResult.textContent = `Партнёр создан.\nWeb: ${webLink}\nBot: ${botLink}`;
+      document.getElementById('partnerName').value = '';
+      document.getElementById('partnerCode').value = '';
+      document.getElementById('partnerContact').value = '';
+      loadDashboard();
+    }
+
+    async function handlePartnerClick(event) {
+      const copyButton = event.target.closest('[data-copy-link]');
+      if (copyButton) {
+        await navigator.clipboard.writeText(copyButton.dataset.copyLink);
+        els.partnerResult.textContent = 'Ссылка скопирована.';
+        return;
+      }
+      const statusButton = event.target.closest('[data-partner-status]');
+      if (statusButton) {
+        const data = await runPartnerAction({ action: 'update_partner', partner_id: statusButton.dataset.partnerId, status: statusButton.dataset.partnerStatus });
+        if (data) loadDashboard();
+        return;
+      }
+      const payoutButton = event.target.closest('[data-partner-payout]');
+      if (payoutButton && confirm('Подтвердить, что деньги уже переведены партнёру?')) {
+        const data = await runPartnerAction({ action: 'record_partner_payout', partner_id: payoutButton.dataset.partnerPayout, note: 'Выплата подтверждена в админке' });
+        if (data) {
+          els.partnerResult.textContent = `Выплата отмечена: ${number(Number(data.payout.amount_minor || 0) / 100)} ₽.`;
+          loadDashboard();
+        }
+      }
+    }
+
+    async function runPartnerAction(payload) {
+      const token = els.token.value.trim();
+      if (!token) { els.partnerResult.textContent = 'Нужен код доступа.'; return null; }
+      els.partnerResult.textContent = 'Выполняю...';
+      try {
+        const response = await fetch(ADMIN_ACTIONS_ENDPOINT, {
+          method: 'POST', headers: { 'content-type': 'application/json', 'x-admin-token': token }, body: JSON.stringify(payload)
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || 'request_failed');
+        return data;
+      } catch (error) {
+        els.partnerResult.textContent = error.message === 'partner_code_exists' ? 'Такой код уже используется.' : `Ошибка: ${error.message}`;
+        return null;
+      }
     }
 
     function renderUpcomingDates(items) {

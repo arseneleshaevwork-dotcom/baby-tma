@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { refundedAccessEnd } from '../_shared/billing.mjs';
 import { clientAddress, json, sha256Hex } from '../_shared/http.ts';
 import { applyFailedYookassaPayment, applySucceededYookassaPayment, redactPayment, yookassaRequest } from '../_shared/yookassa.ts';
+import { reversePartnerCommission } from '../_shared/partners.mjs';
 
 Deno.serve(async req => {
   const headers = { 'Cache-Control': 'no-store' };
@@ -119,6 +120,7 @@ async function processRefund(supabase: any, refund: any, payment: any) {
     updated_at: new Date().toISOString()
   })
     .eq('provider', 'yookassa').eq('external_payment_id', String(payment.id || ''));
+  await reversePartnerCommission({ supabase, paymentId: localPayment.id, fullRefund: isFullRefund });
   if (telegramId && isFullRefund) {
     const [{ data: agreement }, { data: subscription }] = await Promise.all([
       supabase.from('billing_agreements').select('id,last_payment_id').eq('provider', 'yookassa').eq('telegram_id', telegramId).maybeSingle(),
