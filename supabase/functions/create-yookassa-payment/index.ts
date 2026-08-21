@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { authenticateBillingRequest } from '../_shared/billing-auth.ts';
 import { getBillingPlan } from '../_shared/billing.mjs';
 import { corsHeaders, isAllowedOrigin, json, sha256Hex } from '../_shared/http.ts';
-import { redactPayment, yookassaPaymentBody, yookassaRequest } from '../_shared/yookassa.ts';
+import { getYookassaCredentials, redactPayment, yookassaPaymentBody, yookassaRequest } from '../_shared/yookassa.ts';
 
 Deno.serve(async req => {
   const headers = corsHeaders(req);
@@ -18,12 +18,14 @@ Deno.serve(async req => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const webAppUrl = Deno.env.get('WEB_APP_URL') || 'https://arseneleshaevwork-dotcom.github.io/baby-tma/';
+  const recurringEnabled = Deno.env.get('YOOKASSA_RECURRING_ENABLED') === 'true';
+  const yookassaCredentials = getYookassaCredentials();
   const missingConfig = [
     ['TELEGRAM_BOT_TOKEN', botToken],
     ['SUPABASE_URL', supabaseUrl],
     ['SUPABASE_SERVICE_ROLE_KEY', serviceRoleKey],
-    ['YOOKASSA_SHOP_ID', Deno.env.get('YOOKASSA_SHOP_ID')],
-    ['YOOKASSA_SECRET_KEY', Deno.env.get('YOOKASSA_SECRET_KEY')]
+    ['YOOKASSA_SHOP_ID', yookassaCredentials.shopId],
+    ['YOOKASSA_SECRET_KEY', yookassaCredentials.secretKey]
   ].filter(([, value]) => !value).map(([name]) => name);
   if (missingConfig.length) {
     return json({ ok: false, error: 'payments_not_configured', missing: missingConfig }, 503, headers);
@@ -45,7 +47,11 @@ Deno.serve(async req => {
   }
   const plan = getBillingPlan(body?.plan);
   if (!plan) return json({ ok: false, error: 'invalid_plan' }, 400, headers);
-  if (body?.terms_accepted !== true || body?.recurring_accepted !== true) {
+  const receiptEmail = String(body?.receipt_email || '').trim().toLowerCase();
+  if (receiptEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(receiptEmail)) {
+    return json({ ok: false, error: 'receipt_email_required' }, 400, headers);
+  }
+  if (body?.terms_accepted !== true || (recurringEnabled && body?.recurring_accepted !== true)) {
     return json({ ok: false, error: 'billing_consent_required' }, 400, headers);
   }
 
@@ -77,8 +83,8 @@ Deno.serve(async req => {
       idempotency_key: idempotencyKey,
       raw_payload: {
         terms_accepted_at: now,
-        terms_version: '2026-08-02',
-        recurring_accepted: true
+        terms_version: '2026-08-21',
+        recurring_accepted: recurringEnabled && body?.recurring_accepted === true
       }
     });
     if (insertError) return json({ ok: false, error: 'payment_create_failed' }, 500, headers);
@@ -95,7 +101,9 @@ Deno.serve(async req => {
         paymentId,
         telegramId: auth.telegramId,
         customerType: auth.customerType,
-        returnUrl: returnUrl.toString()
+        returnUrl: returnUrl.toString(),
+        receiptEmail,
+        savePaymentMethod: recurringEnabled
       })
     });
     const confirmationUrl = String(payment?.confirmation?.confirmation_url || '');
@@ -103,7 +111,13 @@ Deno.serve(async req => {
     await supabase.from('payments').update({
       external_payment_id: String(payment.id), raw_payload: redactPayment(payment), updated_at: new Date().toISOString()
     }).eq('id', paymentId).neq('status', 'paid');
-    return json({ ok: true, confirmation_url: confirmationUrl, payment_id: paymentId, plan: plan.key }, 200, headers);
+    return json({
+      ok: true,
+      confirmation_url: confirmationUrl,
+      payment_id: paymentId,
+      plan: plan.key,
+      recurring: recurringEnabled
+    }, 200, headers);
   } catch (error) {
     await supabase.from('payments').update({
       error_code: error instanceof Error ? error.message.slice(0, 120) : 'provider_error', updated_at: new Date().toISOString()

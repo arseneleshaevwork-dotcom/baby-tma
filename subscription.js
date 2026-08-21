@@ -35,6 +35,7 @@ const SUB = (() => {
   let _plan = null;
   let _cancelAtPeriodEnd = false;
   let _nextBillingAt = null;
+  let _paymentMethodType = null;
   let _trialUsed = false;
 
   function init() {
@@ -103,6 +104,7 @@ const SUB = (() => {
     _plan = active ? subscription.plan || null : null;
     _cancelAtPeriodEnd = active ? Boolean(subscription.cancel_at_period_end) : false;
     _nextBillingAt = active ? subscription.next_billing_at || null : null;
+    _paymentMethodType = active ? subscription.payment_method_type || null : null;
     localStorage.setItem(KEY_PREMIUM, active ? '1' : '0');
     if (_premiumUntil) localStorage.setItem(KEY_PREMIUM_UNTIL, _premiumUntil);
     else localStorage.removeItem(KEY_PREMIUM_UNTIL);
@@ -134,6 +136,7 @@ const SUB = (() => {
   function getPlan() { return _plan; }
   function isCancelling() { return _cancelAtPeriodEnd; }
   function getNextBillingAt() { return _nextBillingAt; }
+  function getPaymentMethodType() { return _paymentMethodType; }
   function hasUsedTrial() { return _trialUsed; }
 
   // Show paywall if feature is locked
@@ -238,7 +241,7 @@ const SUB = (() => {
 
   return {
     init, startTrial, refreshPremiumStatus, can, getStatus, getDaysLeft, getPremiumUntil,
-    isPremium, isTrialActive, getPlanLimits, getSource, getPlan, isCancelling, getNextBillingAt, hasUsedTrial, requirePremium
+    isPremium, isTrialActive, getPlanLimits, getSource, getPlan, isCancelling, getNextBillingAt, getPaymentMethodType, hasUsedTrial, requirePremium
   };
 })();
 window.SUB = SUB;
@@ -275,12 +278,17 @@ function _renderPremiumActive() {
   const isWeb = _isWebBillingMode();
   const source = SUB.getSource();
   const cancelling = SUB.isCancelling();
-  const manage = isWeb && source === 'yookassa' ? `
+  const oneTime = isWeb && source === 'yookassa' && SUB.getPaymentMethodType() === 'one_time';
+  const manage = isWeb && source === 'yookassa' && !oneTime ? `
     <div class="billing-manage">
       <p>${cancelling ? 'Автопродление отключено. Premium продолжит работать до указанной даты.' : 'Следующее списание произойдёт в конце оплаченного периода.'}</p>
       <button class="cta-outline-btn" onclick="${cancelling ? 'resumeWebSubscription' : 'cancelWebSubscription'}();hapticLight()">
         ${cancelling ? 'Возобновить автопродление' : 'Отключить автопродление'}
       </button>
+    </div>` : '';
+  const oneTimeNote = oneTime ? `
+    <div class="billing-manage">
+      <p>Это разовая покупка без автопродления. Premium продолжит работать до указанной даты.</p>
     </div>` : '';
   return `
     <div class="premium-active-card">
@@ -289,6 +297,7 @@ function _renderPremiumActive() {
       <div class="premium-active-sub">${untilText}</div>
     </div>
     <div class="plan-comparison">${_featuresList(true)}</div>
+    ${oneTimeNote}
     ${manage}
   `;
 }
@@ -369,17 +378,27 @@ function _renderPlanCards(rubles) {
 
 function _renderCheckoutActions(web) {
   const miniWeb = !web && _isMiniWebCheckoutMode();
+  const recurring = window.BABY_YOOKASSA_RECURRING_ENABLED === true;
   const plan = _getSelectedPremiumPlan();
   const quarter = plan === 'quarter';
   const price = quarter ? 899 : 349;
   const stars = quarter ? 769 : 299;
   const period = quarter ? '3 месяца' : '1 месяц';
+  const receiptEmail = _receiptEmailValue();
   const consent = web ? `
+    <label class="web-receipt-field">
+      <span>Email для электронного чека</span>
+      <input id="webReceiptEmail" type="email" inputmode="email" autocomplete="email" maxlength="254"
+        placeholder="name@example.ru" value="${_escapeAttribute(receiptEmail)}" oninput="handleReceiptEmailInput(this.value)">
+      <small>Передадим ЮKassa только для отправки чека.</small>
+    </label>
     <label class="web-billing-consent">
       <input id="webBillingConsent" type="checkbox" onchange="handleBillingConsentChange()" ${_webBillingConsentChecked() ? 'checked' : ''}>
-      <span>Соглашаюсь с <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">условиями подписки</a> и автоматическим списанием ${price} ₽ ${quarter ? 'каждые 3 месяца' : 'ежемесячно'} до отмены.</span>
+      <span>Соглашаюсь с <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">условиями подписки</a> и ${recurring
+        ? `автоматическим списанием ${price} ₽ ${quarter ? 'каждые 3 месяца' : 'ежемесячно'} до отмены`
+        : `разовой оплатой ${price} ₽ за ${period} без автопродления`}.</span>
     </label>` : '';
-  const disabled = web && !_webBillingConsentChecked() ? 'disabled' : '';
+  const disabled = web && (!_webBillingConsentChecked() || !_isValidReceiptEmail(receiptEmail)) ? 'disabled' : '';
   return `
     <div id="premiumCheckout" class="premium-checkout">
       ${consent}
@@ -394,7 +413,9 @@ function _renderCheckoutActions(web) {
       </div>
       <p style="text-align:center;font-size:.72rem;color:var(--text-hint);margin-top:8px;font-weight:500;">
         ${web
-          ? 'Вход в Telegram не нужен · Premium сохранится в этом браузере'
+          ? recurring
+            ? 'Вход в Telegram не нужен · автопродлением можно управлять в Premium'
+            : 'Разовая оплата · Premium сохранится в этом браузере · продление вручную'
           : miniWeb
             ? 'Откроется веб-версия приложения · повторно входить в Telegram не нужно'
             : quarter
@@ -417,6 +438,7 @@ function _getSelectedPremiumPlan() {
 function selectPremiumPlan(plan, shouldScroll = true) {
   if (!['month', 'quarter'].includes(plan)) return;
   rememberWebBillingConsent();
+  rememberReceiptEmail();
   _selectedPremiumPlan = plan;
   _writeSessionValue('babymode_selected_plan', plan);
   renderPremiumPage();
@@ -437,7 +459,32 @@ function selectPremiumPlan(plan, shouldScroll = true) {
 function handleBillingConsentChange() {
   rememberWebBillingConsent();
   const button = document.getElementById('premiumCheckoutButton');
-  if (button) button.disabled = !_webBillingConsentChecked();
+  if (button) button.disabled = !_webBillingConsentChecked() || !_isValidReceiptEmail(_receiptEmailValue());
+}
+
+function handleReceiptEmailInput(value) {
+  _writeSessionValue('babymode_receipt_email', String(value || '').trim());
+  const button = document.getElementById('premiumCheckoutButton');
+  if (button) button.disabled = !_webBillingConsentChecked() || !_isValidReceiptEmail(value);
+}
+
+function rememberReceiptEmail() {
+  const input = document.getElementById('webReceiptEmail');
+  if (input) _writeSessionValue('babymode_receipt_email', String(input.value || '').trim());
+}
+
+function _receiptEmailValue() {
+  const input = document.getElementById('webReceiptEmail');
+  return String(input?.value || _readSessionValue('babymode_receipt_email') || '').trim();
+}
+
+function _isValidReceiptEmail(value) {
+  const email = String(value || '').trim();
+  return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
+function _escapeAttribute(value) {
+  return String(value || '').replace(/[&"<>]/g, char => ({ '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' })[char]);
 }
 
 function _renderPaymentMethodSwitch() {
@@ -566,8 +613,14 @@ async function handleSubscribe(plan) {
 
   if (_isWebBillingMode()) {
     rememberWebBillingConsent();
+    rememberReceiptEmail();
     if (!_webBillingConsentChecked()) {
-      showToast('Подтвердите условия подписки и автопродление.');
+      showToast('Подтвердите условия оплаты.');
+      return;
+    }
+    const receiptEmail = _receiptEmailValue();
+    if (!_isValidReceiptEmail(receiptEmail)) {
+      showToast('Укажите корректный email для электронного чека.');
       return;
     }
     const guestKey = window.BabyAccount?.isAuthenticated() ? '' : _getGuestBillingKey(true);
@@ -587,7 +640,8 @@ async function handleSubscribe(plan) {
         body: {
           plan,
           terms_accepted: true,
-          recurring_accepted: true,
+          recurring_accepted: window.BABY_YOOKASSA_RECURRING_ENABLED === true,
+          receipt_email: receiptEmail,
           ...(guestKey ? { guest_key: guestKey } : {})
         }
       });

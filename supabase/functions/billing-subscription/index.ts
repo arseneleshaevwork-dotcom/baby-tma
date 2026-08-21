@@ -23,6 +23,9 @@ Deno.serve(async req => {
     .select('id,plan,status,next_charge_at,current_period_end,cancel_at_period_end,payment_method_type,last_error')
     .eq('provider', 'yookassa').eq('telegram_id', auth.telegramId).maybeSingle();
   if (!agreement) return json({ ok: true, agreement: null }, 200, headers);
+  if (['cancel', 'resume'].includes(action) && agreement.payment_method_type === 'one_time') {
+    return json({ ok: false, error: 'recurring_not_available' }, 409, headers);
+  }
 
   if (action === 'cancel') {
     const { error: agreementError } = await supabase.from('billing_agreements').update({

@@ -1,12 +1,17 @@
 import { addBillingMonths, getBillingPlan, rubles, sealBillingSecret } from './billing.mjs';
 
+export function getYookassaCredentials() {
+  const shopId = Deno.env.get('YOOKASSA_SHOP_ID')?.trim() || undefined;
+  const secretKey = Deno.env.get('YOOKASSA_SECRET_KEY')?.trim() || undefined;
+  return { shopId, secretKey };
+}
+
 export async function yookassaRequest(path: string, options: {
   method?: string;
   body?: any;
   idempotenceKey?: string;
 } = {}) {
-  const shopId = Deno.env.get('YOOKASSA_SHOP_ID');
-  const secretKey = Deno.env.get('YOOKASSA_SECRET_KEY');
+  const { shopId, secretKey } = getYookassaCredentials();
   if (!shopId || !secretKey) throw new Error('yookassa_not_configured');
   const headers: Record<string, string> = {
     Authorization: `Basic ${btoa(`${shopId}:${secretKey}`)}`,
@@ -28,13 +33,15 @@ export async function yookassaRequest(path: string, options: {
   return data;
 }
 
-export function yookassaPaymentBody({ plan, paymentId, telegramId, returnUrl, paymentMethodId, customerType }: {
+export function yookassaPaymentBody({ plan, paymentId, telegramId, returnUrl, paymentMethodId, customerType, receiptEmail, savePaymentMethod = true }: {
   plan: any;
   paymentId: string;
   telegramId: number;
   returnUrl?: string;
   paymentMethodId?: string;
   customerType?: string;
+  receiptEmail?: string;
+  savePaymentMethod?: boolean;
 }) {
   const resolvedCustomerType = customerType === 'guest' || telegramId < 0 ? 'guest' : 'telegram';
   const body: any = {
@@ -46,15 +53,30 @@ export function yookassaPaymentBody({ plan, paymentId, telegramId, returnUrl, pa
       telegram_id: String(telegramId),
       customer_type: resolvedCustomerType,
       plan: plan.key
-    }
+    },
+    ...(receiptEmail ? {
+      receipt: {
+        customer: { email: receiptEmail },
+        items: [{
+          description: `${plan.label} в приложении Режим Малыша`,
+          quantity: 1,
+          amount: { value: rubles(plan.amountMinor), currency: 'RUB' },
+          vat_code: 1,
+          payment_mode: 'full_payment',
+          payment_subject: 'service'
+        }]
+      }
+    } : {})
   };
   if (paymentMethodId) body.payment_method_id = paymentMethodId;
   else {
     body.confirmation = { type: 'redirect', return_url: returnUrl };
-    body.save_payment_method = true;
-    body.merchant_customer_id = resolvedCustomerType === 'guest'
-      ? `web_${Math.abs(telegramId)}`
-      : `tg_${telegramId}`;
+    if (savePaymentMethod) {
+      body.save_payment_method = true;
+      body.merchant_customer_id = resolvedCustomerType === 'guest'
+        ? `web_${Math.abs(telegramId)}`
+        : `tg_${telegramId}`;
+    }
   }
   return body;
 }
@@ -87,10 +109,13 @@ export async function applySucceededYookassaPayment({ supabase, payment, encrypt
       .eq('provider', 'yookassa').eq('telegram_id', telegramId).maybeSingle()
   ]);
   const paymentMethod = payment?.payment_method;
-  const paymentMethodSaved = paymentMethod?.saved === true && paymentMethod?.id;
-  if (!paymentMethodSaved) throw new Error('payment_method_not_saved');
-  const ciphertext = await sealBillingSecret(String(paymentMethod.id), encryptionSecret);
-  const keepCancelled = Boolean(existingAgreement?.cancel_at_period_end || existingAgreement?.status === 'cancelled');
+  const recurringEnabled = Boolean(paymentMethod?.saved === true && paymentMethod?.id);
+  const ciphertext = await sealBillingSecret(recurringEnabled ? String(paymentMethod.id) : 'one_time', encryptionSecret);
+  const keepCancelled = !recurringEnabled
+    || Boolean(existingAgreement?.cancel_at_period_end || existingAgreement?.status === 'cancelled');
+  const paymentMethodType = recurringEnabled
+    ? String(paymentMethod.type || '').slice(0, 40) || null
+    : 'one_time';
   let currentPeriodStart = localPayment.access_period_start;
   let currentPeriodEnd = localPayment.access_period_end;
   let newlyPaid = false;
@@ -138,7 +163,7 @@ export async function applySucceededYookassaPayment({ supabase, payment, encrypt
     amount_minor: plan.amountMinor,
     currency: 'RUB',
     payment_method_ciphertext: ciphertext,
-    payment_method_type: String(paymentMethod.type || '').slice(0, 40) || null,
+    payment_method_type: paymentMethodType,
     next_charge_at: currentPeriodEnd,
     current_period_end: currentPeriodEnd,
     cancel_at_period_end: keepCancelled,
@@ -160,7 +185,7 @@ export async function applySucceededYookassaPayment({ supabase, payment, encrypt
     cancel_at_period_end: keepCancelled,
     next_billing_at: keepCancelled ? null : currentPeriodEnd,
     last_payment_at: now.toISOString(),
-    payment_method_type: String(paymentMethod.type || '').slice(0, 40) || null,
+    payment_method_type: paymentMethodType,
     last_error: null,
     updated_at: now.toISOString()
   }, { onConflict: 'telegram_id' });
@@ -171,10 +196,10 @@ export async function applySucceededYookassaPayment({ supabase, payment, encrypt
       event_name: 'payment_success',
       user_id: localPayment.user_id,
       telegram_id: telegramId > 0 ? telegramId : null,
-      payload: { provider: 'yookassa', plan: plan.key, amount_minor: plan.amountMinor }
+      payload: { provider: 'yookassa', plan: plan.key, amount_minor: plan.amountMinor, recurring: recurringEnabled }
     });
   }
-  return { alreadyProcessed: !newlyPaid, currentPeriodEnd };
+  return { alreadyProcessed: !newlyPaid, currentPeriodEnd, recurring: recurringEnabled };
 }
 
 export async function applyFailedYookassaPayment({ supabase, payment }: { supabase: any; payment: any }) {
@@ -220,6 +245,7 @@ export function redactPayment(payment: any) {
       issuer_country: copy.payment_method.card.issuer_country || null
     };
   }
+  delete copy.receipt;
   delete copy.authorization_details;
   return copy;
 }

@@ -6,5 +6,6 @@ window.BABY_WEB_AUTH_ENDPOINT = 'https://jfyprwisnrubhhowipdm.functions.supabase
 window.BABY_SYNC_ENDPOINT = 'https://jfyprwisnrubhhowipdm.functions.supabase.co/sync-data';
 window.BABY_CREATE_YOOKASSA_PAYMENT_ENDPOINT = 'https://jfyprwisnrubhhowipdm.functions.supabase.co/create-yookassa-payment';
 window.BABY_BILLING_SUBSCRIPTION_ENDPOINT = 'https://jfyprwisnrubhhowipdm.functions.supabase.co/billing-subscription';
+window.BABY_YOOKASSA_RECURRING_ENABLED = false;
 window.BABY_TELEGRAM_LOGIN_CLIENT_ID = '8999375510';
 window.BABY_WEB_APP_URL = 'https://arseneleshaevwork-dotcom.github.io/baby-tma/';

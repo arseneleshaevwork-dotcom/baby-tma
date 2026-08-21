@@ -145,10 +145,11 @@ test('web checkout reflects the selected ruble plan and its consent terms', () =
   vm.runInContext("selectPremiumPlan('month', false)", context);
   const html = vm.runInContext('_renderFreePage()', context);
   assert.match(html, /1 месяц · 349 ₽/);
-  assert.match(html, /автоматическим списанием 349 ₽ ежемесячно/);
+  assert.match(html, /разовой оплатой 349 ₽ за 1 месяц без автопродления/);
+  assert.match(html, /Email для электронного чека/);
   assert.match(html, /Перейти к оплате · 349 ₽/);
   assert.match(html, /premiumCheckoutButton[^>]*disabled/);
-  assert.match(html, /Вход в Telegram не нужен · Premium сохранится в этом браузере/);
+  assert.match(html, /Разовая оплата · Premium сохранится в этом браузере · продление вручную/);
 });
 
 test('guest web checkout opens YooKassa without a Telegram login prompt', async () => {
@@ -168,7 +169,11 @@ test('guest web checkout opens YooKassa without a Telegram login prompt', async 
     }
   };
   context.BabyAccount = context.window.BabyAccount;
-  context.document.getElementById = id => id === 'webBillingConsent' ? { checked: true } : null;
+  context.document.getElementById = id => {
+    if (id === 'webBillingConsent') return { checked: true };
+    if (id === 'webReceiptEmail') return { value: 'parent@example.ru' };
+    return null;
+  };
   loadSubscription(context);
 
   assert.match(vm.runInContext('_getGuestBillingKey(true)', context), /^[A-Za-z0-9_-]{43}$/);
@@ -179,6 +184,8 @@ test('guest web checkout opens YooKassa without a Telegram login prompt', async 
   assert.strictEqual(context.webCheckoutRequest.url, 'https://example.test/create-yookassa-payment');
   assert.match(context.webCheckoutRequest.body.guest_key, /^[A-Za-z0-9_-]{43}$/);
   assert.strictEqual(context.webCheckoutRequest.body.plan, 'month');
+  assert.strictEqual(context.webCheckoutRequest.body.recurring_accepted, false);
+  assert.strictEqual(context.webCheckoutRequest.body.receipt_email, 'parent@example.ru');
   assert.strictEqual(context.assignedLocation, 'https://yookassa.test/checkout/123');
 });
 

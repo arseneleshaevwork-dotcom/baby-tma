@@ -159,6 +159,27 @@
 body.web-auth-modal-open { overflow:hidden; }
 .profile-menu button > b { white-space:nowrap; font-size:.72rem; }
 
+.web-receipt-field {
+  display:grid;
+  gap:6px;
+  margin:14px 0 10px;
+  color:var(--text-dark);
+  font-size:.76rem;
+  font-weight:800;
+}
+.web-receipt-field input {
+  width:100%;
+  min-height:46px;
+  padding:10px 12px;
+  border:1px solid var(--border-soft);
+  border-radius:8px;
+  background:#fff;
+  color:var(--text-dark);
+  font:700 .86rem 'Nunito',sans-serif;
+  box-sizing:border-box;
+}
+.web-receipt-field input:focus { border-color:var(--clr-primary); outline:2px solid color-mix(in srgb,var(--clr-primary) 20%,transparent); }
+.web-receipt-field small { color:var(--text-hint); font-size:.68rem; font-weight:600; }
 .web-billing-consent {
   display:flex;
   align-items:flex-start;

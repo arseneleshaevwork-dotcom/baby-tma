@@ -81,8 +81,9 @@ Deno.serve(async (req) => {
     }).eq('telegram_id', telegramId).eq('source', 'yookassa');
   } else if (action === 'resume_billing') {
     const { data: agreement } = await supabase.from('billing_agreements')
-      .select('current_period_end').eq('telegram_id', telegramId).eq('provider', 'yookassa').maybeSingle();
+      .select('current_period_end,payment_method_type').eq('telegram_id', telegramId).eq('provider', 'yookassa').maybeSingle();
     if (!agreement || new Date(agreement.current_period_end).getTime() <= Date.now()) return json({ error: 'billing_period_expired' }, 409);
+    if (agreement.payment_method_type === 'one_time') return json({ error: 'recurring_not_available' }, 409);
     await supabase.from('billing_agreements').update({
       status: 'active', cancel_at_period_end: false, next_charge_at: agreement.current_period_end,
       retry_count: 0, last_error: null, updated_at: new Date().toISOString()
