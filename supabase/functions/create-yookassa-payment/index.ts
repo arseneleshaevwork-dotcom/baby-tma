@@ -18,8 +18,15 @@ Deno.serve(async req => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const webAppUrl = Deno.env.get('WEB_APP_URL') || 'https://arseneleshaevwork-dotcom.github.io/baby-tma/';
-  if (!botToken || !supabaseUrl || !serviceRoleKey || !Deno.env.get('YOOKASSA_SHOP_ID') || !Deno.env.get('YOOKASSA_SECRET_KEY')) {
-    return json({ ok: false, error: 'payments_not_configured' }, 503, headers);
+  const missingConfig = [
+    ['TELEGRAM_BOT_TOKEN', botToken],
+    ['SUPABASE_URL', supabaseUrl],
+    ['SUPABASE_SERVICE_ROLE_KEY', serviceRoleKey],
+    ['YOOKASSA_SHOP_ID', Deno.env.get('YOOKASSA_SHOP_ID')],
+    ['YOOKASSA_SECRET_KEY', Deno.env.get('YOOKASSA_SECRET_KEY')]
+  ].filter(([, value]) => !value).map(([name]) => name);
+  if (missingConfig.length) {
+    return json({ ok: false, error: 'payments_not_configured', missing: missingConfig }, 503, headers);
   }
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const forwardedIp = String(req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || 'unknown')
