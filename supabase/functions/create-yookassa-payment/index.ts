@@ -1,7 +1,7 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { authenticateBillingRequest } from '../_shared/billing-auth.ts';
 import { getBillingPlan } from '../_shared/billing.mjs';
-import { corsHeaders, isAllowedOrigin, json, sha256Hex } from '../_shared/http.ts';
+import { clientAddress, corsHeaders, isAllowedOrigin, json, readJsonBody, sha256Hex } from '../_shared/http.ts';
 import { getYookassaCredentials, redactPayment, yookassaPaymentBody, yookassaRequest } from '../_shared/yookassa.ts';
 
 Deno.serve(async req => {
@@ -10,9 +10,6 @@ Deno.serve(async req => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers });
   if (req.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405, headers);
   if (origin && !isAllowedOrigin(origin)) return json({ ok: false, error: 'origin_not_allowed' }, 403, headers);
-  if (Number(req.headers.get('content-length') || 0) > 20_000) {
-    return json({ ok: false, error: 'payload_too_large' }, 413, headers);
-  }
 
   const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
@@ -31,8 +28,7 @@ Deno.serve(async req => {
     return json({ ok: false, error: 'payments_not_configured', missing: missingConfig }, 503, headers);
   }
   const supabase = createClient(supabaseUrl, serviceRoleKey);
-  const forwardedIp = String(req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || 'unknown')
-    .split(',')[0].trim();
+  const forwardedIp = clientAddress(req);
   const fingerprint = await sha256Hex(`${serviceRoleKey}:${forwardedIp}:${String(req.headers.get('user-agent') || '').slice(0, 180)}`);
   const { data: withinQuota, error: quotaError } = await supabase.rpc('consume_analytics_quota', {
     p_key_hash: `billing:${fingerprint}`,
@@ -40,7 +36,11 @@ Deno.serve(async req => {
   });
   if (quotaError) return json({ ok: false, error: 'rate_limit_unavailable' }, 503, headers);
   if (!withinQuota) return json({ ok: false, error: 'payment_rate_limit' }, 429, headers);
-  const body = await req.json().catch(() => ({}));
+  const parsedBody = await readJsonBody(req, 20_000);
+  if (!parsedBody.ok) {
+    return json({ ok: false, error: parsedBody.error }, parsedBody.error === 'payload_too_large' ? 413 : 400, headers);
+  }
+  const body = parsedBody.value;
   const auth = await authenticateBillingRequest({ req, body, supabase, botToken, createGuest: true });
   if (!auth.ok || !['web_session', 'billing_guest'].includes(auth.method)) {
     return json({ ok: false, error: auth.error || 'billing_identity_required' }, 401, headers);
@@ -120,8 +120,10 @@ Deno.serve(async req => {
     }, 200, headers);
   } catch (error) {
     await supabase.from('payments').update({
-      error_code: error instanceof Error ? error.message.slice(0, 120) : 'provider_error', updated_at: new Date().toISOString()
-    }).eq('id', paymentId);
+      status: 'failed',
+      error_code: error instanceof Error ? error.message.slice(0, 120) : 'provider_error',
+      updated_at: new Date().toISOString()
+    }).eq('id', paymentId).neq('status', 'paid');
     return json({ ok: false, error: 'provider_unavailable' }, 502, headers);
   }
 });

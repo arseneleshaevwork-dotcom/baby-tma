@@ -1,6 +1,5 @@
 const DEFAULT_ORIGINS = [
-  'https://arseneleshaevwork-dotcom.github.io',
-  'https://thanhtrucbc12-oss.github.io'
+  'https://arseneleshaevwork-dotcom.github.io'
 ];
 
 export function allowedOrigins() {
@@ -35,6 +34,38 @@ export function json(data: unknown, status: number, headers: Record<string, stri
     status,
     headers: { ...headers, 'Content-Type': 'application/json; charset=utf-8' }
   });
+}
+
+export async function readJsonBody(req: Request, maxBytes = 20_000) {
+  const declaredLength = Number(req.headers.get('content-length') || 0);
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    return { ok: false as const, error: 'payload_too_large' };
+  }
+  let raw = '';
+  try {
+    raw = await req.text();
+  } catch (_) {
+    return { ok: false as const, error: 'invalid_json' };
+  }
+  if (new TextEncoder().encode(raw).byteLength > maxBytes) {
+    return { ok: false as const, error: 'payload_too_large' };
+  }
+  if (!raw.trim()) return { ok: true as const, value: {} };
+  try {
+    return { ok: true as const, value: JSON.parse(raw) };
+  } catch (_) {
+    return { ok: false as const, error: 'invalid_json' };
+  }
+}
+
+export function clientAddress(req: Request) {
+  const cloudflare = String(req.headers.get('cf-connecting-ip') || '').trim();
+  if (cloudflare) return cloudflare.slice(0, 100);
+  const forwarded = String(req.headers.get('x-forwarded-for') || '')
+    .split(',')
+    .map(value => value.trim())
+    .filter(Boolean);
+  return (forwarded[forwarded.length - 1] || 'unknown').slice(0, 100);
 }
 
 export function timingSafeEqual(a: string, b: string) {

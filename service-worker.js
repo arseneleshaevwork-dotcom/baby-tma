@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baby-mode-v20260813-3';
+const CACHE_NAME = 'baby-mode-v20260821-4';
 const APP_SHELL = [
   './', './index.html', './style.css', './analytics-config.js', './analytics.js', './tma.js',
   './web-account.js', './cloud-sync.js', './pwa.js', './chat.js', './sleep-intelligence.js',
@@ -23,10 +23,13 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
   if (request.mode === 'navigate') {
     event.respondWith(fetch(request).then(response => {
-      const copy = response.clone();
-      caches.open(CACHE_NAME).then(cache => cache.put('./index.html', copy));
+      const appPath = /\/(?:baby-tma\/)?(?:|index\.html)$/.test(url.pathname);
+      if (response.ok && appPath) {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put('./index.html', copy));
+      }
       return response;
-    }).catch(() => caches.match('./index.html')));
+    }).catch(() => caches.match(request).then(cached => cached || caches.match('./index.html'))));
     return;
   }
   event.respondWith(caches.match(request).then(cached => cached || fetch(request).then(response => {

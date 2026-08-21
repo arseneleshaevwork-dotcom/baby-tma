@@ -709,6 +709,8 @@ function loadJsPdf() {
     const script = document.createElement('script');
     script.dataset.jspdfLoader = '1';
     script.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+    script.integrity = 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk';
+    script.crossOrigin = 'anonymous';
     script.onload = () => window.jspdf?.jsPDF ? resolve(window.jspdf.jsPDF) : reject(new Error('jspdf_missing'));
     script.onerror = () => reject(new Error('jspdf_load_failed'));
     document.head.appendChild(script);

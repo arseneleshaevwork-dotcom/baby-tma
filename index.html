@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://telegram.org https://oauth.telegram.org https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' https://jfyprwisnrubhhowipdm.functions.supabase.co; frame-src https://oauth.telegram.org; worker-src 'self' blob:; manifest-src 'self'">
 <title>Малыш в ритме — веб-версия «Режим Малыша»</title>
 <meta name="description" content="Веб-версия «Режим Малыша»: режим дня, дневник сна и персональные подсказки для родителей малышей.">
 <meta name="theme-color" content="#5B5863">
@@ -37,7 +38,7 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
 </script>
 
 <!-- Lucide icon system -->
-<script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.468.0/dist/umd/lucide.min.js" integrity="sha384-uTYyvsSSUZeaPhb5RbKlQa0zY/WpX/QHfvg2mczXyBQOpkWPEDy9lczyp+w7SKXu" crossorigin="anonymous" defer></script>
 
 <!-- Google Fonts — Nunito (non-blocking) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -609,7 +610,7 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
     <button id="profileInstallRow" style="display:none" onclick="BabyPWA.install();hapticLight()"><span>＋</span><div><strong>Добавить на главный экран</strong><small>Открывать как обычное приложение</small></div><b>›</b></button>
     <button onclick="openSupport();hapticLight()"><span>💬</span><div><strong>Поддержка</strong><small>Написать в Telegram</small></div><b>›</b></button>
     <button onclick="window.open('privacy.html','_blank','noopener');hapticLight()"><span>🔐</span><div><strong>Конфиденциальность</strong><small>Как хранятся и используются данные</small></div><b>›</b></button>
-    <button onclick="window.open('terms.html','_blank','noopener');hapticLight()"><span>§</span><div><strong>Условия подписки</strong><small>Оплата, автопродление и отмена</small></div><b>›</b></button>
+    <button onclick="window.open('terms.html','_blank','noopener');hapticLight()"><span>§</span><div><strong>Условия подписки</strong><small>Оплата, сроки и возврат</small></div><b>›</b></button>
     <button class="danger-row" onclick="confirmDeleteLocalData();hapticLight()"><span>🗑</span><div><strong>Удалить данные с устройства</strong><small>Очистить профиль и дневник</small></div><b>›</b></button>
   </div>
 </div>
@@ -713,6 +714,31 @@ function refreshIcons() {
   window.lucide.createIcons({ attrs: { 'aria-hidden': 'true' } });
 }
 
+function _escapeUiHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, function(char) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char];
+  });
+}
+
+function _sanitizeBabyName(value) {
+  return String(value || '').replace(/[^а-яёА-ЯЁa-zA-Z\s-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
+}
+
+function _sanitizeTodayScheduleBlocks(value) {
+  var allowedTags = ['sleep', 'feed', 'active', 'hygiene', 'walk'];
+  return (Array.isArray(value) ? value : []).slice(0, 40).map(function(block) {
+    var time = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(block && block.time || '')) ? String(block.time) : '';
+    var tag = allowedTags.includes(String(block && block.tag || '')) ? String(block.tag) : 'active';
+    var title = String(block && block.title || '').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 120);
+    var note = String(block && block.note || '').replace(/[<>\u0000-\u001f]/g, '').trim().slice(0, 240);
+    return time && title ? { time:time, tag:tag, title:title, note:note } : null;
+  }).filter(Boolean);
+}
+
+function _isSafeBabyPhotoDataUrl(value) {
+  return /^data:image\/(?:png|jpeg|webp|gif);base64,[a-z0-9+/=]+$/i.test(String(value || ''));
+}
+
 var _chartLibraryPromise = null;
 function ensureChartLibrary() {
   if (window.Chart) return Promise.resolve(window.Chart);
@@ -720,6 +746,8 @@ function ensureChartLibrary() {
   _chartLibraryPromise = new Promise(function(resolve, reject) {
     var script = document.createElement('script');
     script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    script.integrity = 'sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g';
+    script.crossOrigin = 'anonymous';
     script.async = true;
     script.onload = function() { resolve(window.Chart); };
     script.onerror = function() { reject(new Error('chart_load_failed')); };
@@ -805,7 +833,7 @@ function generateAndSwitch() {
 }
 
 function renderTodayPlan() {
-  var blocks = getTodayScheduleBlocks();
+  var blocks = _sanitizeTodayScheduleBlocks(getTodayScheduleBlocks());
   var card = document.getElementById('todayPlanCard');
   var list = document.getElementById('todayPlanList');
   var title = document.getElementById('todayMainTitle');
@@ -882,9 +910,9 @@ function renderTodayPlan() {
   list.innerHTML = important.map(function(b) {
     var icon = b.tag === 'sleep' ? 'moon' : b.tag === 'feed' ? 'milk' : b.tag === 'walk' ? 'trees' : 'clock-3';
     return '<div class="today-step">'
-      + '<div class="today-step-time">' + b.time + '</div>'
+      + '<div class="today-step-time">' + _escapeUiHtml(b.time) + '</div>'
       + '<div class="today-step-icon today-step-' + b.tag + '"><i data-lucide="' + icon + '"></i></div>'
-      + '<div><strong>' + b.title + '</strong><span>' + b.note + '</span></div>'
+      + '<div><strong>' + _escapeUiHtml(b.title) + '</strong><span>' + _escapeUiHtml(b.note) + '</span></div>'
       + '</div>';
   }).join('');
   card.style.display = important.length ? 'block' : 'none';
@@ -899,9 +927,9 @@ function getTodayScheduleBlocks() {
   try {
     var saved = JSON.parse(localStorage.getItem('babymode_today_schedule_v1') || 'null');
     if (saved && saved.date === today && Array.isArray(saved.blocks)) {
-      window._lastBlocks = saved.blocks;
+      window._lastBlocks = _sanitizeTodayScheduleBlocks(saved.blocks);
       window._lastBlocksDate = today;
-      return saved.blocks;
+      return window._lastBlocks;
     }
   } catch(e) {}
   window._lastBlocks = [];
@@ -932,9 +960,14 @@ function editBabyPhoto() {
   input.onchange = function(e) {
     var file = e.target.files[0];
     if (!file) return;
+    if (!/^image\/(png|jpeg|webp|gif)$/i.test(file.type) || file.size > 5 * 1024 * 1024) {
+      showToast('Выберите PNG, JPEG, WebP или GIF до 5 МБ');
+      return;
+    }
     var reader = new FileReader();
     reader.onload = function(ev) {
       var b64 = ev.target.result;
+      if (!_isSafeBabyPhotoDataUrl(b64)) { showToast('Не удалось прочитать фото'); return; }
       localStorage.setItem('babymode_photo', b64);
       _applyBabyPhoto(b64);
       if (typeof hapticSuccess === 'function') hapticSuccess();
@@ -949,7 +982,7 @@ function _applyBabyPhoto(b64) {
   var img = document.getElementById('babyAvatarImg');
   var emoji = document.getElementById('babyAvatarEmoji');
   if (!img) return;
-  if (b64) {
+  if (b64 && _isSafeBabyPhotoDataUrl(b64)) {
     img.src = b64; img.style.display = 'block';
     if (emoji) emoji.style.display = 'none';
   } else {
@@ -959,7 +992,7 @@ function _applyBabyPhoto(b64) {
   // Also update share card
   var sa = document.getElementById('shareCardAvatar');
   if (sa) {
-    if (b64) {
+    if (b64 && _isSafeBabyPhotoDataUrl(b64)) {
       sa.style.backgroundImage = 'url(' + b64 + ')';
       sa.style.backgroundSize = 'cover';
       sa.textContent = '';
@@ -1164,7 +1197,7 @@ function openShareCard() {
   if (scTitle) scTitle.textContent = name ? ('Режим дня — ' + name) : 'Режим дня малыша';
   var photo = localStorage.getItem('babymode_photo');
   var sa = document.getElementById('shareCardAvatar');
-  if (sa && photo) { sa.style.backgroundImage = 'url('+photo+')'; sa.style.backgroundSize='cover'; sa.textContent=''; }
+  if (sa && _isSafeBabyPhotoDataUrl(photo)) { sa.style.backgroundImage = 'url('+photo+')'; sa.style.backgroundSize='cover'; sa.textContent=''; }
 }
 
 function closeShareModal() {
@@ -1472,7 +1505,10 @@ function renderProfilePage() {
   var nameInput = document.getElementById('profileBabyName');
   var birthInput = document.getElementById('profileBabyBirthdate');
   if (nameInput) nameInput.value = name;
-  if (birthInput) birthInput.value = birthdate;
+  if (birthInput) {
+    birthInput.max = new Date().toISOString().slice(0, 10);
+    birthInput.value = birthdate;
+  }
   var title = document.getElementById('profileTitle');
   var ageText = document.getElementById('profileAge');
   if (title) title.textContent = name || 'Профиль малыша';
@@ -1497,10 +1533,13 @@ function renderProfilePage() {
 }
 
 function saveProfileSettings() {
-  var name = (document.getElementById('profileBabyName')?.value || '').trim();
+  var name = _sanitizeBabyName(document.getElementById('profileBabyName')?.value || '');
   var birthdate = document.getElementById('profileBabyBirthdate')?.value || '';
   if (!name) { showToast('Укажите имя малыша'); return; }
-  if (birthdate && new Date(birthdate + 'T00:00:00') > new Date()) { showToast('Дата рождения не может быть в будущем'); return; }
+  if (birthdate && (!window.BabyMilestones || !BabyMilestones.isValidBirthdate(birthdate, new Date()))) {
+    showToast('Проверьте дату рождения');
+    return;
+  }
   localStorage.setItem('babymode_baby_name', name);
   if (birthdate) localStorage.setItem('babymode_baby_birthdate', birthdate);
   else localStorage.removeItem('babymode_baby_birthdate');
@@ -1559,7 +1598,7 @@ function importBackupData() {
           var safeName = profile.name.replace(/[^а-яёА-ЯЁa-zA-Z\s-]/g, '').trim().slice(0, 40);
           if (safeName) localStorage.setItem('babymode_baby_name', safeName);
         }
-        if (/^\d{4}-\d{2}-\d{2}$/.test(String(profile.birthdate || '')) && new Date(profile.birthdate + 'T00:00:00') <= new Date()) localStorage.setItem('babymode_baby_birthdate', profile.birthdate);
+        if (window.BabyMilestones?.isValidBirthdate(profile.birthdate, new Date())) localStorage.setItem('babymode_baby_birthdate', profile.birthdate);
         if (/^\d{1,2}$/.test(String(profile.age_months || ''))) localStorage.setItem('babymode_last_age', String(Math.min(36, Math.max(1, Number(profile.age_months)))));
         var settings = data.settings || {};
         if (/^\d{2}:\d{2}$/.test(String(settings.wake_time || ''))) localStorage.setItem('babymode_wake_time', settings.wake_time);
@@ -1648,7 +1687,7 @@ window.addEventListener('DOMContentLoaded', function() {
   var savedBirth = localStorage.getItem('babymode_baby_birthdate');
   var savedWake  = localStorage.getItem('babymode_wake_time');
   var savedFeed  = localStorage.getItem('babymode_feed_type');
-  if (savedPhoto) _applyBabyPhoto(savedPhoto);
+  if (_isSafeBabyPhotoDataUrl(savedPhoto)) _applyBabyPhoto(savedPhoto);
   if (savedBirth && window.BabyMilestones) {
     var age = BabyMilestones.getBabyAgeMonths(savedBirth, new Date());
     if (age !== null) localStorage.setItem('babymode_last_age', String(age));

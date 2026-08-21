@@ -1,6 +1,6 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { authenticateBillingRequest } from '../_shared/billing-auth.ts';
-import { corsHeaders, isAllowedOrigin, json } from '../_shared/http.ts';
+import { corsHeaders, isAllowedOrigin, json, readJsonBody } from '../_shared/http.ts';
 
 Deno.serve(async (req) => {
   const headers = corsHeaders(req);
@@ -16,7 +16,9 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: 'server_not_configured' }, 500, headers);
   }
 
-  const body = await req.json().catch(() => ({}));
+  const parsedBody = await readJsonBody(req, 20_000);
+  if (!parsedBody.ok) return json({ ok: false, error: parsedBody.error }, parsedBody.error === 'payload_too_large' ? 413 : 400, headers);
+  const body = parsedBody.value;
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const auth = await authenticateBillingRequest({ req, body, supabase, botToken });
   if (!auth.ok) return json({ ok: false, error: auth.error || 'auth_failed' }, 401, headers);

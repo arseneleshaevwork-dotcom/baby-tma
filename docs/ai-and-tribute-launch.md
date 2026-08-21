@@ -16,7 +16,7 @@ Pilot capacity target: up to 500 registered users, 30-100 daily active users and
 1. Create a separate Nous Portal/Hermes identity for the product. Do not reuse the personal assistant profile.
 2. Authorize that identity on the VPS under a separate Linux account.
 3. Run its OpenAI-compatible API on localhost only, with terminal, filesystem, browser, memory and messaging tools disabled.
-4. Set `BABY_AGENT_PROVIDER_URL`, `BABY_AGENT_PROVIDER_MODEL` and, if required, `BABY_AGENT_PROVIDER_KEY` in `/etc/baby-agent.env`.
+4. Set `BABY_AGENT_PROVIDER_URL` to the loopback proxy (for example `http://127.0.0.1:8645`), plus `BABY_AGENT_PROVIDER_MODEL` and, if required, `BABY_AGENT_PROVIDER_KEY` in `/etc/baby-agent.env`.
 5. Restart `baby-agent.service`, confirm `/health` reports `provider_configured: true`, then test safety, diary and provider-failure fallback.
 6. Watch p95 latency, failures and answer feedback in the admin dashboard for at least one week before raising limits.
 
@@ -29,14 +29,14 @@ The launch uses one Premium entitlement with two compliant checkout paths:
 
 The offers are:
 
-- Web monthly: 349 RUB, recurring every month.
-- Web quarter: 899 RUB, recurring every three calendar months.
+- Web monthly: one-time 349 RUB for one month; renewal is manual.
+- Web quarter: one-time 899 RUB for three months; renewal is manual.
 - Telegram monthly: 299 Stars, recurring every 30 days.
 - Telegram quarter: 769 Stars, one-time access for 90 days.
 
 The quarter offer in Stars is intentionally one-time because Telegram recurring subscriptions currently use a 30-day period. The UI states renewal terms before checkout. A user who signs into the website with Telegram receives the same profile, diary, settings and Premium entitlement on both surfaces.
 
-Tribute and Lava remain outside the launch payment path. They add another entitlement source without improving the main customer journey. YooKassa is the primary web provider because the checkout supports Russian cards and SBP while the product keeps control of customer identity, renewal state, receipts and support.
+Tribute and Lava remain outside the launch payment path. They add another entitlement source without improving the main customer journey. YooKassa is the primary web provider because the checkout supports Russian cards and SBP while the product keeps control of customer identity, receipts and support. Web autorenewal remains disabled until YooKassa explicitly allows recurrent payments for the shop.
 
 Payment acceptance rules:
 
@@ -47,10 +47,10 @@ Payment acceptance rules:
 - activate only successful Telegram payment updates;
 - keep raw payloads private and redact them from logs.
 - verify each YooKassa webhook by fetching the payment or refund from YooKassa API;
-- use idempotence keys for every YooKassa payment and renewal;
-- encrypt saved YooKassa payment-method identifiers at rest;
-- keep Premium active after cancellation until the paid period ends;
-- retry failed web renewals with limits and make errors visible in admin.
+- use idempotence keys for every YooKassa payment;
+- do not save a YooKassa payment method while recurrent payments are disabled;
+- restore only the access period added by a fully refunded payment;
+- keep failed payments and webhook errors visible in admin.
 
 ## Partner program
 
@@ -63,4 +63,4 @@ Partner experiments remain deferred. Attribution by `start_param` and UTM stays 
 - Agent failure returns a useful fallback in the Mini App.
 - p95 response time and error rate are visible in admin analytics.
 - Backup, swap, service restart and rollback have been tested.
-- Stars and YooKassa purchase, renewal, cancellation, refund and duplicate-event tests pass before paid traffic.
+- Stars purchase/renewal and YooKassa purchase/refund/duplicate-event tests pass before paid traffic.

@@ -1,5 +1,6 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { authenticateAppRequest } from '../_shared/auth.ts';
+import { clientAddress, readJsonBody } from '../_shared/http.ts';
 
 const PROD_ORIGIN = 'https://arseneleshaevwork-dotcom.github.io';
 const ALLOWED_EVENTS = new Set([
@@ -23,8 +24,6 @@ Deno.serve(async (req) => {
     return json({ error: 'method_not_allowed' }, 405, corsHeaders);
   }
   if (origin && !isAllowedOrigin(origin)) return json({ error: 'origin_not_allowed' }, 403, corsHeaders);
-  const contentLength = Number(req.headers.get('content-length') || 0);
-  if (contentLength > 65536) return json({ error: 'payload_too_large' }, 413, corsHeaders);
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -32,20 +31,22 @@ Deno.serve(async (req) => {
     return json({ error: 'server_not_configured' }, 500, corsHeaders);
   }
 
-  const body = await req.json().catch(() => null);
+  const parsedBody = await readJsonBody(req, 65_536);
+  if (!parsedBody.ok) return json({ error: parsedBody.error }, parsedBody.error === 'payload_too_large' ? 413 : 400, corsHeaders);
+  const body = parsedBody.value;
   const events = Array.isArray(body?.events) ? body.events.slice(0, 20) : [];
   if (!events.length) return json({ ok: true, inserted: 0 }, 200, corsHeaders);
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
-  const forwardedIp = String(req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || 'unknown').split(',')[0].trim();
+  const forwardedIp = clientAddress(req);
   const clientHint = String(events[0]?.client_id || 'anonymous').slice(0, 100);
-  const rateKey = await hmacHex(new TextEncoder().encode(serviceRoleKey), `${forwardedIp}:${clientHint}`);
-  const { data: withinQuota, error: quotaError } = await supabase.rpc('consume_analytics_quota', {
-    p_key_hash: rateKey,
-    p_limit: 10
-  });
-  if (quotaError) return json({ error: 'rate_limit_unavailable' }, 503, corsHeaders);
-  if (!withinQuota) return json({ error: 'rate_limit' }, 429, corsHeaders);
+  const hmacKey = new TextEncoder().encode(serviceRoleKey);
+  const [ipRate, clientRate] = await Promise.all([
+    hmacHex(hmacKey, `ip:${forwardedIp}`).then(p_key_hash => supabase.rpc('consume_analytics_quota', { p_key_hash, p_limit: 120 })),
+    hmacHex(hmacKey, `client:${forwardedIp}:${clientHint}`).then(p_key_hash => supabase.rpc('consume_analytics_quota', { p_key_hash, p_limit: 10 }))
+  ]);
+  if (ipRate.error || clientRate.error) return json({ error: 'rate_limit_unavailable' }, 503, corsHeaders);
+  if (!ipRate.data || !clientRate.data) return json({ error: 'rate_limit' }, 429, corsHeaders);
 
   const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN') || '';
   const auth = botToken && (body?.init_data || req.headers.get('authorization'))
@@ -68,6 +69,9 @@ Deno.serve(async (req) => {
     const telegramUser = verifiedTelegramUser;
     const baby = event.baby || {};
     const babyAgeMonths = baby.ageMonths === undefined ? null : baby.ageMonths;
+    const safeBabyAge = Number.isFinite(Number(babyAgeMonths)) ? Math.max(0, Math.min(60, Math.round(Number(babyAgeMonths)))) : null;
+    const safeBabyName = sanitizeBabyName(baby.name);
+    const safeBabyBirthdate = sanitizeBirthdate(baby.birthdate);
     let userId: string | null = null;
 
     if (telegramUser?.id) {
@@ -87,15 +91,15 @@ Deno.serve(async (req) => {
       if (!userError) userId = user?.id || null;
     }
 
-    if (verifiedTelegramUser && (baby.name || baby.birthdate || babyAgeMonths !== null) && userId) {
+    if (verifiedTelegramUser && (safeBabyName || safeBabyBirthdate || safeBabyAge !== null) && userId) {
       await supabase
         .from('babies')
         .upsert({
           user_id: userId,
           client_id: clientId,
-          name: String(baby.name || '').slice(0, 80) || null,
-          birthdate: /^\d{4}-\d{2}-\d{2}$/.test(String(baby.birthdate || '')) ? baby.birthdate : null,
-          age_months: Number.isFinite(Number(babyAgeMonths)) ? Math.max(0, Math.min(60, Number(babyAgeMonths))) : null,
+          name: safeBabyName || null,
+          birthdate: safeBabyBirthdate || null,
+          age_months: safeBabyAge,
           updated_at: new Date().toISOString()
         }, { onConflict: userId ? 'user_id' : 'client_id' });
     }
@@ -104,7 +108,7 @@ Deno.serve(async (req) => {
       const enabled = eventName === 'notifications_enabled';
       const setting = {
         user_id: userId,
-        telegram_id: telegramUser?.id || event.payload?.telegram_user_id || null,
+        telegram_id: telegramUser?.id || null,
         client_id: clientId,
         chat_id: telegramUser?.id || null,
         enabled,
@@ -153,9 +157,9 @@ Deno.serve(async (req) => {
       client_id: clientId,
       session_id: String(event.session_id || '').slice(0, 100) || null,
       telegram_id: telegramUser?.id || null,
-      baby_name: verifiedTelegramUser ? String(baby.name || '').slice(0, 80) || null : null,
-      baby_birthdate: verifiedTelegramUser && /^\d{4}-\d{2}-\d{2}$/.test(String(baby.birthdate || '')) ? baby.birthdate : null,
-      baby_age_months: verifiedTelegramUser ? babyAgeMonths : null,
+      baby_name: verifiedTelegramUser ? safeBabyName || null : null,
+      baby_birthdate: verifiedTelegramUser ? safeBabyBirthdate || null : null,
+      baby_age_months: verifiedTelegramUser ? safeBabyAge : null,
       attribution: sanitizePayload(event.attribution),
       payload,
       page: String(event.page || '').slice(0, 500) || null,
@@ -172,7 +176,6 @@ Deno.serve(async (req) => {
 
 function isAllowedOrigin(origin: string) {
   return origin === PROD_ORIGIN
-    || origin === 'https://thanhtrucbc12-oss.github.io'
     || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 }
 
@@ -181,7 +184,8 @@ function buildCorsHeaders(origin: string) {
     'Access-Control-Allow-Origin': isAllowedOrigin(origin) ? origin : PROD_ORIGIN,
     'Vary': 'Origin',
     'Access-Control-Allow-Headers': 'authorization, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Cache-Control': 'no-store'
   };
 }
 
@@ -198,15 +202,21 @@ function validRecentDate(value: any) {
   return date.toISOString();
 }
 
-async function verifyTelegramInitData(initData: string, botToken: string) {
-  const params = new URLSearchParams(initData); const hash = params.get('hash'); if (!hash) return { ok: false };
-  params.delete('hash'); const authDate = Number(params.get('auth_date') || 0);
-  if (!authDate || Date.now() / 1000 - authDate > 86400) return { ok: false };
-  const check = [...params.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('\n');
-  const key = await hmac(new TextEncoder().encode('WebAppData'), botToken);
-  const signature = [...await hmac(key, check)].map(byte => byte.toString(16).padStart(2, '0')).join('');
-  if (!timingSafeEqual(signature, hash)) return { ok: false };
-  return { ok: true, user: JSON.parse(params.get('user') || '{}') };
+function sanitizeBabyName(value: any) {
+  return String(value || '').replace(/[<>\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
+}
+
+function sanitizeBirthdate(value: any) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() !== year
+    || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day
+    || date.getTime() > Date.now()) return '';
+  return date.toISOString().slice(0, 10);
 }
 
 async function hmac(key: Uint8Array, data: string) {
@@ -216,12 +226,6 @@ async function hmac(key: Uint8Array, data: string) {
 
 async function hmacHex(key: Uint8Array, data: string) {
   return [...await hmac(key, data)].map(byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function timingSafeEqual(a: string, b: string) {
-  if (a.length !== b.length) return false; let result = 0;
-  for (let i = 0; i < a.length; i += 1) result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return result === 0;
 }
 
 function json(data: unknown, status = 200, headers: Record<string, string> = buildCorsHeaders('')) {

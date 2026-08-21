@@ -11,16 +11,16 @@ function generatePDF() {
   if (!w) { showToast('Разрешите всплывающие окна'); return; }
 
   const ageLabel = document.getElementById('schedBadge')?.textContent || age + ' мес.';
-  const babyName = localStorage.getItem('babymode_baby_name') || '';
+  const babyName = _escapePdfHtml(localStorage.getItem('babymode_baby_name') || '');
   const tagNames  = {sleep:'Сон',feed:'Кормление',active:'Активность',hygiene:'Уход',walk:'Прогулка'};
   const tagColors = {sleep:'#7C83E8',feed:'#FF9A7B',active:'#5DC9A0',hygiene:'#5BC4D8',walk:'#F48FB1'};
 
   let rows = '';
   for (const b of blocks) {
     rows += `<tr>
-      <td style="font-weight:800;color:#C97BDB;white-space:nowrap">${b.time}</td>
-      <td style="font-size:1.1em">${b.title}</td>
-      <td style="color:#7A6680">${b.note}</td>
+      <td style="font-weight:800;color:#C97BDB;white-space:nowrap">${_escapePdfHtml(b.time)}</td>
+      <td style="font-size:1.1em">${_escapePdfHtml(b.title)}</td>
+      <td style="color:#7A6680">${_escapePdfHtml(b.note)}</td>
       <td><span style="background:${tagColors[b.tag]}22;color:${tagColors[b.tag]};padding:2px 9px;border-radius:12px;font-size:.78em;font-weight:800">${tagNames[b.tag]||''}</span></td>
     </tr>`;
   }
@@ -115,4 +115,10 @@ function generatePDF() {
   if (sv.length >= 3) {
     try { w._pdfStats = [sv[0].textContent, sv[1].textContent, sv[2].textContent]; } catch(e) {}
   }
+}
+
+function _escapePdfHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+  })[char]);
 }

@@ -1,10 +1,11 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://arseneleshaevwork-dotcom.github.io',
   'Vary': 'Origin',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-token',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS'
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Cache-Control': 'no-store'
 };
 
 const trackedEvents = [
@@ -51,7 +52,7 @@ Deno.serve(async (req) => {
 
   const adminToken = Deno.env.get('ADMIN_TOKEN');
   const providedToken = req.headers.get('x-admin-token') || '';
-  if (!adminToken || !safeEqual(providedToken, adminToken)) {
+  if (!adminToken || adminToken.length < 32 || !safeEqual(providedToken, adminToken)) {
     return json({ error: 'unauthorized' }, 401);
   }
 

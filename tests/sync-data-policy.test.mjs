@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { sanitizeDiaryEntry, sanitizeSyncProfile, sanitizeSyncSettings } from '../supabase/functions/sync-data/policy.mjs';
+import { sanitizeDiaryEntry, sanitizeSyncProfile, sanitizeSyncSettings, sanitizeTodaySchedule } from '../supabase/functions/sync-data/policy.mjs';
 
 const now = new Date('2026-08-02T12:00:00.000Z');
 
@@ -13,6 +13,23 @@ test('sync profile rejects future birthdays and strips markup', () => {
 test('sync settings only keeps supported values', () => {
   assert.deepEqual(sanitizeSyncSettings({ wake_time: '07:30', feed_type: 'mixed', secret: 'no', notifications: true }), {
     wake_time: '07:30', feed_type: 'mixed', notifications: true
+  });
+});
+
+test('synced schedules are structured and strip stored markup', () => {
+  assert.deepEqual(sanitizeTodaySchedule({
+    date: '2026-08-02',
+    created_at: '2026-08-02T10:00:00.000Z',
+    age_months: 7,
+    blocks: [
+      { time: '09:30', tag: 'sleep', title: '<img src=x>Дневной сон', note: '<script>alert(1)</script>' },
+      { time: '99:99', tag: 'unknown', title: 'Не попадет' }
+    ]
+  }), {
+    date: '2026-08-02',
+    created_at: '2026-08-02T10:00:00.000Z',
+    age_months: 7,
+    blocks: [{ time: '09:30', tag: 'sleep', title: 'img src=xДневной сон', note: 'scriptalert(1)/script' }]
   });
 });
 

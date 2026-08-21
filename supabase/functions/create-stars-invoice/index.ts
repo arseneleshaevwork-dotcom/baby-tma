@@ -1,11 +1,6 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://arseneleshaevwork-dotcom.github.io',
-  'Vary': 'Origin',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS'
-};
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
+import { upsertTelegramUser, verifyTelegramInitData } from '../_shared/auth.ts';
+import { corsHeaders, isAllowedOrigin, json, readJsonBody } from '../_shared/http.ts';
 
 const PLANS = {
   month: {
@@ -21,40 +16,34 @@ const PLANS = {
 } as const;
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-  if (req.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
+  const headers = corsHeaders(req);
+  const origin = req.headers.get('origin') || '';
+  if (req.method === 'OPTIONS') return new Response('ok', { headers });
+  if (req.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405, headers);
+  if (origin && !isAllowedOrigin(origin)) return json({ ok: false, error: 'origin_not_allowed' }, 403, headers);
 
   const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN');
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   if (!botToken || !supabaseUrl || !serviceRoleKey) {
-    return json({ ok: false, error: 'server_not_configured' }, 500);
+    return json({ ok: false, error: 'server_not_configured' }, 500, headers);
   }
 
-  const body = await req.json().catch(() => ({}));
+  const parsedBody = await readJsonBody(req, 20_000);
+  if (!parsedBody.ok) return json({ ok: false, error: parsedBody.error }, parsedBody.error === 'payload_too_large' ? 413 : 400, headers);
+  const body = parsedBody.value;
   const requestedPlan = String(body?.plan || '');
-  if (!(requestedPlan in PLANS)) return json({ ok: false, error: 'invalid_plan' }, 400);
+  if (!(requestedPlan in PLANS)) return json({ ok: false, error: 'invalid_plan' }, 400, headers);
   const planKey = requestedPlan as keyof typeof PLANS;
   const plan = PLANS[planKey];
   const initData = String(body?.initData || '');
   const auth = await verifyTelegramInitData(initData, botToken);
-  if (!auth.ok || !auth.user?.id) return json({ ok: false, error: 'telegram_auth_failed' }, 401);
+  if (!auth.ok || !auth.user?.id) return json({ ok: false, error: 'telegram_auth_failed' }, 401, headers);
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const telegramId = Number(auth.user.id);
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .upsert({
-      telegram_id: telegramId,
-      username: auth.user.username || null,
-      first_name: auth.user.first_name || null,
-      language_code: auth.user.language_code || null,
-      last_seen_at: new Date().toISOString()
-    }, { onConflict: 'telegram_id' })
-    .select('id')
-    .single();
-
-  if (userError || !user?.id) return json({ ok: false, error: 'user_upsert_failed' }, 500);
+  const user = await upsertTelegramUser(supabase, auth.user);
+  if (!user?.id) return json({ ok: false, error: 'user_upsert_failed' }, 500, headers);
 
   const recentInvoiceWindow = new Date(Date.now() - 10 * 60 * 1000).toISOString();
   const { count: recentInvoices } = await supabase
@@ -63,7 +52,7 @@ Deno.serve(async (req) => {
     .eq('telegram_id', telegramId)
     .eq('status', 'created')
     .gte('created_at', recentInvoiceWindow);
-  if ((recentInvoices || 0) >= 5) return json({ ok: false, error: 'invoice_rate_limit' }, 429);
+  if ((recentInvoices || 0) >= 5) return json({ ok: false, error: 'invoice_rate_limit' }, 429, headers);
 
   const payload = `premium:${planKey}:${telegramId}:${crypto.randomUUID()}`;
   const { error: paymentError } = await supabase.from('payments').insert({
@@ -73,9 +62,10 @@ Deno.serve(async (req) => {
     plan: planKey,
     currency: 'XTR',
     total_amount: plan.stars,
-    status: 'created'
+    status: 'created',
+    provider: 'telegram_stars'
   });
-  if (paymentError) return json({ ok: false, error: 'payment_create_failed' }, 500);
+  if (paymentError) return json({ ok: false, error: 'payment_create_failed' }, 500, headers);
 
   const invoiceResponse = await fetch(`https://api.telegram.org/bot${botToken}/createInvoiceLink`, {
     method: 'POST',
@@ -96,7 +86,7 @@ Deno.serve(async (req) => {
       .from('payments')
       .update({ status: 'invoice_failed', raw_payload: invoice || {} })
       .eq('invoice_payload', payload);
-    return json({ ok: false, error: 'invoice_failed' }, 502);
+    return json({ ok: false, error: 'invoice_failed' }, 502, headers);
   }
 
   return json({
@@ -104,64 +94,5 @@ Deno.serve(async (req) => {
     invoice_link: invoice.result,
     plan: planKey,
     stars: plan.stars
-  });
+  }, 200, headers);
 });
-
-async function verifyTelegramInitData(initData: string, botToken: string) {
-  const params = new URLSearchParams(initData);
-  const hash = params.get('hash');
-  if (!hash) return { ok: false };
-  params.delete('hash');
-
-  const authDate = Number(params.get('auth_date') || 0);
-  if (!authDate || Date.now() / 1000 - authDate > 86400) return { ok: false };
-
-  const dataCheckString = [...params.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${value}`)
-    .join('\n');
-
-  const secret = await hmac('WebAppData', botToken);
-  const signature = await hmacHex(secret, dataCheckString);
-  if (!timingSafeEqual(signature, hash)) return { ok: false };
-
-  const user = JSON.parse(params.get('user') || '{}');
-  return { ok: true, user };
-}
-
-async function hmac(key: string, data: string) {
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(key),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  return new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(data)));
-}
-
-async function hmacHex(key: Uint8Array, data: string) {
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    key,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const bytes = new Uint8Array(await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(data)));
-  return [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function timingSafeEqual(a: string, b: string) {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i += 1) result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return result === 0;
-}
-
-function json(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
-}

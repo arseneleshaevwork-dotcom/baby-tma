@@ -1,10 +1,12 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
+import { readJsonBody } from '../_shared/http.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://arseneleshaevwork-dotcom.github.io',
   'Vary': 'Origin',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-token, x-cron-token',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS'
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Cache-Control': 'no-store'
 };
 
 const milestoneMonths = [1, 3, 6, 9, 12, 18, 24, 36];
@@ -17,7 +19,7 @@ Deno.serve(async (req) => {
   const cronToken = Deno.env.get('CRON_TOKEN');
   const providedToken = req.headers.get('x-admin-token') || '';
   const providedCronToken = req.headers.get('x-cron-token') || '';
-  const adminAuthorized = Boolean(adminToken && safeEqual(providedToken, adminToken));
+  const adminAuthorized = Boolean(adminToken && adminToken.length >= 32 && safeEqual(providedToken, adminToken));
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -28,12 +30,14 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const cronAuthorized = Boolean(
-    (cronToken && safeEqual(providedCronToken, cronToken))
+    (cronToken && cronToken.length >= 32 && providedCronToken.length >= 32 && safeEqual(providedCronToken, cronToken))
     || (providedCronToken && await verifyDatabaseCronToken(supabase, providedCronToken))
   );
   if (!adminAuthorized && !cronAuthorized) return json({ error: 'unauthorized' }, 401);
 
-  const body = await req.json().catch(() => ({}));
+  const parsedBody = await readJsonBody(req, 20_000);
+  if (!parsedBody.ok) return json({ error: parsedBody.error }, parsedBody.error === 'payload_too_large' ? 413 : 400);
+  const body = parsedBody.value;
   const dryRun = Boolean(body?.dry_run);
   const today = dateOnly(body?.date || new Date().toISOString());
 
@@ -294,6 +298,7 @@ function safeEqual(a: string, b: string) {
 }
 
 async function verifyDatabaseCronToken(supabase: any, token: string) {
+  if (token.length < 32) return false;
   const tokenHash = await sha256(token);
   const { data } = await supabase.from('internal_config')
     .select('value').eq('key', 'notification_cron_token_hash').maybeSingle();

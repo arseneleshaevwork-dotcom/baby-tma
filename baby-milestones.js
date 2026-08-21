@@ -8,7 +8,7 @@ function buildUpcomingBabyDates({ babies = [], now = new Date(), horizonDays = 3
   for (const baby of babies) {
     if (!baby.birthdate) continue;
     const birth = parseDateOnly(baby.birthdate);
-    if (!birth) continue;
+    if (!birth || birth > nowDate) continue;
 
     const birthday = nextBirthday(birth, nowDate);
     if (birthday >= nowDate && birthday <= maxDate) {
@@ -93,6 +93,7 @@ function getBabyAgeMonths(birthdate, now = new Date()) {
   const birth = parseDateOnly(birthdate);
   if (!birth) return null;
   const current = toUtcDateOnly(now);
+  if (birth > current) return null;
   let months = (current.getUTCFullYear() - birth.getUTCFullYear()) * 12
     + current.getUTCMonth() - birth.getUTCMonth();
   if (current.getUTCDate() < birth.getUTCDate()) months -= 1;
@@ -130,10 +131,20 @@ function formatAgeLabel(ageMonths) {
 
 function parseDateOnly(value) {
   if (!value) return null;
-  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return null;
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
-  return Number.isNaN(date.getTime()) ? null : date;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() !== year
+    || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return date;
+}
+
+function isValidBirthdate(value, now = new Date()) {
+  const birth = parseDateOnly(value);
+  return Boolean(birth && birth <= toUtcDateOnly(now));
 }
 
 function toUtcDateOnly(value) {
@@ -171,7 +182,8 @@ if (typeof module !== 'undefined') {
     buildUpcomingBabyDates,
     buildNextBabyEvent,
     getBabyAgeMonths,
-    formatAgeLabel
+    formatAgeLabel,
+    isValidBirthdate
   };
 }
 
@@ -182,6 +194,7 @@ if (typeof window !== 'undefined') {
     buildUpcomingBabyDates,
     buildNextBabyEvent,
     getBabyAgeMonths,
-    formatAgeLabel
+    formatAgeLabel,
+    isValidBirthdate
   };
 }

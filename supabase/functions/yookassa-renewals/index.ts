@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { getBillingPlan, openBillingSecret } from '../_shared/billing.mjs';
 import { json, sha256Hex, timingSafeEqual } from '../_shared/http.ts';
 import {
@@ -20,8 +20,8 @@ Deno.serve(async req => {
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   const envCronToken = Deno.env.get('YOOKASSA_CRON_TOKEN') || '';
   const { data: storedCron } = await supabase.from('internal_config').select('value').eq('key', 'yookassa_cron_token_hash').maybeSingle();
-  const databaseTokenValid = provided && storedCron?.value && timingSafeEqual(await sha256Hex(provided), String(storedCron.value));
-  const envTokenValid = envCronToken && timingSafeEqual(envCronToken, provided);
+  const databaseTokenValid = provided.length >= 32 && storedCron?.value && timingSafeEqual(await sha256Hex(provided), String(storedCron.value));
+  const envTokenValid = envCronToken.length >= 32 && provided.length >= 32 && timingSafeEqual(envCronToken, provided);
   if (!databaseTokenValid && !envTokenValid) return json({ ok: false }, 401, headers);
   const now = new Date();
   const result = { reconciled: 0, attempted: 0, succeeded: 0, failed: 0, pending: 0 };

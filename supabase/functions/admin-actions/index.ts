@@ -1,23 +1,27 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
+import { readJsonBody } from '../_shared/http.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://arseneleshaevwork-dotcom.github.io',
   'Vary': 'Origin',
   'Access-Control-Allow-Headers': 'content-type,x-admin-token',
-  'Access-Control-Allow-Methods': 'POST,OPTIONS'
+  'Access-Control-Allow-Methods': 'POST,OPTIONS',
+  'Cache-Control': 'no-store'
 };
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
   const expected = Deno.env.get('ADMIN_TOKEN') || '';
-  if (!expected || !safeEqual(req.headers.get('x-admin-token') || '', expected)) return json({ error: 'unauthorized' }, 401);
+  if (expected.length < 32 || !safeEqual(req.headers.get('x-admin-token') || '', expected)) return json({ error: 'unauthorized' }, 401);
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const botToken = Deno.env.get('TELEGRAM_BOT_TOKEN');
   if (!supabaseUrl || !serviceRoleKey || !botToken) return json({ error: 'server_not_configured' }, 500);
-  const body = await req.json().catch(() => ({}));
+  const parsedBody = await readJsonBody(req, 20_000);
+  if (!parsedBody.ok) return json({ error: parsedBody.error }, parsedBody.error === 'payload_too_large' ? 413 : 400);
+  const body = parsedBody.value;
   const telegramId = Number(body?.telegram_id);
   const action = String(body?.action || 'lookup');
   const supabase = createClient(supabaseUrl, serviceRoleKey);

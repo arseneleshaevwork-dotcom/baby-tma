@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { addBillingMonths, getBillingPlan, openBillingSecret, rubles, sealBillingSecret } from '../supabase/functions/_shared/billing.mjs';
+import { addBillingMonths, getBillingPlan, openBillingSecret, refundedAccessEnd, rubles, sealBillingSecret } from '../supabase/functions/_shared/billing.mjs';
 import { hashGuestBillingKey, normalizeGuestBillingKey } from '../supabase/functions/_shared/guest-billing.mjs';
 
 test('exposes the approved monthly and quarterly ruble plans', () => {
@@ -29,4 +29,15 @@ test('guest billing keys are strict and stored only as hashes', async () => {
   const hash = await hashGuestBillingKey(key);
   assert.match(hash, /^[0-9a-f]{64}$/);
   assert.notEqual(hash, key);
+});
+
+test('full refund restores only the period added by the refunded payment', () => {
+  assert.equal(
+    refundedAccessEnd('2026-09-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z'),
+    '2026-09-01T00:00:00.000Z'
+  );
+  assert.equal(
+    refundedAccessEnd('2026-09-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z', '2027-01-01T00:00:00.000Z'),
+    null
+  );
 });

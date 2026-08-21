@@ -1,21 +1,24 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { buildBotReply } from './bot-flow.mjs';
+import { readJsonBody } from '../_shared/http.ts';
 
 const miniAppUrl = Deno.env.get('MINI_APP_URL') || 'https://arseneleshaevwork-dotcom.github.io/baby-tma/';
 
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
-    return json({ ok: true });
+    return json({ ok: false, error: 'method_not_allowed' }, 405);
   }
 
   const webhookSecret = Deno.env.get('TELEGRAM_WEBHOOK_SECRET');
   if (!webhookSecret) return json({ ok: false, error: 'webhook_secret_missing' }, 503);
   const providedSecret = req.headers.get('x-telegram-bot-api-secret-token') || '';
-  if (!timingSafeEqual(providedSecret, webhookSecret)) {
+  if (webhookSecret.length < 32 || !timingSafeEqual(providedSecret, webhookSecret)) {
     return json({ ok: false, error: 'unauthorized' }, 401);
   }
 
-  const update = await req.json().catch(() => null);
+  const parsedBody = await readJsonBody(req, 512_000);
+  if (!parsedBody.ok) return json({ ok: false, error: parsedBody.error }, parsedBody.error === 'payload_too_large' ? 413 : 400);
+  const update = parsedBody.value;
   const preCheckout = update?.pre_checkout_query;
   if (preCheckout?.id) {
     await answerPreCheckout(preCheckout.id, await verifyPreCheckout(preCheckout));
@@ -413,6 +416,6 @@ function timingSafeEqual(a: string, b: string) {
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json' }
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
   });
 }

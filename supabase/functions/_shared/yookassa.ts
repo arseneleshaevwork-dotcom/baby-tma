@@ -237,6 +237,7 @@ export async function applyFailedYookassaPayment({ supabase, payment }: { supaba
 
 export function redactPayment(payment: any) {
   const copy = JSON.parse(JSON.stringify(payment || {}));
+  if (copy.payment_method) delete copy.payment_method.id;
   if (copy.payment_method?.card) {
     copy.payment_method.card = {
       first6: copy.payment_method.card.first6 || null,

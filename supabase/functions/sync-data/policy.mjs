@@ -1,5 +1,6 @@
 const ALLOWED_TAGS = new Set(['long_soothe', 'cry_sleep', 'cry_wake', 'illness', 'travel', 'teeth', 'regression', 'slept_well']);
 const ALLOWED_MOODS = new Set(['😊', '😐', '😢', '😴', '🤒']);
+const ALLOWED_SCHEDULE_TAGS = new Set(['sleep', 'feed', 'active', 'hygiene', 'walk']);
 const ALLOWED_SETTINGS = new Set([
   'wake_time', 'feed_type', 'last_age', 'notifications', 'ai_consent', 'today_schedule'
 ]);
@@ -27,11 +28,33 @@ export function sanitizeSyncSettings(value) {
     if (key === 'notifications') result[key] = raw === true || raw === '1' || raw === 'true';
     if (key === 'ai_consent') result[key] = raw === 'granted' ? 'granted' : '';
     if (key === 'today_schedule' && raw && typeof raw === 'object') {
-      const encoded = JSON.stringify(raw);
-      if (encoded.length <= 30_000) result[key] = raw;
+      const schedule = sanitizeTodaySchedule(raw);
+      if (schedule) result[key] = schedule;
     }
   }
   return result;
+}
+
+export function sanitizeTodaySchedule(value) {
+  const schedule = value && typeof value === 'object' ? value : {};
+  const date = String(schedule.date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const parsedDate = new Date(`${date}T12:00:00Z`);
+  if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) return null;
+  const createdAt = safeIso(schedule.created_at);
+  const blocks = (Array.isArray(schedule.blocks) ? schedule.blocks : []).slice(0, 40).map(block => {
+    const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(block?.time || '')) ? String(block.time) : '';
+    const tag = ALLOWED_SCHEDULE_TAGS.has(String(block?.tag || '')) ? String(block.tag) : 'active';
+    const title = cleanText(block?.title, 120);
+    const note = cleanText(block?.note, 240);
+    return time && title ? { time, tag, title, note } : null;
+  }).filter(Boolean);
+  return {
+    date,
+    created_at: createdAt || parsedDate.toISOString(),
+    age_months: clampNumber(schedule.age_months, 0, 60),
+    blocks
+  };
 }
 
 export function sanitizeDiaryEntry(value, now = new Date()) {

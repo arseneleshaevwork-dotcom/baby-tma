@@ -22,7 +22,7 @@ export function buildBotReply({ text = '', firstName = '', baby = null, miniAppU
   if (cleanText === '/terms') {
     return {
       action: 'terms',
-      text: 'Условия Premium: внутри Telegram оплата проходит в Stars. В веб-версии доступны карта и СБП через ЮKassa. Автопродление можно отключить в профиле, доступ сохранится до конца оплаченного периода. Для вопросов по оплате используйте /paysupport.',
+      text: 'Условия Premium: внутри Telegram оплата проходит в Stars. Месячная подписка Stars может продлеваться автоматически и управляется средствами Telegram; тариф на 3 месяца оплачивается один раз. В веб-версии карта и СБП через ЮKassa сейчас работают как разовая оплата без автопродления. Для вопросов по оплате используйте /paysupport.',
       reply_markup: termsKeyboard(miniAppUrl)
     };
   }
@@ -145,6 +145,7 @@ export function normalizeBirthdate(text = '') {
   if (year < 2015 || year > new Date().getUTCFullYear()) return null;
   const date = new Date(Date.UTC(year, month - 1, day));
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  if (date.getTime() > Date.now()) return null;
   return date.toISOString().slice(0, 10);
 }
 

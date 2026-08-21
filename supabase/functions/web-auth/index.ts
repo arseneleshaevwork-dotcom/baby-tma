@@ -1,6 +1,6 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { authenticateAppRequest, upsertTelegramUser } from '../_shared/auth.ts';
-import { corsHeaders, isAllowedOrigin, json, randomToken, sha256Hex } from '../_shared/http.ts';
+import { corsHeaders, isAllowedOrigin, json, randomToken, readJsonBody, sha256Hex } from '../_shared/http.ts';
 import { createCheckoutHandoff, verifyCheckoutHandoff } from './handoff.mjs';
 
 const TELEGRAM_ISSUER = 'https://oauth.telegram.org';
@@ -23,8 +23,10 @@ Deno.serve(async req => {
     return json({ ok: false, error: 'server_not_configured' }, 503, headers);
   }
 
+  const parsedBody = await readJsonBody(req, 20_000);
+  if (!parsedBody.ok) return json({ ok: false, error: parsedBody.error }, parsedBody.error === 'payload_too_large' ? 413 : 400, headers);
   const supabase = createClient(supabaseUrl, serviceRoleKey);
-  const body = await req.json().catch(() => ({}));
+  const body = parsedBody.value;
   const action = String(body?.action || 'session');
 
   if (action === 'handoff_create') {

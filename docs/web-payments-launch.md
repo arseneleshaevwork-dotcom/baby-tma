@@ -30,7 +30,7 @@ Inside the Mini App the customer chooses either Telegram Stars or "Card / SBP". 
 - Quarterly SBP checkout grants Premium on both surfaces for three months without a next charge date.
 - A repeated webhook does not extend access twice.
 - One-time purchases never expose cancel or resume-autorenewal controls.
-- A full refund revokes the web entitlement; a partial refund does not revoke the whole paid period.
+- A full refund removes only the access period added by that payment; any earlier paid period remains. A partial refund does not revoke the whole paid period.
 - Logout revokes the web session and another browser cannot reuse it after revocation.
 - Diary edits made on web appear in the Mini App and conflicts keep the newest timestamp.
 

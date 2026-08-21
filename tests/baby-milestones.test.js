@@ -2,7 +2,8 @@ const assert = require('assert');
 const {
   buildUpcomingBabyDates,
   buildNextBabyEvent,
-  getBabyAgeMonths
+  getBabyAgeMonths,
+  isValidBirthdate
 } = require('../baby-milestones');
 
 function test(name, fn) {
@@ -90,4 +91,11 @@ test('builds profile prompt when birthdate is missing', () => {
     age_months: null,
     age_label: 'Возраст не указан'
   });
+});
+
+test('rejects impossible and future birthdates', () => {
+  assert.strictEqual(getBabyAgeMonths('2026-02-31', new Date('2026-08-21T09:00:00Z')), null);
+  assert.strictEqual(getBabyAgeMonths('2026-09-01', new Date('2026-08-21T09:00:00Z')), null);
+  assert.strictEqual(isValidBirthdate('2026-08-20', new Date('2026-08-21T09:00:00Z')), true);
+  assert.strictEqual(isValidBirthdate('2026-08-22', new Date('2026-08-21T09:00:00Z')), false);
 });

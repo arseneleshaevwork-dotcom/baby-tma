@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { authenticateAppRequest } from '../_shared/auth.ts';
 import { corsHeaders, isAllowedOrigin, json } from '../_shared/http.ts';
 import { sanitizeDeletedDiaryDay, sanitizeDiaryEntry, sanitizeSyncProfile, sanitizeSyncSettings } from './policy.mjs';

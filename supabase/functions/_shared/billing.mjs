@@ -24,6 +24,16 @@ export function rubles(amountMinor) {
   return (Math.max(0, Math.round(amountMinor)) / 100).toFixed(2);
 }
 
+export function refundedAccessEnd(paymentStart, paymentEnd, subscriptionEnd) {
+  const start = new Date(paymentStart || 0);
+  const end = new Date(paymentEnd || 0);
+  const current = new Date(subscriptionEnd || 0);
+  if ([start, end, current].some(value => Number.isNaN(value.getTime()))) return null;
+  if (start.getTime() > end.getTime()) return null;
+  if (Math.abs(current.getTime() - end.getTime()) > 1000) return null;
+  return start.toISOString();
+}
+
 export async function sealBillingSecret(value, secret) {
   if (!value || secret.length < 24) throw new Error('billing_encryption_not_configured');
   const key = await deriveKey(secret);

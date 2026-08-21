@@ -71,6 +71,11 @@ function _renderSlide(idx) {
   const isLast   = idx === SLIDES.length - 1;
 
   if (s.type === 'profile') {
+    const savedName = _sanitizeOnboardingName(localStorage.getItem('babymode_baby_name'));
+    const savedBirthdate = /^\d{4}-\d{2}-\d{2}$/.test(localStorage.getItem('babymode_baby_birthdate') || '')
+      ? localStorage.getItem('babymode_baby_birthdate') : '';
+    const savedWakeTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(localStorage.getItem('babymode_wake_time') || '')
+      ? localStorage.getItem('babymode_wake_time') : (document.getElementById('wakeTime')?.value || '07:00');
     slidesEl.innerHTML = `
       <div class="ob-slide ob-profile-slide">
         <div class="ob-bubble">${s.emoji}</div>
@@ -79,16 +84,16 @@ function _renderSlide(idx) {
         <div class="ob-profile-grid">
           <label class="ob-field-label">Имя малыша
             <input class="ob-name-input" id="obBabyName" type="text" placeholder="Например, Артем" maxlength="20"
-              value="${localStorage.getItem('babymode_baby_name') || ''}"
+              value="${_escapeOnboardingAttribute(savedName)}"
               oninput="this.value=this.value.replace(/[^а-яёА-ЯЁa-zA-Z\\s-]/g,'')">
           </label>
           <label class="ob-field-label">Дата рождения
             <input class="ob-name-input ob-birth-input" id="obBabyBirthdate" type="date"
               max="${new Date().toISOString().slice(0, 10)}"
-              value="${localStorage.getItem('babymode_baby_birthdate') || ''}">
+              value="${_escapeOnboardingAttribute(savedBirthdate)}">
           </label>
           <label class="ob-field-label">Обычный подъем
-            <input class="ob-name-input" id="obWakeTime" type="time" value="${localStorage.getItem('babymode_wake_time') || document.getElementById('wakeTime')?.value || '07:00'}">
+            <input class="ob-name-input" id="obWakeTime" type="time" value="${_escapeOnboardingAttribute(savedWakeTime)}">
           </label>
           <label class="ob-field-label">Кормление
             <select class="ob-name-input" id="obFeedType">
@@ -161,14 +166,23 @@ function obPickPhoto() {
   input.onchange = e => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!/^image\/(png|jpeg|webp|gif)$/i.test(file.type) || file.size > 5 * 1024 * 1024) {
+      if (typeof showToast === 'function') showToast('Выберите PNG, JPEG, WebP или GIF до 5 МБ');
+      return;
+    }
     const reader = new FileReader();
     reader.onload = ev => {
       const b64 = ev.target.result;
+      if (!/^data:image\/(?:png|jpeg|webp|gif);base64,[a-z0-9+/=]+$/i.test(String(b64 || ''))) return;
       localStorage.setItem('babymode_photo', b64);
       // Update photo area preview
       const area = document.getElementById('obPhotoArea');
       if (area) {
-        area.innerHTML = `<img src="${b64}" alt="Фото малыша" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+        const image = document.createElement('img');
+        image.src = b64;
+        image.alt = 'Фото малыша';
+        image.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%';
+        area.replaceChildren(image);
       }
       if (typeof _applyBabyPhoto === 'function') _applyBabyPhoto(b64);
       if (typeof hapticSuccess === 'function') hapticSuccess();
@@ -206,8 +220,10 @@ function saveOnboardingProfile() {
   const birth = document.getElementById('obBabyBirthdate');
   const wake = document.getElementById('obWakeTime');
   const feed = document.getElementById('obFeedType');
-  const name = inp && inp.value.trim() ? inp.value.trim() : '';
-  const birthdate = birth && birth.value ? birth.value : '';
+  const name = _sanitizeOnboardingName(inp?.value);
+  const rawBirthdate = birth && birth.value ? birth.value : '';
+  const birthdate = rawBirthdate && window.BabyMilestones?.isValidBirthdate(rawBirthdate, new Date())
+    ? rawBirthdate : '';
   const wakeTime = wake && wake.value ? wake.value : '';
   const feedType = feed && feed.value ? feed.value : '';
   const ageMonths = birthdate && window.BabyMilestones
@@ -237,6 +253,14 @@ function saveOnboardingProfile() {
     BabyCloudSync.markProfileChanged();
     BabyCloudSync.markSettingsChanged();
   }
+}
+
+function _sanitizeOnboardingName(value) {
+  return String(value || '').replace(/[^а-яёА-ЯЁa-zA-Z\s-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
+}
+
+function _escapeOnboardingAttribute(value) {
+  return String(value || '').replace(/[&"<>]/g, char => ({ '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' })[char]);
 }
 
 function saveOnboardingReminderConsent() {
