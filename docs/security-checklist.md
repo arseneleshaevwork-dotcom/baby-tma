@@ -27,6 +27,7 @@
 - Browser CORS is restricted to production origins and approved local development origins.
 - Synced schedules are validated as structured data and escaped before HTML rendering.
 - AI daily limits are claimed atomically in PostgreSQL, so parallel requests cannot bypass the free or Premium cap.
+- Internal `SECURITY DEFINER` maintenance and guest-billing functions explicitly deny execution to `public`, `anon` and `authenticated`; only `service_role` can call them.
 - Third-party jsDelivr scripts use pinned versions and Subresource Integrity; static pages apply restrictive Content Security Policy rules.
 - Supabase Edge Functions pin `@supabase/supabase-js` to `2.112.3` instead of floating on the latest `2.x` release.
 - The Baby Agent accepts a model provider only on loopback, rejects unsafe model output and has a useful knowledge fallback.
