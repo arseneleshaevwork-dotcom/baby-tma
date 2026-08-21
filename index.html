@@ -686,7 +686,7 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
 <script src="tma.js?v=20260812-1"></script>
 <script src="web-account.js?v=20260812-1"></script>
 <script src="cloud-sync.js?v=20260812-1"></script>
-<script src="pwa.js?v=20260812-1"></script>
+<script src="pwa.js?v=20260821-2"></script>
 <script src="chat.js?v=20260812-1"></script>
 <script src="sleep-intelligence.js?v=20260812-1"></script>
 <script src="daily-coach.js?v=20260812-1"></script>
@@ -1481,12 +1481,23 @@ function _updateFab() {
 setInterval(_updateFab, 30000);
 
 // ─── showToast (global) ──────────────────────────────────────────────────────
+var _toastTimer = null;
+function hideToast() {
+  var t = document.getElementById('toast');
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = null;
+  if (t) t.classList.remove('show');
+}
 function showToast(msg, dur) {
   var t = document.getElementById('toast');
   if (!t) return;
+  if (_toastTimer) clearTimeout(_toastTimer);
   t.textContent = msg;
   t.classList.add('show');
-  setTimeout(function() { t.classList.remove('show'); }, dur || 3000);
+  _toastTimer = setTimeout(function() {
+    t.classList.remove('show');
+    _toastTimer = null;
+  }, dur || 2600);
 }
 
 

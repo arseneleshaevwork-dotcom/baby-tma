@@ -57,7 +57,7 @@
     if (typeof global.showToast === 'function') global.showToast('Проверяем оплату...');
     for (let attempt = 0; attempt < 6; attempt += 1) {
       if (global.SUB && await global.SUB.refreshPremiumStatus()) {
-        if (typeof global.showToast === 'function') global.showToast('Premium активирован');
+        if (typeof global.hideToast === 'function') global.hideToast();
         if (typeof global.goPage === 'function') global.goPage('premium', null);
         return;
       }
