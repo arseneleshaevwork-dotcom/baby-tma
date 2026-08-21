@@ -769,7 +769,8 @@
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(data.error || 'request_failed');
-        els.notificationResult.textContent = 'Команды бота обновлены, включая /paysupport.';
+        const suffix = data.pending_update_count ? ` В очереди: ${data.pending_update_count}.` : '';
+        els.notificationResult.textContent = `Бот @${data.bot_username || 'babymode1_bot'} подключён: webhook, меню и команды обновлены.${suffix}`;
       } catch (error) {
         els.notificationResult.textContent = `Ошибка: ${error.message}`;
       } finally {

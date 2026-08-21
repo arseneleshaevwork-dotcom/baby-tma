@@ -26,24 +26,58 @@ Deno.serve(async (req) => {
   const action = String(body?.action || 'lookup');
   const supabase = createClient(supabaseUrl, serviceRoleKey);
   if (action === 'configure_bot_commands') {
-    const response = await fetch(`https://api.telegram.org/bot${botToken}/setMyCommands`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        commands: [
-          { command: 'start', description: 'Открыть Режим малыша' },
-          { command: 'profile', description: 'Профиль малыша' },
-          { command: 'reminders_on', description: 'Включить напоминания' },
-          { command: 'reminders_off', description: 'Отключить напоминания' },
-          { command: 'terms', description: 'Условия Premium и оплаты' },
-          { command: 'paysupport', description: 'Помощь с оплатой' },
-          { command: 'help', description: 'Все возможности бота' }
-        ]
-      })
+    const webhookSecret = Deno.env.get('TELEGRAM_WEBHOOK_SECRET') || '';
+    if (webhookSecret.length < 32 || !/^[A-Za-z0-9_-]+$/.test(webhookSecret)) {
+      return json({ error: 'telegram_webhook_secret_invalid' }, 500);
+    }
+
+    const bot = await telegramCall(botToken, 'getMe');
+    if (!bot.ok) return json({ error: bot.error || 'telegram_token_invalid' }, 502);
+
+    const webhookUrl = `${supabaseUrl}/functions/v1/telegram-webhook`;
+    const webhook = await telegramCall(botToken, 'setWebhook', {
+      url: webhookUrl,
+      secret_token: webhookSecret,
+      allowed_updates: ['message', 'callback_query', 'pre_checkout_query'],
+      drop_pending_updates: false
     });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result.ok) return json({ error: result.description || 'telegram_commands_failed' }, 502);
-    return json({ ok: true, configured: true });
+    if (!webhook.ok) return json({ error: webhook.error || 'telegram_webhook_failed' }, 502);
+
+    const commands = await telegramCall(botToken, 'setMyCommands', {
+      commands: [
+        { command: 'start', description: 'Открыть Режим малыша' },
+        { command: 'profile', description: 'Профиль малыша' },
+        { command: 'reminders_on', description: 'Включить напоминания' },
+        { command: 'reminders_off', description: 'Отключить напоминания' },
+        { command: 'terms', description: 'Условия Premium и оплаты' },
+        { command: 'paysupport', description: 'Помощь с оплатой' },
+        { command: 'help', description: 'Все возможности бота' }
+      ]
+    });
+    if (!commands.ok) return json({ error: commands.error || 'telegram_commands_failed' }, 502);
+
+    const menu = await telegramCall(botToken, 'setChatMenuButton', {
+      menu_button: {
+        type: 'web_app',
+        text: 'Открыть приложение',
+        web_app: { url: Deno.env.get('MINI_APP_URL') || 'https://arseneleshaevwork-dotcom.github.io/baby-tma/' }
+      }
+    });
+    if (!menu.ok) return json({ error: menu.error || 'telegram_menu_failed' }, 502);
+
+    const webhookInfo = await telegramCall(botToken, 'getWebhookInfo');
+    if (!webhookInfo.ok || webhookInfo.result?.url !== webhookUrl) {
+      return json({ error: webhookInfo.error || 'telegram_webhook_verification_failed' }, 502);
+    }
+
+    return json({
+      ok: true,
+      configured: true,
+      bot_username: bot.result?.username || null,
+      webhook_url: webhookInfo.result.url,
+      pending_update_count: Number(webhookInfo.result.pending_update_count || 0),
+      last_error_message: webhookInfo.result.last_error_message || null
+    });
   }
 
   if (action === 'resolve_support') {
@@ -132,4 +166,15 @@ Deno.serve(async (req) => {
 });
 
 function safeEqual(a: string, b: string) { if (a.length !== b.length) return false; let value = 0; for (let i = 0; i < a.length; i++) value |= a.charCodeAt(i) ^ b.charCodeAt(i); return value === 0; }
+async function telegramCall(token: string, method: string, body?: unknown) {
+  const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {})
+  });
+  const result = await response.json().catch(() => ({}));
+  return response.ok && result.ok
+    ? { ok: true, result: result.result }
+    : { ok: false, error: result.description || `telegram_${method}_failed` };
+}
 function json(data: unknown, status = 200) { return new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }); }
