@@ -44,3 +44,10 @@
 - Register the production website in Telegram Login allowed URLs and keep `TELEGRAM_LOGIN_CLIENT_ID` equal to the bot ID.
 - Configure YooKassa HTTP notifications for `payment.succeeded`, `payment.canceled` and `refund.succeeded`.
 - Verify backup restoration and VPS service restart after each infrastructure change.
+- Deploy migration `20260821020000_ai_daily_quota.sql` before deploying the matching `ai-assistant` Edge Function, then repeat the unauthenticated endpoint smoke tests in production.
+
+## Known residual risk
+
+- GitHub Pages does not provide project-level HTTP security headers. The current HTML applies CSP, `no-referrer` and admin `noindex` metadata, but reliable anti-clickjacking (`frame-ancestors`) and `X-Content-Type-Options: nosniff` require moving the public frontend to a host with configurable response headers before broad paid acquisition.
+- The current CSP still permits inline event handlers because the application uses `onclick` and related attributes extensively. User-controlled HTML is escaped and third-party scripts are pinned with SRI, but removing inline handlers and dropping `script-src 'unsafe-inline'` remains a defense-in-depth task.
+- The hardened Edge Functions and atomic AI quota migration from commit `a0d14fe` must be confirmed in Supabase production; a Git push alone does not deploy this repository because it has no Edge deployment workflow.
