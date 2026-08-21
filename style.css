@@ -1435,14 +1435,17 @@ body[data-page="profile"] #page-profile { padding-top:16px; }
    TOAST
 ═══════════════════════════════════════════════════════ */
 .toast {
-  position:fixed; bottom:calc(80px + var(--safe-bottom)); left:50%;
+  position:fixed; bottom:calc(92px + var(--safe-bottom)); left:50%;
   transform:translateX(-50%) translateY(80px);
   background:rgba(61,44,62,.96); border:1.5px solid rgba(201,123,219,.3); border-radius:var(--radius-sm);
   padding:10px 20px; font-size:.85rem; font-weight:700; color:#fff;
-  z-index:999; transition:transform .3s var(--ease-smooth); pointer-events:none; white-space:nowrap;
+  z-index:999; transition:transform .3s var(--ease-smooth), opacity .2s ease;
+  pointer-events:none; white-space:normal; text-align:center;
+  width:max-content; max-width:min(calc(100vw - 32px), 420px);
+  opacity:0; visibility:hidden;
   box-shadow:var(--shadow-md);
 }
-.toast.show { transform:translateX(-50%) translateY(0); }
+.toast.show { transform:translateX(-50%) translateY(0); opacity:1; visibility:visible; }
 
 /* ═══════════════════════════════════════════════════════
    ONBOARDING v2

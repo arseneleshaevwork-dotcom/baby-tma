@@ -44,7 +44,7 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 
-<link rel="stylesheet" href="style.css?v=20260813-3">
+<link rel="stylesheet" href="style.css?v=20260821-4">
 </head>
 <body data-page="home">
 
@@ -644,7 +644,7 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
   </button>
 </div>
 
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-hidden="true"></div>
 
 <!-- Share modal -->
 <div id="shareModal" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(61,44,62,.7);backdrop-filter:blur(10px);align-items:flex-end;justify-content:center">
@@ -1486,16 +1486,21 @@ function hideToast() {
   var t = document.getElementById('toast');
   if (_toastTimer) clearTimeout(_toastTimer);
   _toastTimer = null;
-  if (t) t.classList.remove('show');
+  if (t) {
+    t.classList.remove('show');
+    t.setAttribute('aria-hidden', 'true');
+  }
 }
 function showToast(msg, dur) {
   var t = document.getElementById('toast');
   if (!t) return;
   if (_toastTimer) clearTimeout(_toastTimer);
   t.textContent = msg;
+  t.setAttribute('aria-hidden', 'false');
   t.classList.add('show');
   _toastTimer = setTimeout(function() {
     t.classList.remove('show');
+    t.setAttribute('aria-hidden', 'true');
     _toastTimer = null;
   }, dur || 2600);
 }
