@@ -1,4 +1,5 @@
 const assert = require('assert');
+const fs = require('fs');
 const { buildAdminDashboard } = require('../admin-dashboard');
 
 function test(name, fn) {
@@ -12,7 +13,7 @@ function test(name, fn) {
     });
 }
 
-test('builds admin totals, funnel and baby table from raw analytics rows', () => {
+test('builds admin totals, activation cohorts and baby table from raw analytics rows', () => {
   const events = [
     row('bot_start', 'u1', 'c1', '2026-06-10T10:00:00.000Z', { source: 'telegram' }, { utm_campaign: 'sleep_june', utm_source: 'telegram' }),
     row('app_open', 'u1', 'c1', '2026-06-10T10:01:00.000Z', {}, { utm_campaign: 'sleep_june', utm_source: 'telegram' }),
@@ -116,10 +117,10 @@ test('builds admin totals, funnel and baby table from raw analytics rows', () =>
   assert.strictEqual(dashboard.unique_users.app_open, 2);
   assert.strictEqual(dashboard.bot_started_not_opened, 0);
   assert.strictEqual(dashboard.opened_and_left, 1);
-  assert.deepStrictEqual(dashboard.funnel.map(step => step.users), [2, 2, 1, 1, 1]);
+  assert.deepStrictEqual(dashboard.funnel.map(step => step.users), [2, 1, 1, 1, 0]);
   assert.strictEqual(dashboard.babies.length, 2);
   assert.strictEqual(dashboard.babies[0].name, 'Миша');
-  assert.strictEqual(dashboard.babies[0].age_label, '6 мес.');
+  assert.strictEqual(dashboard.babies[0].age_label, '5 мес.');
   assert.strictEqual(dashboard.upcoming_dates[0].name, 'Миша');
   assert.strictEqual(dashboard.upcoming_dates[0].event_date, '2026-06-20');
   assert.strictEqual(dashboard.sources[0].campaign, 'sleep_june');
@@ -173,6 +174,15 @@ test('builds partner balances with hold, payouts and refunds', () => {
   assert.strictEqual(dashboard.partners.items[0].available_rubles, 104.7);
   assert.strictEqual(dashboard.partners.items[0].paid_rubles, 269.7);
   assert.strictEqual(dashboard.partners.items[0].reversed_rubles, 104.7);
+});
+
+test('admin page compiles and labels mixed billing identities as clients', () => {
+  const html = fs.readFileSync('./admin.html', 'utf8');
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  assert.ok(scripts.length > 0);
+  assert.doesNotThrow(() => new Function(scripts.at(-1)[1]));
+  assert.ok(html.includes('<th>Клиент</th>'));
+  assert.ok(html.includes('function formatCustomer(item = {})'));
 });
 
 function row(eventName, userId, clientId, createdAt, payload = {}, attribution = {}) {

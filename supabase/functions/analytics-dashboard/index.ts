@@ -37,11 +37,11 @@ const trackedEvents = [
 ];
 
 const funnelEvents = [
-  { event: 'bot_start', label: '/start в боте' },
-  { event: 'app_open', label: 'Открыли mini app' },
+  { event: 'app_open', label: 'Открыли приложение' },
   { event: 'profile_saved', label: 'Сохранили малыша' },
   { event: 'schedule_generated', label: 'Получили режим' },
-  { event: 'ai_opened', label: 'Открыли ИИ' }
+  { event: 'ai_opened', label: 'Открыли ИИ' },
+  { event: 'premium_opened', label: 'Открыли Premium' }
 ];
 
 const milestoneMonths = [1, 3, 6, 9, 12, 18, 24, 36];
@@ -252,6 +252,7 @@ function buildDashboard({ events, babies, subscriptions = [], payments = [], bil
   for (const [eventName, users] of Object.entries(usersByEvent)) {
     uniqueUsers[eventName] = users.size;
   }
+  const openedUsers = usersByEvent.app_open || new Set<string>();
 
   let openedAndLeft = 0;
   let botStartedNotOpened = 0;
@@ -271,7 +272,9 @@ function buildDashboard({ events, babies, subscriptions = [], payments = [], bil
     unique_users: uniqueUsers,
     funnel: funnelEvents.map(step => ({
       ...step,
-      users: uniqueUsers[step.event] || 0,
+      users: step.event === 'app_open'
+        ? openedUsers.size
+        : countSharedUsers(openedUsers, usersByEvent[step.event]),
       events: totals[step.event] || 0
     })),
     opened_and_left: openedAndLeft,
@@ -284,7 +287,7 @@ function buildDashboard({ events, babies, subscriptions = [], payments = [], bil
     support_requests: supportRequests.map(formatSupportRequest),
     subscriptions: (subscriptions || []).map(formatSubscription).sort(byPeriodEndDesc).slice(0, 100),
     payments: (payments || []).map(formatPayment).sort(byPaymentCreatedDesc).slice(0, 100),
-    babies: babies.map(formatBaby).sort(byProfileCompleteness),
+    babies: babies.map(baby => formatBaby(baby, generatedAt)).sort(byProfileCompleteness),
     upcoming_dates: buildUpcomingBabyDates({ babies, now: generatedAt, horizonDays: 45 }),
     recent_events: [...events].sort(byCreatedDesc).slice(0, 100).map(formatEvent)
   };
@@ -501,15 +504,26 @@ function hasAny(set: Set<string>, values: string[]) {
   return values.some(value => set.has(value));
 }
 
-function formatBaby(baby: any) {
+function countSharedUsers(cohort: Set<string>, users?: Set<string>) {
+  if (!cohort.size || !users?.size) return 0;
+  let count = 0;
+  for (const user of users) {
+    if (cohort.has(user)) count += 1;
+  }
+  return count;
+}
+
+function formatBaby(baby: any, now: string | Date) {
+  const currentAge = baby.birthdate ? getBabyAgeMonths(baby.birthdate, now) : null;
+  const ageMonths = currentAge ?? baby.age_months ?? null;
   return {
     id: baby.id || '',
     user_id: baby.user_id || null,
     client_id: baby.client_id || null,
     name: baby.name || 'Без имени',
     birthdate: baby.birthdate || null,
-    age_months: baby.age_months ?? null,
-    age_label: formatAge(baby.age_months),
+    age_months: ageMonths,
+    age_label: formatAge(ageMonths),
     updated_at: baby.updated_at || null
   };
 }
@@ -626,6 +640,17 @@ function parseDateOnly(value: string) {
   if (!match) return null;
   const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getBabyAgeMonths(birthdate: string, now: string | Date) {
+  const birth = parseDateOnly(birthdate);
+  if (!birth) return null;
+  const current = toUtcDateOnly(now);
+  if (Number.isNaN(current.getTime()) || birth > current) return null;
+  let months = (current.getUTCFullYear() - birth.getUTCFullYear()) * 12
+    + current.getUTCMonth() - birth.getUTCMonth();
+  if (current.getUTCDate() < birth.getUTCDate()) months -= 1;
+  return Math.max(0, months);
 }
 
 function toUtcDateOnly(value: string | Date) {

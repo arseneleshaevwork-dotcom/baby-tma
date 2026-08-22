@@ -344,7 +344,7 @@
     <section class="grid sections">
       <div class="card" data-admin-view="overview">
         <div class="section-title">
-          <h2>Воронка</h2>
+          <h2>Действия после открытия</h2>
           <span class="muted" id="range"></span>
         </div>
         <div id="funnel"></div>
@@ -653,16 +653,16 @@
         els.funnel.innerHTML = '<div class="empty">Нет данных</div>';
         return;
       }
-      const first = funnel[0]?.users || 0;
+      const opened = funnel.find(step => step.event === 'app_open')?.users || 0;
       els.funnel.innerHTML = `
         <table>
-          <thead><tr><th>Шаг</th><th>Пользователи</th><th>Конверсия</th></tr></thead>
+          <thead><tr><th>Действие</th><th>Пользователи</th><th>Доля открывших</th></tr></thead>
           <tbody>
             ${funnel.map(step => `
               <tr>
                 <td>${escapeHtml(step.label)}</td>
                 <td>${number(step.users)}</td>
-                <td>${first ? Math.round((step.users / first) * 100) : 0}%</td>
+                <td>${opened ? Math.round((step.users / opened) * 100) : 0}%</td>
               </tr>
             `).join('')}
           </tbody>
@@ -840,13 +840,13 @@
       }
       els.subscriptions.innerHTML = `
         <table>
-          <thead><tr><th>Статус</th><th>План</th><th>Telegram</th><th>Доступ до</th><th>Источник</th><th>Обновлено</th></tr></thead>
+          <thead><tr><th>Статус</th><th>План</th><th>Клиент</th><th>Доступ до</th><th>Источник</th><th>Обновлено</th></tr></thead>
           <tbody>
             ${items.map(item => `
               <tr>
                 <td>${statusBadge(item.status, isFuture(item.current_period_end) ? 'ok' : 'warn')}</td>
                 <td>${escapeHtml(planLabel(item.plan))}</td>
-                <td class="mono">${escapeHtml(shortId(item.telegram_id || item.user_id || ''))}</td>
+                <td class="mono">${escapeHtml(formatCustomer(item))}</td>
                 <td>${formatDateTime(item.current_period_end)}</td>
                 <td>${escapeHtml(item.source || '—')}</td>
                 <td>${formatDateTime(item.updated_at)}</td>
@@ -864,7 +864,7 @@
       }
       els.payments.innerHTML = `
         <table>
-          <thead><tr><th>Статус</th><th>План</th><th>Провайдер</th><th>Сумма</th><th>Telegram</th><th>Создан</th><th>Оплачен</th></tr></thead>
+          <thead><tr><th>Статус</th><th>План</th><th>Провайдер</th><th>Сумма</th><th>Клиент</th><th>Создан</th><th>Оплачен</th></tr></thead>
           <tbody>
             ${items.map(item => `
               <tr>
@@ -872,7 +872,7 @@
                 <td>${escapeHtml(planLabel(item.plan))}</td>
                 <td>${escapeHtml(item.provider || '—')}</td>
                 <td>${formatPaymentAmount(item)}</td>
-                <td class="mono">${escapeHtml(shortId(item.telegram_id || item.user_id || ''))}</td>
+                <td class="mono">${escapeHtml(formatCustomer(item))}</td>
                 <td>${formatDateTime(item.created_at)}</td>
                 <td>${formatDateTime(item.paid_at)}</td>
               </tr>
@@ -1101,6 +1101,13 @@
     function shortId(value) {
       const text = String(value || '');
       return text.length > 18 ? `${text.slice(0, 9)}...${text.slice(-6)}` : text || '—';
+    }
+
+    function formatCustomer(item = {}) {
+      const telegramId = Number(item.telegram_id);
+      if (Number.isSafeInteger(telegramId) && telegramId > 0) return `TG ${telegramId}`;
+      if (item.user_id) return `Web ${shortId(item.user_id)}`;
+      return '—';
     }
 
     function statusBadge(label, tone = '') {

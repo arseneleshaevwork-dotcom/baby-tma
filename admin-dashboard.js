@@ -21,16 +21,16 @@ const TRACKED_EVENTS = [
 ];
 
 const FUNNEL_EVENTS = [
-  { event: 'bot_start', label: '/start в боте' },
-  { event: 'app_open', label: 'Открыли mini app' },
+  { event: 'app_open', label: 'Открыли приложение' },
   { event: 'profile_saved', label: 'Сохранили малыша' },
   { event: 'schedule_generated', label: 'Получили режим' },
-  { event: 'ai_opened', label: 'Открыли ИИ' }
+  { event: 'ai_opened', label: 'Открыли ИИ' },
+  { event: 'premium_opened', label: 'Открыли Premium' }
 ];
 
-const { buildUpcomingBabyDates } = typeof require === 'function'
+const { buildUpcomingBabyDates, getBabyAgeMonths } = typeof require === 'function'
   ? require('./baby-milestones')
-  : { buildUpcomingBabyDates: () => [] };
+  : { buildUpcomingBabyDates: () => [], getBabyAgeMonths: () => null };
 
 function buildAdminDashboard({ events = [], babies = [], subscriptions = [], payments = [], billingAgreements = [], billingEvents = [], partners = [], partnerReferrals = [], partnerCommissions = [], partnerPayouts = [], aiRequests = [], notificationSettings = [], notificationDeliveries = [], scheduleReminders = [], notificationRuns = [], supportRequests = [], generatedAt, rangeDays = 30, now = new Date() } = {}) {
   const totals = Object.fromEntries(TRACKED_EVENTS.map(event => [event, 0]));
@@ -58,9 +58,12 @@ function buildAdminDashboard({ events = [], babies = [], subscriptions = [], pay
     uniqueUsers[eventName] = users.size;
   }
 
+  const openedUsers = usersByEvent.app_open || new Set();
   const funnel = FUNNEL_EVENTS.map(step => ({
     ...step,
-    users: uniqueUsers[step.event] || 0,
+    users: step.event === 'app_open'
+      ? openedUsers.size
+      : countSharedUsers(openedUsers, usersByEvent[step.event]),
     events: totals[step.event] || 0
   }));
 
@@ -91,7 +94,7 @@ function buildAdminDashboard({ events = [], babies = [], subscriptions = [], pay
     support_requests: supportRequests.map(formatSupportRequest),
     subscriptions: subscriptions.map(formatSubscription).sort(byPeriodEndDesc).slice(0, 100),
     payments: payments.map(formatPayment).sort(byPaymentCreatedDesc).slice(0, 100),
-    babies: babies.map(formatBaby).sort(byProfileCompleteness),
+    babies: babies.map(baby => formatBaby(baby, now)).sort(byProfileCompleteness),
     upcoming_dates: buildUpcomingBabyDates({ babies, now, horizonDays: 45 }),
     recent_events: [...events].sort(byCreatedDesc).slice(0, 100).map(formatEvent)
   };
@@ -251,15 +254,26 @@ function hasAny(set, values) {
   return values.some(value => set.has(value));
 }
 
-function formatBaby(baby = {}) {
+function countSharedUsers(cohort, users) {
+  if (!cohort?.size || !users?.size) return 0;
+  let count = 0;
+  for (const user of users) {
+    if (cohort.has(user)) count += 1;
+  }
+  return count;
+}
+
+function formatBaby(baby = {}, now = new Date()) {
+  const currentAge = baby.birthdate ? getBabyAgeMonths(baby.birthdate, now) : null;
+  const ageMonths = currentAge ?? baby.age_months ?? null;
   return {
     id: baby.id || '',
     user_id: baby.user_id || null,
     client_id: baby.client_id || null,
     name: baby.name || 'Без имени',
     birthdate: baby.birthdate || null,
-    age_months: baby.age_months ?? null,
-    age_label: formatAge(baby.age_months),
+    age_months: ageMonths,
+    age_label: formatAge(ageMonths),
     updated_at: baby.updated_at || null
   };
 }
