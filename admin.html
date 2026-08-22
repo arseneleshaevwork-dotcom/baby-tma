@@ -331,7 +331,7 @@
     <section class="grid metrics" id="metrics" data-admin-view="overview"></section>
 
     <section class="card admin-actions" data-admin-view="partners" hidden>
-      <div class="section-title"><h2>Новый партнёр</h2><span class="muted">30% · 30 дней · холд 14 дней</span></div>
+      <div class="section-title"><h2>Новый партнёр</h2><span class="muted">30% · 2 оплаты · холд 14 дней</span></div>
       <div class="action-row">
         <label>Имя или канал<input id="partnerName" maxlength="120" placeholder="Мария / Сон малыша"></label>
         <label>Код ссылки<input id="partnerCode" maxlength="32" placeholder="maria_sleep"></label>
@@ -891,7 +891,7 @@
       }
       const cards = [
         ['Активные', number(summary.active), `${number(summary.referrals)} закреплений`],
-        ['Покупки', number(summary.conversions), 'только подтверждённые платежи'],
+        ['Покупки', number(summary.conversions), 'до 2 RUB-оплат на клиента'],
         ['К выплате', `${number(summary.available_rubles)} ₽`, 'после 14 дней без возврата'],
         ['Выплачено', `${number(summary.paid_rubles)} ₽`, `${number(summary.reversed_rubles)} ₽ отменено возвратами`]
       ];

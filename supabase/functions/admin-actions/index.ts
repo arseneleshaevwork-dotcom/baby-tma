@@ -99,8 +99,9 @@ Deno.serve(async (req) => {
     const commissionBps = Math.max(0, Math.min(5000, Math.round(Number(body?.commission_bps) || 3000)));
     if (!code || name.length < 2) return json({ error: 'invalid_partner' }, 400);
     const { data, error } = await supabase.from('partners').insert({
-      code, name, contact, commission_bps: commissionBps, attribution_days: 30, hold_days: 14
-    }).select('id,code,name,contact,status,commission_bps,attribution_days,hold_days').maybeSingle();
+      code, name, contact, commission_bps: commissionBps, attribution_days: 30, hold_days: 14,
+      commission_payment_limit: 2, commission_days: 62
+    }).select('id,code,name,contact,status,commission_bps,attribution_days,hold_days,commission_payment_limit,commission_days').maybeSingle();
     if (error?.code === '23505') return json({ error: 'partner_code_exists' }, 409);
     if (error || !data) return json({ error: 'partner_create_failed' }, 500);
     return json({ ok: true, partner: data });

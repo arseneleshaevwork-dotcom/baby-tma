@@ -152,15 +152,15 @@ Deno.serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(1000),
     supabase.from('partners')
-      .select('id,code,name,contact,status,commission_bps,attribution_days,hold_days,created_at,updated_at')
+      .select('id,code,name,contact,status,commission_bps,attribution_days,hold_days,commission_payment_limit,commission_days,created_at,updated_at')
       .order('created_at', { ascending: false })
       .limit(1000),
     supabase.from('partner_referrals')
-      .select('id,partner_id,billing_identity_id,source,captured_at,expires_at')
+      .select('id,partner_id,billing_identity_id,source,captured_at,expires_at,converted_at,commission_ends_at')
       .order('captured_at', { ascending: false })
       .limit(10000),
     supabase.from('partner_commissions')
-      .select('id,partner_id,payment_id,payout_id,amount_minor,commission_bps,commission_minor,status,available_at,paid_at,reversed_at,created_at')
+      .select('id,partner_id,payment_id,payout_id,payment_number,amount_minor,commission_bps,commission_minor,status,available_at,paid_at,reversed_at,created_at')
       .order('created_at', { ascending: false })
       .limit(10000),
     supabase.from('partner_payouts')

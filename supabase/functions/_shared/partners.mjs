@@ -19,6 +19,26 @@ export function partnerReferralExpiry(capturedAt, attributionDays) {
   return new Date(start.getTime() + days * 86400_000);
 }
 
+export function partnerCommissionWindowEnd(convertedAt, commissionDays) {
+  const start = new Date(convertedAt);
+  const days = Math.max(1, Math.min(365, Number(commissionDays) || 62));
+  return new Date(start.getTime() + days * 86400_000);
+}
+
+export function partnerPaymentEligibility({ paymentAt, referralExpiresAt, commissionEndsAt, existingPayments = 0, paymentLimit = 2 }) {
+  const paymentTime = new Date(paymentAt).getTime();
+  const count = Math.max(0, Number(existingPayments) || 0);
+  const limit = Math.max(1, Math.min(12, Number(paymentLimit) || 2));
+  if (!Number.isFinite(paymentTime) || count >= limit) return { eligible: false, paymentNumber: null };
+
+  const deadline = count === 0 ? referralExpiresAt : commissionEndsAt;
+  const deadlineTime = new Date(deadline || 0).getTime();
+  return {
+    eligible: Number.isFinite(deadlineTime) && paymentTime <= deadlineTime,
+    paymentNumber: count + 1
+  };
+}
+
 export function partnerCommissionMinor(amountMinor, commissionBps) {
   const amount = Number(amountMinor);
   const bps = Number(commissionBps);
@@ -32,10 +52,13 @@ export async function claimPartnerReferral({ supabase, code, userId, billingIden
   if (!normalized || !Number.isSafeInteger(identity) || identity === 0 || !userId) return null;
 
   const { data: existing } = await supabase.from('partner_referrals')
-    .select('id,partner_id,code,captured_at,expires_at')
+    .select('id,partner_id,code,captured_at,expires_at,converted_at,commission_ends_at')
     .eq('billing_identity_id', identity)
     .maybeSingle();
-  if (existing && new Date(existing.expires_at).getTime() >= new Date(now).getTime()) return existing;
+  const nowTime = new Date(now).getTime();
+  const attributionActive = existing && new Date(existing.expires_at).getTime() >= nowTime;
+  const commissionActive = existing?.commission_ends_at && new Date(existing.commission_ends_at).getTime() >= nowTime;
+  if (existing?.converted_at || attributionActive || commissionActive) return existing;
 
   const { data: partner } = await supabase.from('partners')
     .select('id,code,attribution_days')
@@ -53,16 +76,18 @@ export async function claimPartnerReferral({ supabase, code, userId, billingIden
     source,
     code: partner.code,
     captured_at: capturedAt.toISOString(),
-    expires_at: expiresAt.toISOString()
+    expires_at: expiresAt.toISOString(),
+    converted_at: null,
+    commission_ends_at: null
   };
   const mutation = existing
     ? supabase.from('partner_referrals').update(referralValues).eq('id', existing.id)
     : supabase.from('partner_referrals').insert(referralValues);
-  const { data, error } = await mutation.select('id,partner_id,code,captured_at,expires_at').maybeSingle();
+  const { data, error } = await mutation.select('id,partner_id,code,captured_at,expires_at,converted_at,commission_ends_at').maybeSingle();
 
   if (!error) return data;
   const { data: raced } = await supabase.from('partner_referrals')
-    .select('id,partner_id,code,captured_at,expires_at')
+    .select('id,partner_id,code,captured_at,expires_at,converted_at,commission_ends_at')
     .eq('billing_identity_id', identity)
     .maybeSingle();
   return raced || null;
@@ -76,18 +101,47 @@ export async function accruePartnerCommission({ supabase, payment, paidAt = new 
 
   const paymentTime = new Date(paidAt);
   const { data: referral } = await supabase.from('partner_referrals')
-    .select('id,partner_id,captured_at,expires_at')
+    .select('id,partner_id,captured_at,expires_at,converted_at,commission_ends_at')
     .eq('billing_identity_id', identity)
     .lte('captured_at', paymentTime.toISOString())
-    .gte('expires_at', paymentTime.toISOString())
     .maybeSingle();
   if (!referral) return null;
 
   const { data: partner } = await supabase.from('partners')
-    .select('commission_bps,hold_days')
+    .select('commission_bps,hold_days,commission_payment_limit,commission_days')
     .eq('id', referral.partner_id)
     .maybeSingle();
   if (!partner) return null;
+
+  const { data: existingCommission } = await supabase.from('partner_commissions')
+    .select('id,status,commission_minor,available_at,payment_number')
+    .eq('payment_id', payment.id)
+    .maybeSingle();
+  if (existingCommission) return existingCommission;
+
+  const { data: priorCommissions, error: priorError } = await supabase.from('partner_commissions')
+    .select('payment_number')
+    .eq('referral_id', referral.id);
+  if (priorError) return null;
+
+  const eligibility = partnerPaymentEligibility({
+    paymentAt: paymentTime,
+    referralExpiresAt: referral.expires_at,
+    commissionEndsAt: referral.commission_ends_at,
+    existingPayments: priorCommissions?.length || 0,
+    paymentLimit: partner.commission_payment_limit
+  });
+  if (!eligibility.eligible) return null;
+
+  if (eligibility.paymentNumber === 1) {
+    const convertedAt = paymentTime.toISOString();
+    const commissionEndsAt = partnerCommissionWindowEnd(paymentTime, partner.commission_days).toISOString();
+    const { error: referralError } = await supabase.from('partner_referrals').update({
+      converted_at: convertedAt,
+      commission_ends_at: commissionEndsAt
+    }).eq('id', referral.id);
+    if (referralError) return null;
+  }
 
   const commissionBps = Number(partner.commission_bps || 0);
   const commissionMinor = partnerCommissionMinor(amountMinor, commissionBps);
@@ -100,14 +154,15 @@ export async function accruePartnerCommission({ supabase, payment, paidAt = new 
     amount_minor: amountMinor,
     commission_bps: commissionBps,
     commission_minor: commissionMinor,
+    payment_number: eligibility.paymentNumber,
     currency: 'RUB',
     status: 'pending',
     available_at: availableAt.toISOString()
-  }).select('id,status,commission_minor,available_at').maybeSingle();
+  }).select('id,status,commission_minor,available_at,payment_number').maybeSingle();
 
   if (!error) return data;
   const { data: existing } = await supabase.from('partner_commissions')
-    .select('id,status,commission_minor,available_at')
+    .select('id,status,commission_minor,available_at,payment_number')
     .eq('payment_id', payment.id)
     .maybeSingle();
   return existing || null;
