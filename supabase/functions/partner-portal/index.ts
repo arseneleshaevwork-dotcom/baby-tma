@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
   });
 });
 
-const partnerFields = 'id,code,name,contact,status,commission_bps,attribution_days,hold_days,commission_payment_limit,commission_days,created_at,applied_at,reviewed_at,approved_at';
+const partnerFields = 'id,code,name,contact,status,commission_bps,created_at,applied_at,reviewed_at,approved_at';
 
 async function findOwnedPartner(supabase: any, userId: string, telegramId: number) {
   const byUser = await supabase.from('partners').select(partnerFields).eq('user_id', userId).maybeSingle();

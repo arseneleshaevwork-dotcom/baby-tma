@@ -1,6 +1,6 @@
 import { normalizePartnerCode } from './partners.mjs';
 
-export const PARTNER_TERMS_VERSION = 'partner-v1-2026-08-22';
+export const PARTNER_TERMS_VERSION = 'partner-v2-2026-08-22';
 
 export function validatePartnerApplication(value = {}) {
   const name = String(value.name || '').replace(/\s+/g, ' ').trim().slice(0, 120);
@@ -26,10 +26,6 @@ export function buildPartnerSummary({ partner, referrals = [], commissions = [],
     contact: partner.contact || null,
     status: partner.status,
     commission_percent: Number(partner.commission_bps || 0) / 100,
-    attribution_days: Number(partner.attribution_days || 0),
-    hold_days: Number(partner.hold_days || 0),
-    commission_payment_limit: Number(partner.commission_payment_limit || 0),
-    commission_days: Number(partner.commission_days || 0),
     applied_at: partner.applied_at || partner.created_at || null,
     reviewed_at: partner.reviewed_at || null,
     approved_at: partner.approved_at || null

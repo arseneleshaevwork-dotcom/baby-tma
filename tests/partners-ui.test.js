@@ -23,7 +23,9 @@ assert.strictEqual(window.BabyPartners.statusCopy('active')[0], 'Партнёр�
 const html = fs.readFileSync('./index.html', 'utf8');
 assert.ok(html.includes('id="page-partner"'));
 assert.ok(html.includes('BabyPartners.open()'));
-assert.ok(html.includes('30% начисляется с первых двух подтверждённых оплат в рублях'));
+assert.ok(html.includes('30% начисляется с подходящих подтверждённых оплат в рублях'));
+assert.ok(!html.includes('в течение 62 дней'));
+assert.ok(!fs.readFileSync('./partners.js', 'utf8').includes('автоматически на 30 дней'));
 assert.ok(html.includes('<script src="partners.js'));
 
 console.log('ok - partner public page entry and validation');

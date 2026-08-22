@@ -14,7 +14,7 @@ assert.deepEqual(validatePartnerApplication({
 }), { ok: true, name: 'Сон малыша', code: 'sleep_maria', contact: '@maria' });
 assert.equal(validatePartnerApplication({ name: 'Мария', code: 'x', terms_accepted: true }).error, 'partner_code_invalid');
 assert.equal(validatePartnerApplication({ name: 'Мария', code: 'maria', terms_accepted: false }).error, 'partner_terms_required');
-assert.match(PARTNER_TERMS_VERSION, /^partner-v1-/);
+assert.match(PARTNER_TERMS_VERSION, /^partner-v2-/);
 
 const summary = buildPartnerSummary({
   partner: {
@@ -33,6 +33,9 @@ const summary = buildPartnerSummary({
 });
 
 assert.equal(summary.partner.commission_percent, 30);
+assert.equal(summary.partner.attribution_days, undefined);
+assert.equal(summary.partner.commission_days, undefined);
+assert.equal(summary.partner.commission_payment_limit, undefined);
 assert.equal(summary.stats.referrals, 2);
 assert.equal(summary.stats.conversions, 3);
 assert.equal(summary.stats.gross_rubles, 1248);

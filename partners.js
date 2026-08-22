@@ -129,7 +129,7 @@
         <div class="field"><label for="partnerNameInput">Имя или название площадки</label><input id="partnerNameInput" name="partnerName" maxlength="120" autocomplete="organization" value="${escapeHtml(existing?.name || '')}" placeholder="Например, Сон малыша"><small class="field-error" id="partnerNameError"></small></div>
         <div class="field"><label for="partnerCodeInput">Код для ссылки</label><input id="partnerCodeInput" name="partnerCode" maxlength="32" autocapitalize="none" autocomplete="off" spellcheck="false" value="${escapeHtml(existing?.code || '')}" placeholder="sleep_maria"><small>Только латинские буквы, цифры, _ или -.</small><small class="field-error" id="partnerCodeError"></small></div>
         <div class="field"><label for="partnerContactInput">Контакт для связи</label><input id="partnerContactInput" name="partnerContact" maxlength="160" autocomplete="username" value="${escapeHtml(existing?.contact || '')}" placeholder="@username или email"><small>Необязательно, если с вами можно связаться в Telegram.</small></div>
-        <label class="partner-consent"><input type="checkbox" name="partnerTerms"><span>Я ознакомился с правилами ниже: 30% с первых двух подтверждённых оплат в рублях, холд 14 дней, ручные выплаты от 1 000 ₽.</span></label>
+        <label class="partner-consent"><input type="checkbox" name="partnerTerms"><span>Я ознакомился с правилами ниже: 30% с подходящих подтверждённых оплат в рублях, проверка платежей и ручные выплаты от 1 000 ₽.</span></label>
         <small class="field-error" id="partnerTermsError"></small>
         <small class="field-error" id="partnerFormError" role="alert"></small>
         <button class="save-log-btn" type="submit">${rejected ? 'Отправить повторно' : 'Отправить заявку'}</button>
@@ -159,9 +159,9 @@
         <div class="section-title">Ссылки для приглашения</div>
         ${linkField('Web-ссылка', 'Web', portal.links.web)}
         ${linkField('Ссылка на Telegram-бота', 'Bot', portal.links.bot)}
-        <p>Реферал ничего не вводит: он просто впервые открывает приложение или бота по вашей ссылке. Код закрепляется автоматически на 30 дней.</p>
+        <p>Реферал ничего не вводит: он просто впервые открывает приложение или бота по вашей ссылке. Код закрепляется автоматически.</p>
       </div>
-      <div class="card partner-balance-note"><strong>В холде: ${formatRubles(stats.pending_rubles)}</strong><span>Сумма становится доступной через 14 дней, если платёж не возвращён. Выплаты проводятся вручную раз в месяц от 1 000 ₽.</span></div>`);
+      <div class="card partner-balance-note"><strong>На проверке: ${formatRubles(stats.pending_rubles)}</strong><span>Сумма становится доступной после проверки платежа, если он не возвращён. Выплаты проводятся вручную от 1 000 ₽.</span></div>`);
     document.querySelectorAll('[data-copy-partner]').forEach(button => button.addEventListener('click', () => copyLink(button.dataset.copyPartner)));
   }
 
