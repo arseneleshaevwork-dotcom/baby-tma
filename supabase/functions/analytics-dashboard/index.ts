@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(1000),
     supabase.from('partners')
-      .select('id,code,name,contact,status,commission_bps,attribution_days,hold_days,commission_payment_limit,commission_days,created_at,updated_at')
+      .select('id,code,name,contact,status,telegram_id,commission_bps,attribution_days,hold_days,commission_payment_limit,commission_days,applied_at,reviewed_at,approved_at,created_at,updated_at')
       .order('created_at', { ascending: false })
       .limit(1000),
     supabase.from('partner_referrals')
@@ -383,6 +383,7 @@ function buildPartners({ partners = [], referrals = [], commissions = [], payout
   return {
     summary: {
       active: partners.filter((item: any) => item.status === 'active').length,
+      pending: partners.filter((item: any) => item.status === 'pending').length,
       referrals: referrals.length,
       conversions: commissions.length,
       available_rubles: rows.reduce((sum: number, item: any) => sum + Number(item.available_rubles || 0), 0),

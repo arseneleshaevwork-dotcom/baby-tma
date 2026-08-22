@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.admin-actions]
 verify_jwt = false
 
+[functions.partner-portal]
+verify_jwt = false
+
 [functions.ai-assistant]
 verify_jwt = false
 

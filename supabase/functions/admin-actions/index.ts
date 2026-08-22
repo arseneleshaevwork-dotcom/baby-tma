@@ -98,9 +98,10 @@ Deno.serve(async (req) => {
     const contact = String(body?.contact || '').trim().slice(0, 160) || null;
     const commissionBps = Math.max(0, Math.min(5000, Math.round(Number(body?.commission_bps) || 3000)));
     if (!code || name.length < 2) return json({ error: 'invalid_partner' }, 400);
+    const now = new Date().toISOString();
     const { data, error } = await supabase.from('partners').insert({
       code, name, contact, commission_bps: commissionBps, attribution_days: 30, hold_days: 14,
-      commission_payment_limit: 2, commission_days: 62
+      commission_payment_limit: 2, commission_days: 62, status: 'active', approved_at: now, reviewed_at: now
     }).select('id,code,name,contact,status,commission_bps,attribution_days,hold_days,commission_payment_limit,commission_days').maybeSingle();
     if (error?.code === '23505') return json({ error: 'partner_code_exists' }, 409);
     if (error || !data) return json({ error: 'partner_create_failed' }, 500);
@@ -110,12 +111,15 @@ Deno.serve(async (req) => {
   if (action === 'update_partner') {
     const partnerId = String(body?.partner_id || '');
     const status = String(body?.status || '');
-    if (!/^[0-9a-f-]{36}$/i.test(partnerId) || !['active', 'paused'].includes(status)) {
+    if (!/^[0-9a-f-]{36}$/i.test(partnerId) || !['active', 'paused', 'rejected'].includes(status)) {
       return json({ error: 'invalid_partner_update' }, 400);
     }
-    const { data, error } = await supabase.from('partners').update({
-      status, updated_at: new Date().toISOString()
-    }).eq('id', partnerId).select('id,code,name,status').maybeSingle();
+    const now = new Date().toISOString();
+    const updateValues: Record<string, string> = { status, updated_at: now };
+    if (status === 'active' || status === 'rejected') updateValues.reviewed_at = now;
+    if (status === 'active') updateValues.approved_at = now;
+    const { data, error } = await supabase.from('partners').update(updateValues)
+      .eq('id', partnerId).select('id,code,name,status,reviewed_at,approved_at').maybeSingle();
     if (error) return json({ error: 'partner_update_failed' }, 500);
     if (!data) return json({ error: 'partner_not_found' }, 404);
     return json({ ok: true, partner: data });

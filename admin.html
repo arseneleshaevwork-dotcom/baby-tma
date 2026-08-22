@@ -890,7 +890,7 @@
         return;
       }
       const cards = [
-        ['Активные', number(summary.active), `${number(summary.referrals)} закреплений`],
+        ['Заявки', number(summary.pending), `${number(summary.active)} активных партнёров`],
         ['Покупки', number(summary.conversions), 'до 2 RUB-оплат на клиента'],
         ['К выплате', `${number(summary.available_rubles)} ₽`, 'после 14 дней без возврата'],
         ['Выплачено', `${number(summary.paid_rubles)} ₽`, `${number(summary.reversed_rubles)} ₽ отменено возвратами`]
@@ -900,19 +900,26 @@
           ${cards.map(([label, value, hint]) => `<article class="card"><div class="metric-label">${escapeHtml(label)}</div><div class="metric-value">${escapeHtml(value)}</div><div class="muted">${escapeHtml(hint)}</div></article>`).join('')}
         </div>
         <table>
-          <thead><tr><th>Партнёр</th><th>Ссылки</th><th>Лиды / покупки</th><th>Продажи</th><th>К выплате</th><th>Выплачено</th><th>Статус</th><th></th></tr></thead>
+          <thead><tr><th>Партнёр</th><th>Ссылки</th><th>Лиды / покупки</th><th>Продажи</th><th>К выплате</th><th>Выплачено</th><th>Статус</th><th>Действия</th></tr></thead>
           <tbody>${items.map(item => {
             const webLink = `https://arseneleshaevwork-dotcom.github.io/baby-tma/?ref=${encodeURIComponent(item.code)}`;
             const botLink = `https://t.me/babymode1_bot?start=ref_${encodeURIComponent(item.code)}`;
+            const linksEnabled = ['active', 'paused'].includes(item.status);
+            const tone = item.status === 'active' ? 'ok' : item.status === 'rejected' ? 'bad' : 'warn';
+            const actions = item.status === 'pending'
+              ? `<button type="button" data-partner-status="active" data-partner-id="${escapeHtml(item.id)}">Одобрить</button> <button class="danger" type="button" data-partner-status="rejected" data-partner-id="${escapeHtml(item.id)}">Отклонить</button>`
+              : item.status === 'active'
+                ? `<button class="ghost" type="button" data-partner-status="paused" data-partner-id="${escapeHtml(item.id)}">Пауза</button>`
+                : `<button class="ghost" type="button" data-partner-status="active" data-partner-id="${escapeHtml(item.id)}">${item.status === 'rejected' ? 'Одобрить' : 'Включить'}</button>`;
             return `<tr>
-              <td><strong>${escapeHtml(item.name)}</strong><br><span class="muted">${escapeHtml(item.contact || item.code)}</span></td>
-              <td><button class="ghost" type="button" data-copy-link="${escapeHtml(webLink)}">Web</button> <button class="ghost" type="button" data-copy-link="${escapeHtml(botLink)}">Bot</button></td>
+              <td><strong>${escapeHtml(item.name)}</strong><br><span class="muted">${escapeHtml(item.contact || item.code)}${item.telegram_id ? ` · TG ${escapeHtml(item.telegram_id)}` : ''}</span></td>
+              <td>${linksEnabled ? `<button class="ghost" type="button" data-copy-link="${escapeHtml(webLink)}">Web</button> <button class="ghost" type="button" data-copy-link="${escapeHtml(botLink)}">Bot</button>` : '<span class="muted">после одобрения</span>'}</td>
               <td>${number(item.referrals)} / ${number(item.conversions)}<br><span class="muted">${number(item.conversion_rate)}%</span></td>
               <td>${number(item.gross_rubles)} ₽</td>
               <td><strong>${number(item.available_rubles)} ₽</strong><br><span class="muted">${number(item.pending_rubles)} ₽ всего в холде</span></td>
               <td>${number(item.paid_rubles)} ₽</td>
-              <td>${statusBadge(item.status, item.status === 'active' ? 'ok' : 'warn')}</td>
-              <td><button class="ghost" type="button" data-partner-status="${item.status === 'active' ? 'paused' : 'active'}" data-partner-id="${escapeHtml(item.id)}">${item.status === 'active' ? 'Пауза' : 'Включить'}</button>${Number(item.available_rubles) >= 1000 ? ` <button type="button" data-partner-payout="${escapeHtml(item.id)}">Выплачено</button>` : ''}</td>
+              <td>${statusBadge(item.status, tone)}<br><span class="muted">${formatDateTime(item.applied_at || item.created_at)}</span></td>
+              <td>${actions}${Number(item.available_rubles) >= 1000 ? ` <button type="button" data-partner-payout="${escapeHtml(item.id)}">Выплачено</button>` : ''}</td>
             </tr>`;
           }).join('')}</tbody>
         </table>`;

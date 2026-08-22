@@ -126,6 +126,7 @@ function buildPartners({ partners = [], referrals = [], commissions = [], payout
   return {
     summary: {
       active: partners.filter(item => item.status === 'active').length,
+      pending: partners.filter(item => item.status === 'pending').length,
       referrals: referrals.length,
       conversions: commissions.length,
       available_rubles: items.reduce((sum, item) => sum + Number(item.available_rubles || 0), 0),

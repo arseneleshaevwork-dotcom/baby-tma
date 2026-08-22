@@ -169,6 +169,7 @@ test('builds partner balances with hold, payouts and refunds', () => {
   });
 
   assert.strictEqual(dashboard.partners.summary.active, 1);
+  assert.strictEqual(dashboard.partners.summary.pending, 0);
   assert.strictEqual(dashboard.partners.items[0].referrals, 2);
   assert.strictEqual(dashboard.partners.items[0].conversions, 3);
   assert.strictEqual(dashboard.partners.items[0].available_rubles, 104.7);
@@ -183,6 +184,7 @@ test('admin page compiles and labels mixed billing identities as clients', () =>
   assert.doesNotThrow(() => new Function(scripts.at(-1)[1]));
   assert.ok(html.includes('<th>Клиент</th>'));
   assert.ok(html.includes('function formatCustomer(item = {})'));
+  assert.ok(html.includes('data-partner-status="rejected"'));
 });
 
 function row(eventName, userId, clientId, createdAt, payload = {}, attribution = {}) {

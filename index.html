@@ -44,7 +44,7 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 
-<link rel="stylesheet" href="style.css?v=20260821-4">
+<link rel="stylesheet" href="style.css?v=20260822-1">
 </head>
 <body data-page="home">
 
@@ -585,6 +585,37 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
 </div>
 
 <!-- ═══════════════════════════════════════════════════════
+     PAGE: PARTNER PROGRAM
+════════════════════════════════════════════════════════ -->
+<div id="page-partner" class="page">
+  <div class="partner-page-head">
+    <button type="button" onclick="goPage('profile',document.getElementById('bn-profile'));renderProfilePage();hapticLight()" aria-label="Вернуться в профиль"><i data-lucide="arrow-left"></i></button>
+    <div><span>Партнёрская программа</span><h2>Рекомендуйте с пользой</h2></div>
+  </div>
+  <div class="partner-hero">
+    <span class="partner-hero-kicker">30% вознаграждения</span>
+    <h1>Делитесь «Режимом малыша» со своей аудиторией</h1>
+    <p>После одобрения вы получите ссылки для сайта и Telegram-бота. Приглашённому достаточно открыть одну из них — код закрепится автоматически.</p>
+  </div>
+  <div class="partner-rule-grid">
+    <div><strong>2 оплаты</strong><span>30% с первых двух подтверждённых RUB-платежей</span></div>
+    <div><strong>30 дней</strong><span>окно закрепления после первого перехода</span></div>
+    <div><strong>14 дней</strong><span>холд перед доступностью вознаграждения</span></div>
+  </div>
+  <div id="partnerPortalContent" aria-live="polite"></div>
+  <details class="partner-rules card">
+    <summary>Полные правила программы</summary>
+    <ul>
+      <li>30% начисляется с первых двух подтверждённых оплат в рублях.</li>
+      <li>Первый платёж должен пройти в течение 30 дней после закрепления, второй — в течение 62 дней после первого.</li>
+      <li>Вознаграждение удерживается 14 дней; полный возврат отменяет начисление.</li>
+      <li>Выплаты проводятся вручную раз в месяц при доступном балансе от 1 000 ₽.</li>
+      <li>Покупки за Telegram Stars видны как конверсии, но денежное вознаграждение по ним не начисляется.</li>
+    </ul>
+  </details>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
      PAGE: PROFILE
 ═══════════════════════════════════════════════════════ -->
 <div id="page-profile" class="page">
@@ -603,6 +634,7 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
     <button onclick="goPage('premium',null);renderPremiumPage();hapticLight()"><span>⭐</span><div><strong>Premium</strong><small id="profilePremiumStatus">Проверяем статус</small></div><b>›</b></button>
     <button onclick="goPage('articles',null);hapticLight()"><span>📚</span><div><strong>База знаний</strong><small>Сон, кормление и развитие</small></div><b>›</b></button>
     <button onclick="goPage('ritual',null);hapticLight()"><span>🌙</span><div><strong>Ритуал сна</strong><small>Таймер и спокойные звуки</small></div><b>›</b></button>
+    <button onclick="BabyPartners.open();hapticLight()"><span>↗</span><div><strong>Партнёрская программа</strong><small>Получить ссылку и видеть вознаграждения</small></div><b>›</b></button>
     <button onclick="toggleNotifications();hapticLight()"><span>🔔</span><div><strong>Напоминания</strong><small id="profileNotifStatus">Настроить в Telegram</small></div><b>›</b></button>
     <button onclick="manageAiConsent();hapticLight()"><span>✨</span><div><strong>ИИ и данные</strong><small id="profileAiStatus">Спросим согласие перед первым вопросом</small></div><b>›</b></button>
     <button onclick="exportAllData();hapticLight()"><span>📥</span><div><strong>Скачать мои данные</strong><small>Профиль, дневник и настройки</small></div><b>›</b></button>
@@ -685,6 +717,7 @@ window.BABY_TELEGRAM_SDK_READY = (function() {
 <script src="analytics.js?v=20260821-1"></script>
 <script src="tma.js?v=20260812-1"></script>
 <script src="web-account.js?v=20260812-1"></script>
+<script src="partners.js?v=20260822-1"></script>
 <script src="cloud-sync.js?v=20260812-1"></script>
 <script src="pwa.js?v=20260821-2"></script>
 <script src="chat.js?v=20260812-1"></script>
