@@ -273,9 +273,9 @@ function renderStatCharts(p,daySegs){
         {label:'Ориентир режима',data:[p.ns,(daySleepMin/60).toFixed(1),p.ts],backgroundColor:['rgba(124,131,232,.75)','rgba(93,201,160,.72)','rgba(255,154,123,.72)'],borderRadius:8,borderSkipped:false}
       ]},
     options:{responsive:true,
-      plugins:{legend:{labels:{color:'#94a3b8',font:{size:11}}}},
-      scales:{x:{ticks:{color:'#94a3b8',font:{size:11}},grid:{color:'rgba(255,255,255,.05)'}},
-        y:{ticks:{color:'#94a3b8',font:{size:11},callback:v=>v+'ч'},grid:{color:'rgba(255,255,255,.05)'},max:14}}
+      plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#5F5A65',font:{size:11,weight:'700'},maxRotation:0,minRotation:0},grid:{display:false}},
+        y:{ticks:{color:'#5F5A65',font:{size:11,weight:'700'},callback:v=>v+'ч'},grid:{color:'rgba(36,33,42,.08)'},max:14}}
     }
   });
 

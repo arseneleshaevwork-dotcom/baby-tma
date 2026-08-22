@@ -9,13 +9,7 @@ let _notifTimers = [];
 let _tgUserId = null;
 
 function initNotifications() {
-  // Get Telegram user ID if in TMA
-  try {
-    const tg = window.Telegram && window.Telegram.WebApp;
-    if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
-      _tgUserId = tg.initDataUnsafe.user.id;
-    }
-  } catch(e) {}
+  _refreshTelegramUserId();
 
   if (typeof SUB !== 'undefined' && !SUB.can('notifications')) {
     _notifTimers.forEach(t => clearTimeout(t));
@@ -67,6 +61,12 @@ function _showNotifPrompt() {
 }
 
 function _showInAppPrompt() {
+  if (window.BabyAccount?.isAuthenticated?.() && !window.BabyAccount.isMiniApp()) {
+    setNotificationPreference('tg');
+    if (typeof showToast === 'function') showToast('В Telegram нажмите «Запустить», чтобы бот мог присылать напоминания');
+    window.open('https://t.me/babymode1_bot?start=reminders', '_blank', 'noopener');
+    return;
+  }
   if (typeof showToast === 'function') {
     showToast('💡 Напоминания: нажмите кнопку 🔔 после генерации расписания');
   }
@@ -113,19 +113,7 @@ function scheduleReminders(blocks) {
   _renderReminderBadge(reminderPlan.length);
   _renderReminderList(reminderPlan);
 
-  if (isNotificationsEnabled() && _tgUserId && window.BabyAnalytics && reminderPlan.length) {
-    BabyAnalytics.track('schedule_reminders_planned', {
-      reminders: reminderPlan.map(item => ({
-        id: item.id,
-        kind: item.kind,
-        type: item.type,
-        title: item.title,
-        at: item.at,
-        message: item.message
-      }))
-    });
-    BabyAnalytics.flush();
-  }
+  _syncReminderPlanToTelegram(reminderPlan);
 
   if (reminderPlan.length > 0 && typeof showToast === 'function') {
     showToast(`🔔 Напоминания установлены: ${reminderPlan.length}`);
@@ -176,6 +164,7 @@ function getTodayReminderPlan() {
 
 function _storeReminderPlan(plan) {
   localStorage.setItem('babymode_today_reminders', JSON.stringify((plan || []).map(item => ({
+    id: item.id,
     kind: item.kind,
     type: item.type,
     title: item.title,
@@ -239,6 +228,7 @@ function _escapeHtml(value) {
 }
 
 function setNotificationPreference(value) {
+  _refreshTelegramUserId();
   localStorage.setItem(NOTIF_KEY, value);
   if (window.BabyCloudSync) BabyCloudSync.markSettingsChanged();
   if (!window.BabyAnalytics) return;
@@ -254,6 +244,46 @@ function setNotificationPreference(value) {
   });
   BabyAnalytics.flush();
 }
+
+function _refreshTelegramUserId() {
+  try {
+    const miniAppUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+    const webUser = window.BabyAccount?.getUser?.();
+    const value = Number(miniAppUser?.id || webUser?.telegram_id || 0);
+    _tgUserId = Number.isSafeInteger(value) && value > 0 ? value : null;
+  } catch (_) {
+    _tgUserId = null;
+  }
+  return _tgUserId;
+}
+
+function _syncReminderPlanToTelegram(plan) {
+  _refreshTelegramUserId();
+  if (!isNotificationsEnabled() || !_tgUserId || !window.BabyAnalytics || !Array.isArray(plan) || !plan.length) return false;
+  BabyAnalytics.track('schedule_reminders_planned', {
+    reminders: plan.map(item => ({
+      id: item.id,
+      kind: item.kind,
+      type: item.type,
+      title: item.title,
+      at: item.at,
+      message: item.message
+    }))
+  });
+  BabyAnalytics.flush();
+  return true;
+}
+
+window.addEventListener('baby-account-authenticated', function() {
+  _refreshTelegramUserId();
+  const plan = getTodayReminderPlan();
+  if (plan.length) _syncReminderPlanToTelegram(plan);
+  if (isNotificationsEnabled() && typeof showToast === 'function') {
+    showToast('Напоминания привязаны к Telegram');
+  }
+});
+
+window.addEventListener('baby-account-ready', _refreshTelegramUserId);
 
 
 const _setNotificationPreference = setNotificationPreference;

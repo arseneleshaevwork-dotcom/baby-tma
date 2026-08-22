@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.112.3';
 import { readJsonBody } from '../_shared/http.ts';
+import { isComfortableDeliveryTime, localDateTime, reminderForBaby } from './policy.mjs';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://arseneleshaevwork-dotcom.github.io',
@@ -8,8 +9,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Cache-Control': 'no-store'
 };
-
-const milestoneMonths = [1, 3, 6, 9, 12, 18, 24, 36];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -39,7 +38,9 @@ Deno.serve(async (req) => {
   if (!parsedBody.ok) return json({ error: parsedBody.error }, parsedBody.error === 'payload_too_large' ? 413 : 400);
   const body = parsedBody.value;
   const dryRun = Boolean(body?.dry_run);
-  const today = dateOnly(body?.date || new Date().toISOString());
+  const now = new Date();
+  const forcedDate = body?.date ? dateOnly(body.date) : '';
+  const today = forcedDate || dateOnly(now.toISOString());
 
   const scheduled = body?.run_scheduled === false
     ? []
@@ -48,7 +49,7 @@ Deno.serve(async (req) => {
   const [settingsResult, babiesResult, deliveriesResult] = await Promise.all([
     supabase
       .from('notification_settings')
-      .select('user_id,telegram_id,client_id,chat_id,enabled,birthday_reminders,age_milestones')
+      .select('user_id,telegram_id,client_id,chat_id,enabled,timezone,birthday_reminders,age_milestones')
       .eq('enabled', true)
       .limit(5000),
     supabase
@@ -59,7 +60,8 @@ Deno.serve(async (req) => {
     supabase
       .from('notification_deliveries')
       .select('baby_id,reminder_type,event_date,status,claimed_at')
-      .eq('event_date', today)
+      .gte('event_date', dateOnly(new Date(now.getTime() - 36 * 60 * 60 * 1000).toISOString()))
+      .lte('event_date', dateOnly(new Date(now.getTime() + 36 * 60 * 60 * 1000).toISOString()))
       .limit(5000)
   ]);
 
@@ -75,7 +77,8 @@ Deno.serve(async (req) => {
   const jobs = buildReminderJobs({
     babies: babiesResult.data || [],
     settings,
-    today,
+    now,
+    forcedDate,
     delivered
   });
 
@@ -190,10 +193,11 @@ function summarizeResults(items: any[]) {
   };
 }
 
-function buildReminderJobs({ babies, settings, today, delivered }: {
+function buildReminderJobs({ babies, settings, now, forcedDate, delivered }: {
   babies: any[];
   settings: any[];
-  today: string;
+  now: Date;
+  forcedDate: string;
   delivered: Set<string>;
 }) {
   const byUser = new Map(settings.filter(s => s.user_id).map(s => [s.user_id, s]));
@@ -204,10 +208,14 @@ function buildReminderJobs({ babies, settings, today, delivered }: {
     const setting = (baby.user_id && byUser.get(baby.user_id)) || (baby.client_id && byClient.get(baby.client_id));
     if (!setting?.chat_id) continue;
 
-    const reminder = reminderForBaby(baby, today, setting);
+    const local = forcedDate
+      ? { date: forcedDate, hour: 9 }
+      : localDateTime(now, setting.timezone || 'Europe/Moscow');
+    if (!forcedDate && !isComfortableDeliveryTime(local.hour)) continue;
+    const reminder = reminderForBaby(baby, local.date, setting);
     if (!reminder) continue;
 
-    const key = `${baby.id}:${reminder.type}:${today}`;
+    const key = `${baby.id}:${reminder.type}:${local.date}`;
     if (delivered.has(key)) continue;
 
     jobs.push({
@@ -218,30 +226,12 @@ function buildReminderJobs({ babies, settings, today, delivered }: {
       chat_id: setting.chat_id,
       name: baby.name || 'малыша',
       reminder_type: reminder.type,
-      event_date: today,
+      event_date: local.date,
       text: buildMessage(baby.name || 'малыша', reminder)
     });
   }
 
   return jobs;
-}
-
-function reminderForBaby(baby: any, today: string, setting: any) {
-  const birth = parseDateOnly(baby.birthdate);
-  const date = parseDateOnly(today);
-  if (!birth || !date) return null;
-
-  if (setting.birthday_reminders && birth.getUTCMonth() === date.getUTCMonth() && birth.getUTCDate() === date.getUTCDate()) {
-    const years = date.getUTCFullYear() - birth.getUTCFullYear();
-    if (years > 0) return { type: 'birthday', ageLabel: years === 1 ? '1 год' : `${years} года` };
-  }
-
-  const months = fullMonthsBetween(birth, date);
-  if (setting.age_milestones && milestoneMonths.includes(months) && birth.getUTCDate() === date.getUTCDate()) {
-    return { type: 'age_milestone', ageLabel: formatMonthLabel(months) };
-  }
-
-  return null;
 }
 
 function buildMessage(name: string, reminder: { type: string; ageLabel: string }) {
@@ -261,28 +251,6 @@ async function sendTelegram(token: string, chatId: number, text: string) {
   if (!('json' in response)) return { ok: false, error: response.error };
   const data = await response.json().catch(() => ({}));
   return { ok: Boolean(response.ok && data.ok), error: data.description || null };
-}
-
-function fullMonthsBetween(from: Date, to: Date) {
-  let months = (to.getUTCFullYear() - from.getUTCFullYear()) * 12 + to.getUTCMonth() - from.getUTCMonth();
-  if (to.getUTCDate() < from.getUTCDate()) months -= 1;
-  return Math.max(0, months);
-}
-
-function formatMonthLabel(months: number) {
-  if (months === 1) return '1 месяц';
-  if ([2, 3, 4].includes(months)) return `${months} месяца`;
-  if (months === 12) return '1 год';
-  if (months > 12 && months % 12 === 0) return `${months / 12} года`;
-  if (months > 12) return `${Math.floor(months / 12)} г. ${months % 12} мес.`;
-  return `${months} месяцев`;
-}
-
-function parseDateOnly(value: string) {
-  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!match) return null;
-  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
-  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 function dateOnly(value: string) {

@@ -194,6 +194,12 @@ test('onboarding does not show an automatic trial toast', () => {
   assert.doesNotMatch(source, /Активируйте 7 дней Premium/);
 });
 
+test('Premium page lets a monthly Stars subscriber control renewal', () => {
+  const source = fs.readFileSync('./subscription.js', 'utf8');
+  assert.match(source, /editUserStarSubscription|cancelStarsSubscription/);
+  assert.match(source, /Отключить автопродление/);
+});
+
 test('subscribe outside Telegram does not set premium cache', async () => {
   const { context, store } = createContext({ initData: '' });
   loadSubscription(context);

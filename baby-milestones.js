@@ -161,7 +161,11 @@ function nextBirthday(birth, nowDate) {
 }
 
 function addMonths(date, months) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, date.getUTCDate()));
+  const targetMonth = date.getUTCMonth() + months;
+  const targetYear = date.getUTCFullYear() + Math.floor(targetMonth / 12);
+  const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+  const lastDay = new Date(Date.UTC(targetYear, normalizedMonth + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(targetYear, normalizedMonth, Math.min(date.getUTCDate(), lastDay)));
 }
 
 function addDays(date, days) {

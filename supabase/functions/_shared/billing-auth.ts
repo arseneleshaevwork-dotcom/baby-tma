@@ -23,7 +23,7 @@ export async function authenticateBillingRequest({ req, body, supabase, botToken
     guest = Array.isArray(data) ? data[0] : data;
   } else {
     const { data } = await supabase.from('web_billing_guests')
-      .select('id,user_id,billing_identity_id')
+      .select('id,user_id,billing_identity_id,linked_telegram_id')
       .eq('guest_token_hash', tokenHash)
       .maybeSingle();
     guest = data;
@@ -32,6 +32,7 @@ export async function authenticateBillingRequest({ req, body, supabase, botToken
     }
   }
 
+  if (guest?.linked_telegram_id) return { ok: false, error: 'guest_already_linked' };
   const billingIdentityId = Number(guest?.billing_identity_id);
   if (!guest?.user_id || !Number.isSafeInteger(billingIdentityId) || billingIdentityId >= 0) {
     return { ok: false, error: 'guest_identity_not_found' };

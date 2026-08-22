@@ -95,6 +95,7 @@
             authenticated = true;
             user = data.user || null;
             applyServerBaby(data.baby);
+            if (global.SUB?.claimGuestPremium) await global.SUB.claimGuestPremium();
             hideGate();
             renderAccount();
             dispatchReady();
@@ -138,6 +139,7 @@
       const data = await loginResponse.json().catch(() => ({}));
       if (!loginResponse.ok || !data.session_token) throw new Error(data.error || 'session_failed');
       applySession(data);
+      if (global.SUB?.claimGuestPremium) await global.SUB.claimGuestPremium();
       hideGate();
       renderAccount();
       global.dispatchEvent(new CustomEvent('baby-account-authenticated', { detail: { mode, user } }));

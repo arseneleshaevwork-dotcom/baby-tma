@@ -217,6 +217,26 @@ const SUB = (() => {
     }
   }
 
+  async function claimGuestPremium() {
+    if (!window.BabyAccount?.isAuthenticated?.() || !window.BABY_BILLING_SUBSCRIPTION_ENDPOINT) return false;
+    const guestKey = _getGuestBillingKey(false);
+    if (!guestKey) return false;
+    try {
+      const response = await BabyAccount.request(window.BABY_BILLING_SUBSCRIPTION_ENDPOINT, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: { action: 'claim_guest', guest_key: guestKey }
+      });
+      if (response.status === 409) return false;
+      if (!response.ok) return false;
+      localStorage.removeItem(WEB_BILLING_GUEST_KEY_STORAGE);
+      await refreshPremiumStatus();
+      if (typeof showToast === 'function') showToast('Premium привязан к Telegram');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   function _showConfetti() {
     const colors = ['#FF9A7B','#C97BDB','#FFB347','#5DC9A0','#F48FB1','#7C83E8'];
     for (let i = 0; i < 30; i++) {
@@ -240,7 +260,7 @@ const SUB = (() => {
   }
 
   return {
-    init, startTrial, refreshPremiumStatus, can, getStatus, getDaysLeft, getPremiumUntil,
+    init, startTrial, refreshPremiumStatus, claimGuestPremium, can, getStatus, getDaysLeft, getPremiumUntil,
     isPremium, isTrialActive, getPlanLimits, getSource, getPlan, isCancelling, getNextBillingAt, getPaymentMethodType, hasUsedTrial, requirePremium
   };
 })();
@@ -279,6 +299,7 @@ function _renderPremiumActive() {
   const source = SUB.getSource();
   const cancelling = SUB.isCancelling();
   const oneTime = isWeb && source === 'yookassa' && SUB.getPaymentMethodType() === 'one_time';
+  const recurringStars = source === 'telegram_stars' && SUB.getPlan() === 'month';
   const manage = isWeb && source === 'yookassa' && !oneTime ? `
     <div class="billing-manage">
       <p>${cancelling ? 'Автопродление отключено. Premium продолжит работать до указанной даты.' : 'Следующее списание произойдёт в конце оплаченного периода.'}</p>
@@ -290,6 +311,13 @@ function _renderPremiumActive() {
     <div class="billing-manage">
       <p>Это разовая покупка без автопродления. Premium продолжит работать до указанной даты.</p>
     </div>` : '';
+  const starsManage = recurringStars ? `
+    <div class="billing-manage">
+      <p>${cancelling ? 'Автопродление Stars отключено. Premium работает до конца оплаченного периода.' : 'Ежемесячная подписка будет продлена в Telegram Stars.'}</p>
+      <button class="cta-outline-btn" onclick="${cancelling ? 'resumeStarsSubscription' : 'cancelStarsSubscription'}();hapticLight()">
+        ${cancelling ? 'Включить автопродление' : 'Отключить автопродление'}
+      </button>
+    </div>` : '';
   return `
     <div class="premium-active-card">
       <div class="premium-crown">👑</div>
@@ -299,6 +327,7 @@ function _renderPremiumActive() {
     <div class="plan-comparison">${_featuresList(true)}</div>
     ${oneTimeNote}
     ${manage}
+    ${starsManage}
   `;
 }
 
@@ -781,6 +810,35 @@ function resumePendingWebCheckout() {
 
 async function cancelWebSubscription() {
   await _manageWebSubscription('cancel');
+}
+
+async function cancelStarsSubscription() {
+  await _manageStarsSubscription('cancel_stars');
+}
+
+async function resumeStarsSubscription() {
+  await _manageStarsSubscription('resume_stars');
+}
+
+async function _manageStarsSubscription(action) {
+  const endpoint = window.BABY_BILLING_SUBSCRIPTION_ENDPOINT;
+  if (!endpoint || !window.BabyAccount?.canUseServer?.()) {
+    showToast('Откройте Premium после входа через Telegram');
+    return false;
+  }
+  try {
+    const response = await BabyAccount.request(endpoint, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: { action }
+    });
+    if (!response.ok) throw new Error('stars_subscription_manage_failed');
+    await SUB.refreshPremiumStatus();
+    renderPremiumPage();
+    showToast(action === 'cancel_stars' ? 'Автопродление Stars отключено' : 'Автопродление Stars включено');
+    return true;
+  } catch (_) {
+    showToast('Не удалось изменить подписку. Напишите в поддержку.');
+    return false;
+  }
 }
 
 async function resumeWebSubscription() {

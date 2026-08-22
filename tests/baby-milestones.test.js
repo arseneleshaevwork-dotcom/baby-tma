@@ -99,3 +99,13 @@ test('rejects impossible and future birthdates', () => {
   assert.strictEqual(isValidBirthdate('2026-08-20', new Date('2026-08-21T09:00:00Z')), true);
   assert.strictEqual(isValidBirthdate('2026-08-22', new Date('2026-08-21T09:00:00Z')), false);
 });
+
+test('clamps upcoming milestones to the last day of a short month', () => {
+  const dates = buildUpcomingBabyDates({
+    babies: [{ id: 'b1', name: 'Миша', birthdate: '2026-01-31', client_id: 'c1' }],
+    now: '2026-02-20T09:00:00.000Z',
+    horizonDays: 10
+  });
+  assert.equal(dates[0].event_date, '2026-02-28');
+  assert.equal(dates[0].age_label, '1 месяц');
+});
