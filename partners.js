@@ -98,6 +98,32 @@
     }
   }
 
+  async function copyClientPromo() {
+    const text = global.BabyPromo?.buildClientPromo(portal?.links?.bot);
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      if (typeof global.showToast === 'function') global.showToast('Промо-текст скопирован');
+    } catch (_) {
+      const field = document.getElementById('partnerClientPromo');
+      field?.select();
+    }
+  }
+
+  async function shareClientPromo() {
+    const text = global.BabyPromo?.buildClientPromo(portal?.links?.bot);
+    if (!text) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Режим Малыша', text });
+        return;
+      } catch (error) {
+        if (error?.name === 'AbortError') return;
+      }
+    }
+    await copyClientPromo();
+  }
+
   function render() {
     if (!portal) return renderApplication();
     const status = portal.partner?.status;
@@ -147,6 +173,7 @@
   function renderActive() {
     const copy = statusCopy('active');
     const stats = portal.stats || {};
+    const clientPromo = global.BabyPromo?.buildClientPromo(portal.links.bot) || '';
     setContent(`
       <div class="partner-status-banner is-active"><span>✓</span><div><strong>${copy[0]}</strong><small>${copy[1]}</small></div></div>
       <div class="partner-metrics" aria-label="Статистика партнёра">
@@ -161,8 +188,20 @@
         ${linkField('Ссылка на Telegram-бота', 'Bot', portal.links.bot)}
         <p>Реферал ничего не вводит: он просто впервые открывает приложение или бота по вашей ссылке. Код закрепляется автоматически.</p>
       </div>
+      <div class="card partner-promo-card">
+        <div class="section-title">Готовое промо для клиентов</div>
+        <p>Персональная ссылка уже подставлена. Отправьте текст как есть или адаптируйте под свой стиль.</p>
+        <label for="partnerClientPromo">Текст для рассылки</label>
+        <textarea id="partnerClientPromo" rows="13" readonly>${escapeHtml(clientPromo)}</textarea>
+        <div class="partner-promo-actions">
+          <button class="save-log-btn" type="button" id="partnerPromoCopyBtn">Скопировать текст</button>
+          <button class="cta-outline-btn" type="button" id="partnerPromoShareBtn">Поделиться</button>
+        </div>
+      </div>
       <div class="card partner-balance-note"><strong>На проверке: ${formatRubles(stats.pending_rubles)}</strong><span>Сумма становится доступной после проверки платежа, если он не возвращён. Выплаты проводятся вручную от 1 000 ₽.</span></div>`);
     document.querySelectorAll('[data-copy-partner]').forEach(button => button.addEventListener('click', () => copyLink(button.dataset.copyPartner)));
+    document.getElementById('partnerPromoCopyBtn')?.addEventListener('click', copyClientPromo);
+    document.getElementById('partnerPromoShareBtn')?.addEventListener('click', shareClientPromo);
   }
 
   function renderLoading() {
@@ -206,7 +245,7 @@
     return String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
   }
 
-  global.BabyPartners = { open, load, apply, copyLink, normalizeCode, statusCopy };
+  global.BabyPartners = { open, load, apply, copyLink, copyClientPromo, shareClientPromo, normalizeCode, statusCopy };
   global.addEventListener('baby-account-authenticated', () => {
     if (document.body.dataset.page === 'partner') load();
   });

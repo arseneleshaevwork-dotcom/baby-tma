@@ -17,7 +17,7 @@ function test(name, fn) {
     });
 }
 
-test('builds colorful start greeting and asks for baby name', () => {
+test('builds sales-oriented start greeting and asks for baby name', () => {
   const reply = buildBotReply({
     text: '/start',
     firstName: 'Анна',
@@ -28,7 +28,23 @@ test('builds colorful start greeting and asks for baby name', () => {
   assert.equal(reply.action, 'ask_name');
   assert.match(reply.text, /Анна/);
   assert.match(reply.text, /Как зовут малыша/);
-  assert.equal(reply.reply_markup.inline_keyboard[0][0].text, 'Открыть мини-приложение');
+  assert.match(reply.text, /Начать можно бесплатно/);
+  assert.match(reply.text, /ближайшее окно сна/);
+  assert.equal(reply.reply_markup.inline_keyboard[0][0].text, 'Собрать режим малыша');
+});
+
+test('returns an outcome-focused greeting to an existing parent', () => {
+  const reply = buildBotReply({
+    text: '/start',
+    firstName: 'Анна',
+    baby: { name: 'Миша' },
+    miniAppUrl: 'https://example.test/app'
+  });
+
+  assert.equal(reply.action, 'welcome_back');
+  assert.match(reply.text, /план на сегодня/i);
+  assert.match(reply.text, /Миша/);
+  assert.equal(reply.reply_markup.inline_keyboard[0][0].text, 'Открыть план на сегодня');
 });
 
 test('treats short plain text as baby name when profile has no name', () => {

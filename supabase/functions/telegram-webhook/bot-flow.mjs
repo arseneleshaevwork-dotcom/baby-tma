@@ -69,12 +69,13 @@ export function buildBotReply({ text = '', firstName = '', baby = null, miniAppU
   }
 
   if (cleanText.startsWith('/start')) {
+    const returning = Boolean(baby?.name);
     return {
-      action: baby?.name ? 'welcome_back' : 'ask_name',
-      text: baby?.name
-        ? `🌸 ${name}, рада видеть вас снова.\n\nЯ помогу вести режим ${baby.name}: сон, кормления, дневник, ИИ-подсказки и важные даты.\n\nОткройте мини-приложение, чтобы собрать план на сегодня.`
-        : `🌸 ${name}, добро пожаловать в «Режим малыша».\n\nЯ помогу:\n• собрать спокойный режим дня;\n• вести дневник сна и кормлений;\n• подсказать, что меняется по возрасту;\n• напомнить о важных датах малыша.\n\nКак зовут малыша? Напишите имя одним сообщением.`,
-      reply_markup: openAppKeyboard(miniAppUrl)
+      action: returning ? 'welcome_back' : 'ask_name',
+      text: returning
+        ? `🌙 ${name}, с возвращением в «Режим Малыша».\n\nПлан на сегодня, ближайшее окно сна, дневник и персональные подсказки уже в мини-приложении.\n\nОткройте его, чтобы спокойнее спланировать день ${baby.name}.`
+        : `🌙 ${name}, добро пожаловать в «Режим Малыша» — спокойный помощник для родителей.\n\nЗдесь не нужно собирать режим по кусочкам:\n• получите план дня по возрасту малыша;\n• увидите ближайшее окно сна;\n• отмечайте сон и кормления за пару касаний;\n• получайте персональные подсказки и ответы ИИ-помощника;\n• не пропускайте важные даты и напоминания.\n\nНачать можно бесплатно. Как зовут малыша?`,
+      reply_markup: welcomeKeyboard(miniAppUrl, returning)
     };
   }
 
@@ -209,6 +210,15 @@ function openAppKeyboard(miniAppUrl) {
   return {
     inline_keyboard: [[{
       text: 'Открыть мини-приложение',
+      web_app: { url: miniAppUrl }
+    }]]
+  };
+}
+
+function welcomeKeyboard(miniAppUrl, returning = false) {
+  return {
+    inline_keyboard: [[{
+      text: returning ? 'Открыть план на сегодня' : 'Собрать режим малыша',
       web_app: { url: miniAppUrl }
     }]]
   };

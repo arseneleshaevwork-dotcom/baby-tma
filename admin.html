@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex,nofollow,noarchive">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://jfyprwisnrubhhowipdm.functions.supabase.co">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; object-src 'none'; form-action 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://jfyprwisnrubhhowipdm.functions.supabase.co">
   <title>Режим малыша — админка</title>
   <style>
     :root {
@@ -147,6 +147,11 @@
     button.danger { background:#b42318; }
     button.ghost { background:#fff; color:var(--text); border:1px solid var(--line); }
     .ops-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+    .promo-card { margin-bottom:16px; }
+    .promo-card textarea { min-height:250px; line-height:1.5; background:#f8fafc; }
+    .promo-card .promo-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+    .promo-card .promo-actions button { min-height:44px; }
+    .promo-card .promo-actions .muted { flex:1; min-width:220px; }
     .table-search { height:32px; width:min(240px, 100%); }
 
     .grid {
@@ -341,6 +346,17 @@
       <div class="action-result" id="partnerResult">Партнёрские ссылки появятся после создания.</div>
     </section>
 
+    <section class="card promo-card" data-admin-view="partners" hidden>
+      <div class="section-title"><h2>Промо для потенциального партнёра</h2><span class="muted">готово к отправке</span></div>
+      <label for="partnerRecruitPromo">Текст приглашения</label>
+      <textarea id="partnerRecruitPromo" readonly></textarea>
+      <div class="promo-actions">
+        <button id="copyPartnerRecruitPromo" type="button">Скопировать текст</button>
+        <span class="muted">Прямая ссылка в тексте сразу открывает заявку на партнёрство.</span>
+      </div>
+      <div class="action-result" id="partnerRecruitResult" role="status" aria-live="polite">Текст готов к отправке.</div>
+    </section>
+
     <section class="grid sections">
       <div class="card" data-admin-view="overview">
         <div class="section-title">
@@ -455,6 +471,7 @@
     </section>
   </main>
 
+  <script src="promo-copy.js?v=20260822-1"></script>
   <script>
     const ADMIN_ENDPOINT = 'https://jfyprwisnrubhhowipdm.functions.supabase.co/analytics-dashboard';
     const ADMIN_ACTIONS_ENDPOINT = 'https://jfyprwisnrubhhowipdm.functions.supabase.co/admin-actions';
@@ -514,6 +531,8 @@
       supportRequests: document.getElementById('supportRequests'),
       partners: document.getElementById('partners'),
       partnerResult: document.getElementById('partnerResult'),
+      partnerRecruitPromo: document.getElementById('partnerRecruitPromo'),
+      partnerRecruitResult: document.getElementById('partnerRecruitResult'),
       notificationResult: document.getElementById('notificationResult')
     };
 
@@ -547,14 +566,28 @@
       document.getElementById('runNotifications').addEventListener('click', () => runNotificationCheck(false));
       document.getElementById('configureBot').addEventListener('click', configureBotCommands);
       document.getElementById('createPartner').addEventListener('click', createPartner);
+      document.getElementById('copyPartnerRecruitPromo').addEventListener('click', copyPartnerRecruitPromo);
       els.partners.addEventListener('click', handlePartnerClick);
       els.supportRequests.addEventListener('click', event => {
         const button = event.target.closest('[data-resolve-support]');
         if (button) resolveSupportRequest(button.dataset.resolveSupport);
       });
 
+      els.partnerRecruitPromo.value = window.BabyPromo?.buildPartnerRecruitPromo() || '';
+
       if (els.token.value) loadDashboard();
       else setStatus('Введите код доступа и нажмите “Обновить”.');
+    }
+
+    async function copyPartnerRecruitPromo() {
+      const text = els.partnerRecruitPromo.value;
+      try {
+        await navigator.clipboard.writeText(text);
+        els.partnerRecruitResult.textContent = 'Промо-текст скопирован.';
+      } catch (_) {
+        els.partnerRecruitPromo.select();
+        els.partnerRecruitResult.textContent = 'Выделили текст — скопируйте его вручную.';
+      }
     }
 
     async function loadDashboard() {

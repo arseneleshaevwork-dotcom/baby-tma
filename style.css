@@ -1017,6 +1017,12 @@ body[data-page="partner"] #fabSleepWrap { display:none; }
 .partner-link-field input { min-width:0; min-height:46px; padding:10px 11px; border:1px solid var(--border); border-radius:8px; background:#F8F9F8; color:var(--text-mid); font:650 .73rem 'Nunito',sans-serif; }
 .partner-link-field button { min-height:46px; padding:0 12px; border:1px solid var(--clr-primary); border-radius:8px; background:#fff; color:var(--clr-primary); font:800 .72rem 'Nunito',sans-serif; }
 .partner-links p { margin-top:14px; padding:12px; border-radius:8px; background:#F6F7F6; color:var(--text-mid); font-size:.7rem; line-height:1.45; font-weight:600; }
+.partner-promo-card { display:grid; gap:10px; margin-bottom:14px; }
+.partner-promo-card p { color:var(--text-mid); font-size:.72rem; line-height:1.5; font-weight:600; }
+.partner-promo-card label { color:var(--text-dark); font-size:.72rem; font-weight:800; }
+.partner-promo-card textarea { width:100%; min-height:270px; resize:vertical; padding:12px; border:1px solid var(--border); border-radius:8px; background:#F8F9F8; color:var(--text-mid); font:650 .74rem/1.5 'Nunito',sans-serif; overflow-wrap:anywhere; }
+.partner-promo-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.partner-promo-actions button { min-height:46px; margin:0; }
 .partner-balance-note { display:grid; gap:4px; margin-bottom:14px; }
 .partner-balance-note strong { color:var(--text-dark); font-size:.85rem; }
 .partner-balance-note span { color:var(--text-hint); font-size:.7rem; line-height:1.45; font-weight:600; }
@@ -1027,6 +1033,7 @@ body[data-page="partner"] #fabSleepWrap { display:none; }
   .partner-rule-grid { grid-template-columns:1fr; }
   .partner-rule-grid div { min-height:auto; }
   .partner-link-field > div { grid-template-columns:1fr; }
+  .partner-promo-actions { grid-template-columns:1fr; }
 }
 .quick-sleep-card {
   padding:13px; margin-bottom:14px; border-radius:var(--radius-md);

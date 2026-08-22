@@ -12,6 +12,7 @@ const context = {
 };
 Object.assign(window, context);
 vm.createContext(context);
+vm.runInContext(fs.readFileSync('./promo-copy.js', 'utf8'), context);
 vm.runInContext(fs.readFileSync('./partners.js', 'utf8'), context);
 
 assert.strictEqual(window.BabyPartners.normalizeCode(' SLEEP_MARIA '), 'sleep_maria');
@@ -26,6 +27,9 @@ assert.ok(html.includes('BabyPartners.open()'));
 assert.ok(html.includes('30% начисляется с подходящих подтверждённых оплат в рублях'));
 assert.ok(!html.includes('в течение 62 дней'));
 assert.ok(!fs.readFileSync('./partners.js', 'utf8').includes('автоматически на 30 дней'));
+assert.ok(fs.readFileSync('./partners.js', 'utf8').includes('id="partnerClientPromo"'));
+assert.ok(html.includes('<script src="promo-copy.js'));
 assert.ok(html.includes('<script src="partners.js'));
+assert.ok(html.includes("get('partner') === '1'"));
 
 console.log('ok - partner public page entry and validation');

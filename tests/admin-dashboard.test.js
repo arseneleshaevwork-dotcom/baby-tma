@@ -185,6 +185,9 @@ test('admin page compiles and labels mixed billing identities as clients', () =>
   assert.ok(html.includes('<th>Клиент</th>'));
   assert.ok(html.includes('function formatCustomer(item = {})'));
   assert.ok(html.includes('data-partner-status="rejected"'));
+  assert.ok(html.includes('id="partnerRecruitPromo"'));
+  assert.ok(html.includes('<script src="promo-copy.js'));
+  assert.ok(html.includes("script-src 'self' 'unsafe-inline'"));
 });
 
 function row(eventName, userId, clientId, createdAt, payload = {}, attribution = {}) {
